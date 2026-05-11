@@ -310,10 +310,15 @@ async def background_hunter():
 
 @asynccontextmanager
 async def lifespan(app):
-    task = asyncio.create_task(background_hunter())
-    log.info(f"Мисливець запущено (інтервал: {HUNT_INTERVAL}с)")
+    task = None
+    if HUNT_INTERVAL > 0:
+        task = asyncio.create_task(background_hunter())
+        log.info(f"Мисливець запущено (інтервал: {HUNT_INTERVAL}с)")
+    else:
+        log.info("Мисливець вимкнено (HUNT_INTERVAL=0)")
     yield
-    task.cancel()
+    if task:
+        task.cancel()
 
 app = FastAPI(title="Omni-Vision", version="1.2.0", lifespan=lifespan)
 
