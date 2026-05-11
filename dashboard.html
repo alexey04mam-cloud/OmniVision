@@ -95,6 +95,14 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
  </div>
 </header>
 
+<!-- TradingView Ticker Tape -->
+<div class="tradingview-widget-container" style="width:100%;border-bottom:1px solid rgba(255,255,255,.05)">
+ <div class="tradingview-widget-container__widget"></div>
+ <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+ {"symbols":[{"proName":"BINANCE:BTCUSDT","title":"BTC"},{"proName":"BINANCE:ETHUSDT","title":"ETH"},{"proName":"BINANCE:SOLUSDT","title":"SOL"},{"proName":"BINANCE:BNBUSDT","title":"BNB"},{"proName":"BINANCE:XRPUSDT","title":"XRP"},{"proName":"BINANCE:DOGEUSDT","title":"DOGE"},{"proName":"NASDAQ:NVDA","title":"NVDA"},{"proName":"NASDAQ:AAPL","title":"AAPL"},{"proName":"NASDAQ:TSLA","title":"TSLA"},{"proName":"NASDAQ:MSFT","title":"MSFT"},{"proName":"NASDAQ:AMZN","title":"AMZN"},{"proName":"NASDAQ:META","title":"META"},{"proName":"TVC:GOLD","title":"Gold"},{"proName":"TVC:SILVER","title":"Silver"},{"proName":"NYMEX:CL1!","title":"Oil"},{"proName":"NYMEX:NG1!","title":"Gas"},{"proName":"SP:SPX","title":"S&P500"},{"proName":"NASDAQ:QQQ","title":"QQQ"}],"showSymbolLogo":true,"isTransparent":true,"displayMode":"adaptive","colorTheme":"dark","locale":"ru"}
+ </script>
+</div>
+
 <main class="max-w-7xl mx-auto px-6 py-8">
  <!-- Greeting -->
  <div class="mb-8">
@@ -187,6 +195,34 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 
  <!-- ═══════ CRYPTO TAB ═══════ -->
  <div id="panel-crypto" class="tab-panel hidden">
+  <!-- Live Crypto Chart -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <div class="flex items-center justify-between mb-3">
+    <h2 class="text-white font-semibold">Крипто-графік (live)</h2>
+    <div class="flex gap-2">
+     <button onclick="setCryptoChart('BTCUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-emerald-400 hover:bg-white/10 transition font-semibold">BTC</button>
+     <button onclick="setCryptoChart('ETHUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-blue-400 hover:bg-white/10 transition">ETH</button>
+     <button onclick="setCryptoChart('SOLUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-400 hover:bg-white/10 transition">SOL</button>
+     <button onclick="setCryptoChart('BNBUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-400 hover:bg-white/10 transition">BNB</button>
+     <button onclick="setCryptoChart('XRPUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 transition">XRP</button>
+     <button onclick="setCryptoChart('DOGEUSDT')" class="crypto-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-300 hover:bg-white/10 transition">DOGE</button>
+    </div>
+   </div>
+   <div id="cryptoChartContainer" style="height:480px;border-radius:12px;overflow:hidden"></div>
+  </div>
+
+  <!-- Crypto Market Overview -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <h3 class="text-sm text-white font-semibold mb-3">Огляд крипторинку</h3>
+   <div class="tradingview-widget-container" style="height:400px">
+    <div class="tradingview-widget-container__widget"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+    {"dataSource":"Crypto","blockSize":"market_cap_calc","blockColor":"change","locale":"ru","symbolUrl":"","colorTheme":"dark","hasTopBar":false,"isDataSet498Enabled":false,"isZoomEnabled":true,"hasSymbolTooltip":true,"isMonoSize":false,"width":"100%","height":"100%"}
+    </script>
+   </div>
+  </div>
+
+  <!-- Token Lookup -->
   <div class="card p-6">
    <h2 class="text-white font-semibold mb-1">Перевірка токена</h2>
    <p class="text-xs text-gray-600 mb-4">Введіть контрактний адрес для отримання даних з DexScreener</p>
@@ -204,6 +240,35 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 
  <!-- ═══════ STOCKS TAB ═══════ -->
  <div id="panel-stocks" class="tab-panel hidden">
+  <!-- Live Stocks Chart -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <div class="flex items-center justify-between mb-3">
+    <h2 class="text-white font-semibold">Графік акцій (live)</h2>
+    <div class="flex gap-2 flex-wrap">
+     <button onclick="setStockChart('NVDA')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-emerald-400 hover:bg-white/10 transition font-semibold">NVDA</button>
+     <button onclick="setStockChart('AAPL')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-blue-400 hover:bg-white/10 transition">AAPL</button>
+     <button onclick="setStockChart('TSLA')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-red-400 hover:bg-white/10 transition">TSLA</button>
+     <button onclick="setStockChart('MSFT')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-cyan-400 hover:bg-white/10 transition">MSFT</button>
+     <button onclick="setStockChart('AMZN')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-400 hover:bg-white/10 transition">AMZN</button>
+     <button onclick="setStockChart('META')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-blue-300 hover:bg-white/10 transition">META</button>
+     <button onclick="setStockChart('GOOGL')" class="stock-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-purple-400 hover:bg-white/10 transition">GOOGL</button>
+    </div>
+   </div>
+   <div id="stockChartContainer" style="height:480px;border-radius:12px;overflow:hidden"></div>
+  </div>
+
+  <!-- Stock Heatmap -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <h3 class="text-sm text-white font-semibold mb-3">Теплова карта S&P 500</h3>
+   <div class="tradingview-widget-container" style="height:400px">
+    <div class="tradingview-widget-container__widget"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+    {"exchanges":[],"dataSource":"SPX500","grouping":"sector","blockSize":"market_cap_basic","blockColor":"change","locale":"ru","symbolUrl":"","colorTheme":"dark","hasTopBar":false,"isDataSet498Enabled":false,"isZoomEnabled":true,"hasSymbolTooltip":true,"isMonoSize":false,"width":"100%","height":"100%"}
+    </script>
+   </div>
+  </div>
+
+  <!-- Radar -->
   <div class="card p-6">
    <div class="flex items-center justify-between mb-4">
     <div>
@@ -225,6 +290,50 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 
  <!-- ═══════ COMMODITIES TAB ═══════ -->
  <div id="panel-commodities" class="tab-panel hidden">
+  <!-- Live Commodity Chart -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <div class="flex items-center justify-between mb-3">
+    <h2 class="text-white font-semibold">Графік сировини (live)</h2>
+    <div class="flex gap-2 flex-wrap">
+     <button onclick="setCommodityChart('TVC:GOLD')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-amber-400 hover:bg-white/10 transition font-semibold">Gold</button>
+     <button onclick="setCommodityChart('TVC:SILVER')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition">Silver</button>
+     <button onclick="setCommodityChart('NYMEX:CL1!')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-emerald-400 hover:bg-white/10 transition">Oil</button>
+     <button onclick="setCommodityChart('NYMEX:NG1!')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-red-400 hover:bg-white/10 transition">Gas</button>
+     <button onclick="setCommodityChart('COMEX:HG1!')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-orange-400 hover:bg-white/10 transition">Copper</button>
+     <button onclick="setCommodityChart('NYMEX:PL1!')" class="comm-chart-btn text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-blue-300 hover:bg-white/10 transition">Platinum</button>
+    </div>
+   </div>
+   <div id="commodityChartContainer" style="height:480px;border-radius:12px;overflow:hidden"></div>
+  </div>
+
+  <!-- Mini Charts Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+   <div class="card" style="overflow:hidden;border-radius:16px">
+    <div class="tradingview-widget-container">
+     <div class="tradingview-widget-container__widget"></div>
+     <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+     {"symbol":"TVC:GOLD","width":"100%","height":"220","locale":"ru","dateRange":"1M","colorTheme":"dark","isTransparent":true,"autosize":false,"largeChartUrl":""}
+     </script>
+    </div>
+   </div>
+   <div class="card" style="overflow:hidden;border-radius:16px">
+    <div class="tradingview-widget-container">
+     <div class="tradingview-widget-container__widget"></div>
+     <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+     {"symbol":"NYMEX:CL1!","width":"100%","height":"220","locale":"ru","dateRange":"1M","colorTheme":"dark","isTransparent":true,"autosize":false,"largeChartUrl":""}
+     </script>
+    </div>
+   </div>
+   <div class="card" style="overflow:hidden;border-radius:16px">
+    <div class="tradingview-widget-container">
+     <div class="tradingview-widget-container__widget"></div>
+     <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+     {"symbol":"NYMEX:NG1!","width":"100%","height":"220","locale":"ru","dateRange":"1M","colorTheme":"dark","isTransparent":true,"autosize":false,"largeChartUrl":""}
+     </script>
+    </div>
+   </div>
+  </div>
+
   <div class="flex items-center justify-between mb-5">
    <div>
     <h2 class="text-white font-semibold">Радар копалин</h2>
@@ -240,6 +349,28 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 
  <!-- ═══════ FLOW TAB ═══════ -->
  <div id="panel-flow" class="tab-panel hidden">
+  <!-- Market Overview Widget -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <h3 class="text-sm text-white font-semibold mb-3">Огляд ринків (live)</h3>
+   <div class="tradingview-widget-container" style="height:450px">
+    <div class="tradingview-widget-container__widget"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+    {"colorTheme":"dark","dateRange":"1M","showChart":true,"locale":"ru","width":"100%","height":"100%","largeChartUrl":"","isTransparent":true,"showSymbolLogo":true,"showFloatingTooltip":true,"plotLineColorGrowing":"rgba(16,185,129,1)","plotLineColorFalling":"rgba(239,68,68,1)","gridLineColor":"rgba(255,255,255,0.05)","scaleFontColor":"rgba(120,120,120,1)","belowLineFillColorGrowing":"rgba(16,185,129,0.07)","belowLineFillColorFalling":"rgba(239,68,68,0.07)","belowLineFillColorGrowingBottom":"rgba(16,185,129,0)","belowLineFillColorFallingBottom":"rgba(239,68,68,0)","symbolActiveColor":"rgba(16,185,129,0.12)","tabs":[{"title":"Індекси","symbols":[{"s":"FOREXCOM:SPXUSD","d":"S&P 500"},{"s":"FOREXCOM:NSXUSD","d":"Nasdaq"},{"s":"FOREXCOM:DJI","d":"Dow Jones"},{"s":"INDEX:NKY","d":"Nikkei 225"},{"s":"INDEX:DEU40","d":"DAX"}]},{"title":"Ф'ючерси","symbols":[{"s":"CME_MINI:ES1!","d":"S&P 500"},{"s":"CME:NQ1!","d":"Nasdaq"},{"s":"NYMEX:CL1!","d":"Нафта WTI"},{"s":"COMEX:GC1!","d":"Золото"},{"s":"NYMEX:NG1!","d":"Газ"}]},{"title":"Крипто","symbols":[{"s":"BINANCE:BTCUSDT","d":"Bitcoin"},{"s":"BINANCE:ETHUSDT","d":"Ethereum"},{"s":"BINANCE:SOLUSDT","d":"Solana"},{"s":"BINANCE:BNBUSDT","d":"BNB"},{"s":"BINANCE:XRPUSDT","d":"XRP"}]},{"title":"Форекс","symbols":[{"s":"FX:EURUSD","d":"EUR/USD"},{"s":"FX:GBPUSD","d":"GBP/USD"},{"s":"FX:USDJPY","d":"USD/JPY"},{"s":"FX_IDC:USDCNY","d":"USD/CNY"},{"s":"FX:USDCHF","d":"USD/CHF"}]}]}
+    </script>
+   </div>
+  </div>
+
+  <!-- Economic Calendar -->
+  <div class="card p-4 mb-5" style="overflow:hidden;border-radius:16px">
+   <h3 class="text-sm text-white font-semibold mb-3">Економічний календар</h3>
+   <div class="tradingview-widget-container" style="height:350px">
+    <div class="tradingview-widget-container__widget"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+    {"colorTheme":"dark","isTransparent":true,"width":"100%","height":"100%","locale":"ru","importanceFilter":"-1,0,1","countryFilter":"us,eu,gb,jp,cn"}
+    </script>
+   </div>
+  </div>
+
   <div class="flex items-center justify-between mb-5">
    <div>
     <h2 class="text-white font-semibold">Ринкові переливи</h2>
@@ -822,6 +953,83 @@ function removeWatchlist(id){
  fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(){loadWatchlist();showToast("Видалено",true)})
 }
 
+/* ── TradingView Dynamic Charts ── */
+function createTVChart(containerId, symbol, exchange) {
+ var container = document.getElementById(containerId);
+ container.innerHTML = '';
+ var widgetDiv = document.createElement('div');
+ widgetDiv.className = 'tradingview-widget-container';
+ widgetDiv.style.height = '100%';
+ var innerDiv = document.createElement('div');
+ innerDiv.className = 'tradingview-widget-container__widget';
+ innerDiv.style.height = 'calc(100% - 32px)';
+ innerDiv.style.width = '100%';
+ widgetDiv.appendChild(innerDiv);
+ var script = document.createElement('script');
+ script.type = 'text/javascript';
+ script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+ script.async = true;
+ script.textContent = JSON.stringify({
+  "autosize": true,
+  "symbol": (exchange ? exchange + ':' : '') + symbol,
+  "interval": "15",
+  "timezone": "Etc/UTC",
+  "theme": "dark",
+  "style": "1",
+  "locale": "ru",
+  "backgroundColor": "rgba(6, 8, 13, 0)",
+  "gridColor": "rgba(255, 255, 255, 0.03)",
+  "hide_top_toolbar": false,
+  "hide_legend": false,
+  "allow_symbol_change": true,
+  "save_image": false,
+  "calendar": false,
+  "hide_volume": false,
+  "support_host": "https://www.tradingview.com",
+  "studies": ["RSI@tv-basicstudies","MASimple@tv-basicstudies"]
+ });
+ widgetDiv.appendChild(script);
+ container.appendChild(widgetDiv);
+}
+
+function setCryptoChart(pair) {
+ createTVChart('cryptoChartContainer', pair, 'BINANCE');
+ document.querySelectorAll('.crypto-chart-btn').forEach(function(b){b.classList.remove('font-semibold');b.style.borderColor='rgba(255,255,255,.1)'});
+ event.target.classList.add('font-semibold');event.target.style.borderColor='rgba(16,185,129,.5)';
+}
+
+function setStockChart(ticker) {
+ createTVChart('stockChartContainer', ticker, 'NASDAQ');
+ document.querySelectorAll('.stock-chart-btn').forEach(function(b){b.classList.remove('font-semibold');b.style.borderColor='rgba(255,255,255,.1)'});
+ event.target.classList.add('font-semibold');event.target.style.borderColor='rgba(59,130,246,.5)';
+}
+
+function setCommodityChart(symbol) {
+ createTVChart('commodityChartContainer', symbol, '');
+ document.querySelectorAll('.comm-chart-btn').forEach(function(b){b.classList.remove('font-semibold');b.style.borderColor='rgba(255,255,255,.1)'});
+ event.target.classList.add('font-semibold');event.target.style.borderColor='rgba(251,191,36,.5)';
+}
+
+/* ── Lazy-load charts on tab switch ── */
+var chartsInitialized = {crypto: false, stocks: false, commodities: false};
+var origShowTab = showTab;
+showTab = function(n) {
+ origShowTab(n);
+ if (n === 'crypto' && !chartsInitialized.crypto) {
+  chartsInitialized.crypto = true;
+  createTVChart('cryptoChartContainer', 'BTCUSDT', 'BINANCE');
+ }
+ if (n === 'stocks' && !chartsInitialized.stocks) {
+  chartsInitialized.stocks = true;
+  createTVChart('stockChartContainer', 'NVDA', 'NASDAQ');
+ }
+ if (n === 'commodities' && !chartsInitialized.commodities) {
+  chartsInitialized.commodities = true;
+  createTVChart('commodityChartContainer', 'TVC:GOLD', '');
+ }
+};
+
+/* ── Init ── */
 loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
 setInterval(function(){loadHunted();updateHunterStatus();loadAnalytics()},30000);
 </script>
