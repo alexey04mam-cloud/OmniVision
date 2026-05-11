@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omni-Vision v1.2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
+
+/* Glass & Cards */
+.glass{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);backdrop-filter:blur(20px)}
+.card{background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,rgba(255,255,255,.01) 100%);border:1px solid rgba(255,255,255,.06);border-radius:16px;transition:all .3s ease}
+.card:hover{border-color:rgba(255,255,255,.12);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+
+/* Gradient accents */
+.glow-green{box-shadow:0 0 20px rgba(16,185,129,.15)}
+.glow-blue{box-shadow:0 0 20px rgba(59,130,246,.15)}
+.glow-amber{box-shadow:0 0 20px rgba(251,191,36,.15)}
+.glow-purple{box-shadow:0 0 20px rgba(168,85,247,.15)}
+
+/* Status pulse */
+.pulse-ring{position:relative}
+.pulse-ring::before{content:'';position:absolute;inset:-4px;border-radius:50%;background:rgba(16,185,129,.3);animation:ring 2s ease-out infinite}
+@keyframes ring{0%{transform:scale(.8);opacity:1}100%{transform:scale(2);opacity:0}}
+.status-dot{width:10px;height:10px;border-radius:50%;background:#10b981;position:relative;z-index:1}
+
+/* Tabs */
+.tab-btn{position:relative;color:rgba(255,255,255,.4);transition:all .2s}
+.tab-btn:hover{color:rgba(255,255,255,.7)}
+.tab-btn.active{color:#fff}
+.tab-btn.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:linear-gradient(90deg,#10b981,#3b82f6);border-radius:1px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;padding:14px 22px;border-radius:12px;font-size:13px;z-index:50;animation:toastIn .4s cubic-bezier(.16,1,.3,1)}
+@keyframes toastIn{from{transform:translateY(20px) scale(.95);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+
+/* Category badges */
+.badge{padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.5px}
+.badge-CRYPTO{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2)}
+.badge-STOCKS{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+.badge-COMMODITIES{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.2)}
+
+/* Severity */
+.sev-HIGH{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#fca5a5}
+.sev-MEDIUM{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:#fde68a}
+.sev-LOW{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:#6ee7b7}
+
+/* Stat card gradients */
+.stat-hunted{background:linear-gradient(135deg,rgba(16,185,129,.1) 0%,rgba(6,8,13,.5) 100%)}
+.stat-assets{background:linear-gradient(135deg,rgba(59,130,246,.1) 0%,rgba(6,8,13,.5) 100%)}
+.stat-wallets{background:linear-gradient(135deg,rgba(168,85,247,.1) 0%,rgba(6,8,13,.5) 100%)}
+.stat-insights{background:linear-gradient(135deg,rgba(251,191,36,.1) 0%,rgba(6,8,13,.5) 100%)}
+
+/* Skeleton loading */
+.skeleton{background:linear-gradient(90deg,rgba(255,255,255,.03) 25%,rgba(255,255,255,.06) 50%,rgba(255,255,255,.03) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Grid item animation */
+.hunt-card{animation:fadeUp .4s ease-out both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Mini bar chart */
+.mini-bar{display:inline-block;width:3px;margin-right:1px;border-radius:1px;vertical-align:bottom;background:#10b981;opacity:.6;transition:height .3s}
+</style>
+</head>
+<body class="min-h-screen text-gray-300">
+
+<!-- HEADER -->
+<header class="sticky top-0 z-40 border-b border-white/5" style="background:rgba(6,8,13,.85);backdrop-filter:blur(16px)">
+ <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+   <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-white text-xs font-black">OV</div>
+   <span class="text-lg font-bold text-white tracking-wide">OMNI<span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-400">-VISION</span></span>
+   <span class="text-[10px] text-gray-600 hidden sm:inline">v1.2</span>
+  </div>
+  <div class="flex items-center gap-4">
+   <div class="flex items-center gap-2 text-xs">
+    <div class="pulse-ring"><div class="status-dot"></div></div>
+    <span class="text-emerald-400 font-medium" id="headerStatus">Online</span>
+   </div>
+   <div class="flex gap-1 bg-white/5 rounded-lg p-0.5">
+    <a href="/?lang=ukr" class="px-2.5 py-1 text-[11px] rounded-md hover:bg-white/10 transition">UA</a>
+    <a href="/?lang=eng" class="px-2.5 py-1 text-[11px] rounded-md hover:bg-white/10 transition">EN</a>
+    <a href="/?lang=rus" class="px-2.5 py-1 text-[11px] rounded-md hover:bg-white/10 transition">RU</a>
+   </div>
+   <a href="/profile" class="ml-2 px-3 py-1.5 text-[11px] rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition" title="Профіль">👤 {{USER}}</a>
+   <a href="/logout" class="px-3 py-1.5 text-[11px] rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition" title="Вийти">Вихід</a>
+  </div>
+ </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+ <!-- Greeting -->
+ <div class="mb-8">
+  <h1 class="text-2xl font-semibold text-white mb-1">{{GREETING}}</h1>
+  <p class="text-sm text-gray-500">{{DASHBOARD_TITLE}} &middot; <span id="hunterInfo" class="text-gray-600">Мисливець: завантаження...</span></p>
+ </div>
+
+ <!-- Stats Row -->
+ <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="card stat-hunted p-5 glow-green">
+   <div class="flex items-center justify-between mb-3">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest font-medium">{{HUNTED_LABEL}}</p>
+    <span class="text-lg">🎯</span>
+   </div>
+   <p class="text-3xl font-bold text-emerald-400" id="statHunted">{{HUNTED_COUNT}}</p>
+   <p class="text-[11px] text-gray-600 mt-1">Авто-захоплення</p>
+  </div>
+  <div class="card stat-assets p-5 glow-blue">
+   <div class="flex items-center justify-between mb-3">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest font-medium">{{ASSETS_LABEL}}</p>
+    <span class="text-lg">📊</span>
+   </div>
+   <p class="text-3xl font-bold text-blue-400">{{ASSET_COUNT}}</p>
+   <p class="text-[11px] text-gray-600 mt-1">В базі даних</p>
+  </div>
+  <div class="card stat-wallets p-5 glow-purple">
+   <div class="flex items-center justify-between mb-3">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest font-medium">{{WALLETS_LABEL}}</p>
+    <span class="text-lg">💎</span>
+   </div>
+   <p class="text-3xl font-bold text-purple-400">{{WALLET_COUNT}}</p>
+   <p class="text-[11px] text-gray-600 mt-1">Відстежується</p>
+  </div>
+  <div class="card stat-insights p-5 glow-amber">
+   <div class="flex items-center justify-between mb-3">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest font-medium">{{PORTFOLIO_LABEL}}</p>
+    <span class="text-lg">💰</span>
+   </div>
+   <p class="text-3xl font-bold text-amber-400" id="statPortfolio">{{PORTFOLIO_COUNT}}</p>
+   <p class="text-[11px] text-gray-600 mt-1">Відкритих позицій</p>
+  </div>
+ </div>
+
+ <!-- Tabs -->
+ <div class="flex gap-1 mb-6 border-b border-white/5 overflow-x-auto pb-px">
+  <button onclick="showTab('hunted')" id="tab-hunted" class="tab-btn active px-5 py-3 text-sm font-medium whitespace-nowrap">🎯 Вполювано</button>
+  <button onclick="showTab('crypto')" id="tab-crypto" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">₿ Крипто</button>
+  <button onclick="showTab('stocks')" id="tab-stocks" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">📈 Акції</button>
+  <button onclick="showTab('commodities')" id="tab-commodities" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">⛏️ Копалини</button>
+  <button onclick="showTab('flow')" id="tab-flow" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">🌊 Переливи</button>
+  <button onclick="showTab('analytics')" id="tab-analytics" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">📊 Аналітика</button>
+  <button onclick="showTab('advisor')" id="tab-advisor" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">🧠 Радник</button>
+  <button onclick="showTab('watchlist')" id="tab-watchlist" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">👁 Watchlist</button>
+  <button onclick="showTab('wallets')" id="tab-wallets" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">💎 Гаманці</button>
+ </div>
+
+ <!-- ═══════ HUNTED TAB ═══════ -->
+ <div id="panel-hunted" class="tab-panel">
+  <div class="flex items-center justify-between mb-4">
+   <div>
+    <h2 class="text-white font-semibold">Вполювані активи</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Автоматичне захоплення: об'єм > $100k/год</p>
+   </div>
+   <button onclick="loadHunted()" class="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20">⟳ Оновити</button>
+  </div>
+  <!-- Filters -->
+  <div class="card p-4 mb-5">
+   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <input id="huntSearch" type="text" placeholder="🔍 Пошук по назві..." oninput="applyHuntFilters()"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition lg:col-span-2">
+    <select id="huntCatFilter" onchange="applyHuntFilters()"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="">Всі категорії</option><option value="CRYPTO">Крипто</option><option value="STOCKS">Акції</option><option value="COMMODITIES">Копалини</option>
+    </select>
+    <select id="huntSortBy" onchange="applyHuntFilters()"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="date">За датою</option><option value="change_desc">Зміна ↓</option><option value="change_asc">Зміна ↑</option><option value="price_desc">Ціна ↓</option><option value="price_asc">Ціна ↑</option><option value="name">За назвою</option>
+    </select>
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+     <span id="huntResultCount">0</span> <span>знайдено</span>
+    </div>
+   </div>
+  </div>
+  <div id="huntedList">
+   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="card p-5 skeleton h-40"></div><div class="card p-5 skeleton h-40"></div><div class="card p-5 skeleton h-40"></div>
+   </div>
+  </div>
+ </div>
+
+ <!-- ═══════ CRYPTO TAB ═══════ -->
+ <div id="panel-crypto" class="tab-panel hidden">
+  <div class="card p-6">
+   <h2 class="text-white font-semibold mb-1">Перевірка токена</h2>
+   <p class="text-xs text-gray-600 mb-4">Введіть контрактний адрес для отримання даних з DexScreener</p>
+   <div class="flex gap-3 mb-4">
+    <input id="tokenAddr" type="text" placeholder="0x..."
+     class="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition">
+    <button onclick="lookupToken()" id="lookupBtn"
+     class="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-sm font-semibold px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20">Перевірити</button>
+   </div>
+   <div id="tokenResult" class="hidden">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="tokenCards"></div>
+   </div>
+  </div>
+ </div>
+
+ <!-- ═══════ STOCKS TAB ═══════ -->
+ <div id="panel-stocks" class="tab-panel hidden">
+  <div class="card p-6">
+   <div class="flex items-center justify-between mb-4">
+    <div>
+     <h2 class="text-white font-semibold">Радар акцій</h2>
+     <p class="text-xs text-gray-600 mt-0.5">S&P 500 Core — 100 тікерів з RVOL аналізом</p>
+    </div>
+    <button onclick="scanStocks()" id="scanStocksBtn"
+     class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/20">Сканувати</button>
+   </div>
+   <div class="flex gap-3 mb-4">
+    <input id="stockTicker" type="text" placeholder="Тікер (NVDA, TSLA, AAPL...)"
+     class="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition">
+    <button onclick="lookupStock()" id="lookupStockBtn"
+     class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm px-5 py-3 rounded-xl transition">Шукати</button>
+   </div>
+   <div id="stocksTable"><p class="text-gray-600 text-sm text-center py-8">Натисніть «Сканувати» для аналізу ринку</p></div>
+  </div>
+ </div>
+
+ <!-- ═══════ COMMODITIES TAB ═══════ -->
+ <div id="panel-commodities" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">Радар копалин</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Золото, нафта, газ, метали, сільськогосподарські товари</p>
+   </div>
+   <button onclick="scanCommodities()" id="scanCommBtn"
+    class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20">Сканувати</button>
+  </div>
+  <div id="commoditiesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   <p class="text-gray-600 text-sm text-center py-8 col-span-4">Натисніть «Сканувати» для отримання котирувань</p>
+  </div>
+ </div>
+
+ <!-- ═══════ FLOW TAB ═══════ -->
+ <div id="panel-flow" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">Ринкові переливи</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Аналіз міжринкових потоків капіталу (5 правил)</p>
+   </div>
+   <button onclick="detectFlow()" id="flowBtn"
+    class="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-purple-500/20">Аналізувати</button>
+  </div>
+  <div id="flowAlerts"><p class="text-gray-600 text-sm text-center py-8">Натисніть «Аналізувати» для детекції переливів</p></div>
+ </div>
+
+ <!-- ═══════ ANALYTICS TAB ═══════ -->
+ <div id="panel-analytics" class="tab-panel hidden">
+  <!-- Portfolio Summary -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+   <div class="card p-5">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Інвестовано</p>
+    <p class="text-2xl font-bold text-white" id="totalInvested">$0</p>
+   </div>
+   <div class="card p-5">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Поточна вартість</p>
+    <p class="text-2xl font-bold text-white" id="totalCurrent">$0</p>
+   </div>
+   <div class="card p-5">
+    <p class="text-[11px] text-gray-500 uppercase tracking-widest mb-2">Нереалізований P&L</p>
+    <p class="text-2xl font-bold" id="totalPnl">$0</p>
+   </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+   <div class="card p-5">
+    <h3 class="text-sm text-white font-semibold mb-3">Історія вполювань</h3>
+    <canvas id="huntChart" height="200"></canvas>
+   </div>
+   <div class="card p-5">
+    <h3 class="text-sm text-white font-semibold mb-3">Розподіл по категоріях</h3>
+    <canvas id="categoryChart" height="200"></canvas>
+   </div>
+  </div>
+
+  <!-- Portfolio Table -->
+  <div class="card p-6 mb-6">
+   <div class="flex items-center justify-between mb-4">
+    <div>
+     <h2 class="text-white font-semibold">Портфель позицій</h2>
+     <p class="text-xs text-gray-600 mt-0.5">Трекер P&L — додайте позиції для відстеження прибутку</p>
+    </div>
+    <div class="flex gap-2">
+     <button onclick="loadPortfolio('open')" class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs px-3 py-2 rounded-lg transition">Відкриті</button>
+     <button onclick="loadPortfolio('closed')" class="bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400 text-xs px-3 py-2 rounded-lg transition">Закриті</button>
+    </div>
+   </div>
+   <div id="portfolioTable"><p class="text-gray-600 text-sm text-center py-6">Завантаження...</p></div>
+  </div>
+
+  <!-- Add Position Form -->
+  <div class="card p-6 mb-6">
+   <h2 class="text-white font-semibold mb-1">Додати позицію</h2>
+   <p class="text-xs text-gray-600 mb-4">Введіть дані купівлі</p>
+   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <input id="posSymbol" type="text" placeholder="Символ (NVDA, BTC...)"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <input id="posBuyPrice" type="number" step="0.000001" placeholder="Ціна купівлі"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <input id="posQty" type="number" step="0.01" placeholder="Кількість" value="1"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <select id="posCat" class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="CRYPTO">Крипто</option><option value="STOCKS">Акції</option><option value="COMMODITIES">Копалини</option>
+    </select>
+   </div>
+   <div class="flex gap-3">
+    <button onclick="addPosition()" id="addPosBtn"
+     class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-sm font-semibold px-6 py-3 rounded-xl transition-all shadow-lg shadow-amber-500/20">+ Додати позицію</button>
+    <a href="/api/export/hunted" class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm px-5 py-3 rounded-xl transition inline-flex items-center gap-2">📥 CSV Вполювання</a>
+    <a href="/api/export/portfolio" class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm px-5 py-3 rounded-xl transition inline-flex items-center gap-2">📥 CSV Портфель</a>
+   </div>
+  </div>
+
+  <!-- Top Movers -->
+  <div class="card p-6">
+   <h2 class="text-white font-semibold mb-4">Топ-5 рухів</h2>
+   <div id="topMovers"><p class="text-gray-600 text-sm text-center py-4">Завантаження...</p></div>
+  </div>
+ </div>
+
+ <!-- ═══════ ADVISOR TAB ═══════ -->
+ <div id="panel-advisor" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">AI Радник</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Персональні рекомендації на основі вашого портфелю та ринку</p>
+   </div>
+   <button onclick="loadAdvisor()" class="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-purple-500/20">🧠 Аналізувати</button>
+  </div>
+  <div id="advisorContent">
+   <div class="card p-8 text-center"><p class="text-gray-500 text-sm">Натисніть "Аналізувати" для отримання порад</p></div>
+  </div>
+ </div>
+
+ <!-- ═══════ WATCHLIST TAB ═══════ -->
+ <div id="panel-watchlist" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">Watchlist</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Спостерігайте за активами та отримуйте алерти</p>
+   </div>
+   <button onclick="loadWatchlist()" class="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">⟳ Оновити</button>
+  </div>
+  <div class="card p-4 mb-5">
+   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <input id="wlSymbol" type="text" placeholder="Символ (BTC, NVDA...)"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <select id="wlCat" class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="CRYPTO">Крипто</option><option value="STOCKS">Акції</option><option value="COMMODITIES">Копалини</option>
+    </select>
+    <input id="wlTarget" type="number" step="0.0001" placeholder="Цільова ціна"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <select id="wlDir" class="bg-white/5 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="above">Вище ціни ↑</option><option value="below">Нижче ціни ↓</option>
+    </select>
+    <button onclick="addWatchlistItem()" class="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all hover:shadow-lg">+ Додати</button>
+   </div>
+  </div>
+  <div id="watchlistContent"></div>
+ </div>
+
+ <!-- ═══════ WALLETS TAB ═══════ -->
+ <div id="panel-wallets" class="tab-panel hidden">
+  <div class="card p-6 mb-6">
+   <h2 class="text-white font-semibold mb-1">Додати гаманець</h2>
+   <p class="text-xs text-gray-600 mb-4">Додайте гаманець для відстеження</p>
+   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+    <input id="walletAddr" type="text" placeholder="Адреса гаманця / токена"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition">
+    <input id="walletLabel" type="text" placeholder="Мітка (напр. Investor #1)"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none transition">
+    <select id="walletChain"
+     class="bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-gray-400 focus:outline-none transition appearance-none">
+     <option value="ethereum">Ethereum</option><option value="bsc">BSC</option>
+     <option value="solana">Solana</option><option value="arbitrum">Arbitrum</option>
+     <option value="base">Base</option><option value="polygon">Polygon</option>
+    </select>
+   </div>
+   <button onclick="addWallet()" id="addBtn"
+    class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-sm font-medium px-6 py-3 rounded-xl transition w-full sm:w-auto">+ Додати гаманець</button>
+  </div>
+  <div class="card overflow-hidden">
+   <table class="w-full text-sm">
+    <thead><tr class="border-b border-white/5 text-[11px] text-gray-500 uppercase tracking-wider">
+     <th class="px-5 py-3.5 text-left">Адреса</th><th class="px-5 py-3.5 text-left">Мітка</th>
+     <th class="px-5 py-3.5 text-left">Мережа</th><th class="px-5 py-3.5 text-left">Актив</th>
+     <th class="px-5 py-3.5 text-right">Ціна</th>
+    </tr></thead>
+    <tbody id="walletTable"><tr><td colspan="5" class="px-5 py-8 text-center text-gray-600">Завантаження...</td></tr></tbody>
+   </table>
+  </div>
+ </div>
+</main>
+
+<footer class="text-center text-gray-800 text-[11px] py-8 border-t border-white/[.03]">
+ Omni-Vision &copy; {{YEAR}} &middot; Autonomous Global Market Radar
+</footer>
+<div id="toastBox"></div>
+
+<!-- Price Chart Modal -->
+<div id="chartModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeChartModal()">
+ <div style="background:rgba(15,20,35,.95);border:1px solid rgba(0,224,255,.2);border-radius:20px;padding:28px;width:90%;max-width:700px;position:relative">
+  <button onclick="closeChartModal()" style="position:absolute;right:16px;top:16px;background:none;border:none;color:rgba(255,255,255,.4);font-size:24px;cursor:pointer">&times;</button>
+  <h3 id="chartTitle" style="color:#fff;font-size:18px;font-weight:700;margin-bottom:4px"></h3>
+  <p id="chartSub" style="color:rgba(255,255,255,.4);font-size:12px;margin-bottom:16px"></p>
+  <canvas id="priceChartCanvas" height="250"></canvas>
+ </div>
+</div>
+
+<script>
+/* ── Helpers ── */
+function showTab(n){
+ document.querySelectorAll(".tab-panel").forEach(function(p){p.classList.add("hidden")});
+ document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});
+ document.getElementById("panel-"+n).classList.remove("hidden");
+ document.getElementById("tab-"+n).classList.add("active");
+}
+function showToast(m,ok){
+ var e=document.createElement("div");
+ e.className="toast "+(ok?"bg-emerald-950/90 text-emerald-300 border border-emerald-800/50":"bg-red-950/90 text-red-300 border border-red-800/50");
+ e.innerHTML=(ok?"✓ ":"✗ ")+m;
+ document.getElementById("toastBox").appendChild(e);
+ setTimeout(function(){e.style.opacity="0";e.style.transform="translateY(10px)";e.style.transition="all .3s";setTimeout(function(){e.remove()},300)},3500);
+}
+function chC(v){return v>=0?"text-emerald-400":"text-red-400"}
+function chIcon(v){return v>=0?"▲":"▼"}
+function chS(v){return(v>=0?"+":"")+v.toFixed(2)+"%"}
+function fmtVol(v){if(!v)return"—";if(v>=1e9)return"$"+(v/1e9).toFixed(1)+"B";if(v>=1e6)return"$"+(v/1e6).toFixed(1)+"M";if(v>=1e3)return"$"+(v/1e3).toFixed(0)+"K";return"$"+v.toFixed(0)}
+function fmtPrice(p){if(!p)return"—";p=parseFloat(p);if(p>=100)return"$"+p.toFixed(2);if(p>=1)return"$"+p.toFixed(4);return"$"+p.toFixed(6)}
+
+/* ── Hunted ── */
+var allHuntedItems=[];
+function loadHunted(){
+ fetch("/api/hunted").then(function(r){return r.json()}).then(function(items){
+  allHuntedItems=items||[];
+  document.getElementById("statHunted").textContent=allHuntedItems.length;
+  applyHuntFilters();
+ }).catch(function(e){console.error(e)})
+}
+function applyHuntFilters(){
+ var search=(document.getElementById("huntSearch").value||"").toLowerCase();
+ var cat=document.getElementById("huntCatFilter").value;
+ var sort=document.getElementById("huntSortBy").value;
+ var filtered=allHuntedItems.filter(function(a){
+  if(cat&&a.category!==cat) return false;
+  if(search&&(a.symbol||"").toLowerCase().indexOf(search)===-1&&(a.name||"").toLowerCase().indexOf(search)===-1) return false;
+  return true;
+ });
+ if(sort==="change_desc") filtered.sort(function(a,b){return(b.change_pct||0)-(a.change_pct||0)});
+ else if(sort==="change_asc") filtered.sort(function(a,b){return(a.change_pct||0)-(b.change_pct||0)});
+ else if(sort==="price_desc") filtered.sort(function(a,b){return(b.price_usd||0)-(a.price_usd||0)});
+ else if(sort==="price_asc") filtered.sort(function(a,b){return(a.price_usd||0)-(b.price_usd||0)});
+ else if(sort==="name") filtered.sort(function(a,b){return(a.symbol||"").localeCompare(b.symbol||"")});
+ document.getElementById("huntResultCount").textContent=filtered.length;
+ renderHunted(filtered);
+}
+function renderHunted(items){
+ var el=document.getElementById("huntedList");
+ if(!items||items.length===0){el.innerHTML='<div class="card p-8 text-center"><p class="text-gray-500 text-sm">Нічого не знайдено</p><p class="text-gray-700 text-xs mt-1">Спробуйте змінити фільтри</p></div>';return}
+ var html='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
+ for(var i=0;i<items.length;i++){
+  var a=items[i],ch=a.change_pct||0;
+  var delay=Math.min(i*0.05,0.5);
+  html+='<div class="card p-5 hunt-card cursor-pointer" style="animation-delay:'+delay+'s" onclick="openChart(\''+a.symbol+'\',\''+a.category+'\')">'
+   +'<div class="flex items-center justify-between mb-3">'
+   +'<div class="flex items-center gap-2"><span class="text-white font-bold text-lg">'+a.symbol+'</span></div>'
+   +'<span class="badge badge-'+a.category+'">'+a.category+'</span></div>'
+   +'<p class="text-xs text-gray-500 mb-3 truncate">'+(a.name||"")+(a.chain?' <span class="text-gray-700">· '+a.chain+'</span>':'')+'</p>'
+   +'<div class="flex items-end justify-between mb-3">'
+   +'<span class="text-2xl font-bold text-white">'+fmtPrice(a.price_usd)+'</span>'
+   +'<span class="text-sm font-semibold '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
+   +'<div class="flex items-center justify-between pt-3 border-t border-white/5">'
+   +'<span class="text-[11px] text-gray-600">Об\'єм/год: <span class="text-gray-400">'+fmtVol(a.volume_1h)+'</span></span></div>'
+   +(a.capture_reason?'<p class="text-[11px] text-emerald-600/80 mt-2 truncate">'+a.capture_reason+'</p>':'')
+   +'</div>';
+ }
+ html+='</div>';el.innerHTML=html;
+}
+
+/* ── Crypto ── */
+function lookupToken(){
+ var addr=document.getElementById("tokenAddr").value.trim();if(!addr)return;
+ var btn=document.getElementById("lookupBtn");btn.textContent="Шукаю...";btn.disabled=true;
+ fetch("/api/radar/crypto?token_address="+encodeURIComponent(addr)).then(function(r){return r.json()}).then(function(d){
+  var box=document.getElementById("tokenResult"),cards=document.getElementById("tokenCards");box.classList.remove("hidden");
+  if(d.found){var ch=parseFloat(d.change_24h||0);
+   cards.innerHTML='<div class="card p-4"><p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Назва</p><p class="text-white font-semibold">'+d.name+'</p><p class="text-emerald-400 text-xs">'+d.symbol+'</p></div>'
+   +'<div class="card p-4"><p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Ціна</p><p class="text-white font-semibold text-lg">'+fmtPrice(d.price_usd)+'</p></div>'
+   +'<div class="card p-4"><p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Зміна 24г</p><p class="text-lg font-semibold '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</p></div>'
+   +'<div class="card p-4"><p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Мережа</p><p class="text-white">'+d.chain+'</p><p class="text-gray-500 text-xs">'+d.dex+'</p></div>'}
+  else{cards.innerHTML='<div class="col-span-4 card p-4 text-red-400 text-sm">'+(d.error||"Токен не знайдено")+"</div>"}
+  btn.textContent="Перевірити";btn.disabled=false;
+ }).catch(function(e){showToast(e.message,false);btn.textContent="Перевірити";btn.disabled=false})}
+
+/* ── Stocks ── */
+function renderStocks(stocks){
+ var el=document.getElementById("stocksTable");if(!stocks||!stocks.length){el.innerHTML='<p class="text-gray-600 text-sm text-center py-8">Немає даних</p>';return}
+ var h='<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-white/5 text-[11px] text-gray-500 uppercase tracking-wider">'
+  +'<th class="px-4 py-3 text-left">Тікер</th><th class="px-4 py-3 text-left">Назва</th>'
+  +'<th class="px-4 py-3 text-right">Ціна</th><th class="px-4 py-3 text-right">Зміна</th>'
+  +'<th class="px-4 py-3 text-center">RVOL</th><th class="px-4 py-3 text-center">Сплеск</th></tr></thead><tbody>';
+ for(var i=0;i<stocks.length;i++){var s=stocks[i];if(!s.found)continue;var ch=s.change_pct||0;
+  h+='<tr class="border-b border-white/[.03] hover:bg-white/[0.02] transition">'
+  +'<td class="px-4 py-3"><span class="text-blue-400 font-bold">'+s.symbol+'</span></td>'
+  +'<td class="px-4 py-3 text-gray-400 text-xs max-w-[150px] truncate">'+(s.name||"")+'</td>'
+  +'<td class="px-4 py-3 text-right text-white font-medium">$'+(s.price_usd?s.price_usd.toFixed(2):"—")+'</td>'
+  +'<td class="px-4 py-3 text-right font-semibold '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</td>'
+  +'<td class="px-4 py-3 text-center text-gray-500 text-xs">'+(s.rvol?s.rvol+"x":"—")+'</td>'
+  +'<td class="px-4 py-3 text-center">'+(s.volume_spike?'<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>':"—")+"</td></tr>"}
+ h+="</tbody></table></div>";el.innerHTML=h}
+
+function scanStocks(){var b=document.getElementById("scanStocksBtn");b.textContent="Сканую...";b.disabled=true;
+ fetch("/api/radar/stocks").then(function(r){return r.json()}).then(function(d){renderStocks(d.stocks);b.textContent="Сканувати";b.disabled=false;showToast("Відскановано "+d.total_scanned+" акцій",true)}).catch(function(e){showToast(e.message,false);b.textContent="Сканувати";b.disabled=false})}
+function lookupStock(){var t=document.getElementById("stockTicker").value.trim().toUpperCase();if(!t)return;var b=document.getElementById("lookupStockBtn");b.textContent="...";b.disabled=true;
+ fetch("/api/radar/stocks/"+encodeURIComponent(t)).then(function(r){return r.json()}).then(function(d){renderStocks([d]);b.textContent="Шукати";b.disabled=false}).catch(function(e){showToast(e.message,false);b.textContent="Шукати";b.disabled=false})}
+
+/* ── Commodities ── */
+function scanCommodities(){var b=document.getElementById("scanCommBtn");b.textContent="Сканую...";b.disabled=true;
+ fetch("/api/radar/commodities").then(function(r){return r.json()}).then(function(d){
+ var g=document.getElementById("commoditiesGrid"),h="",items=d.commodities||[];
+ for(var i=0;i<items.length;i++){var c=items[i];if(!c.found)continue;var ch=c.change_pct||0,wch=c.week_change_pct||0;
+  var icon=c.symbol.includes("GC")?"🥇":c.symbol.includes("SI")?"🥈":c.symbol.includes("CL")||c.symbol.includes("BZ")?"🛢️":c.symbol.includes("NG")?"🔥":c.symbol.includes("HG")?"🔶":c.symbol.includes("PL")?"⬜":c.symbol.includes("ZW")?"🌾":c.symbol.includes("ZC")?"🌽":c.symbol.includes("ZS")?"🫘":"📦";
+  h+='<div class="card p-5"><div class="flex items-center justify-between mb-3"><span class="text-2xl">'+icon+'</span><span class="text-[10px] text-gray-600 font-mono">'+c.symbol+'</span></div>'
+  +'<p class="text-white font-semibold mb-1">'+c.name+'</p>'
+  +'<p class="text-2xl font-bold text-white mb-3">$'+c.price_usd.toFixed(2)+'</p>'
+  +'<div class="flex gap-4 text-xs"><div><span class="text-gray-600">День</span><p class="font-semibold '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</p></div>'
+  +'<div><span class="text-gray-600">Тиждень</span><p class="font-semibold '+chC(wch)+'">'+chIcon(wch)+' '+chS(wch)+'</p></div></div></div>'}
+ g.innerHTML=h||'<p class="text-gray-600 text-sm text-center py-8 col-span-4">Немає даних</p>';
+ b.textContent="Сканувати";b.disabled=false;showToast("Завантажено "+items.length+" інструментів",true)}).catch(function(e){showToast(e.message,false);b.textContent="Сканувати";b.disabled=false})}
+
+/* ── Flow ── */
+function detectFlow(){var b=document.getElementById("flowBtn");b.textContent="Аналізую...";b.disabled=true;
+ fetch("/api/radar/flow").then(function(r){return r.json()}).then(function(d){
+ var el=document.getElementById("flowAlerts"),alerts=d.flow_alerts||[],h="";
+ for(var i=0;i<alerts.length;i++){var a=alerts[i];
+  var icon=a.type==="MARKET_OVERFLOW"?"🌊":a.type==="FEAR_ROTATION"?"😨":a.type==="INFLATION_SIGNAL"?"📈":a.type==="MASS_VOLUME_SPIKE"?"💥":a.type==="EUPHORIA_WARNING"?"🎪":"✅";
+  h+='<div class="card p-5 mb-3 sev-'+a.severity+'">'
+  +'<div class="flex items-center gap-3 mb-2"><span class="text-xl">'+icon+'</span>'
+  +'<span class="badge bg-white/5 border-white/10 text-white">'+a.type+'</span>'
+  +'<span class="text-[11px] font-semibold uppercase">'+a.severity+'</span></div>'
+  +'<p class="text-sm leading-relaxed">'+a.message+'</p></div>'}
+ el.innerHTML=h;b.textContent="Аналізувати";b.disabled=false;showToast("Аналіз завершено: "+alerts.length+" сигналів",true)}).catch(function(e){showToast(e.message,false);b.textContent="Аналізувати";b.disabled=false})}
+
+/* ── Wallets ── */
+function addWallet(){
+ var addr=document.getElementById("walletAddr").value.trim(),lbl=document.getElementById("walletLabel").value.trim(),ch=document.getElementById("walletChain").value;
+ if(!addr){showToast("Введіть адресу гаманця",false);return}
+ var b=document.getElementById("addBtn");b.textContent="Додаю...";b.disabled=true;
+ fetch("/add_wallet",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({address:addr,label:lbl||null,blockchain:ch})})
+ .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+ .then(function(res){if(res.ok){showToast("Гаманець додано: "+(res.data.wallet.asset||addr.slice(0,10)+"..."),true);document.getElementById("walletAddr").value="";document.getElementById("walletLabel").value="";loadWallets()}else{showToast(res.data.detail||"Помилка",false)}b.textContent="+ Додати гаманець";b.disabled=false})
+ .catch(function(e){showToast(e.message,false);b.textContent="+ Додати гаманець";b.disabled=false})}
+
+function loadWallets(){fetch("/api/wallets").then(function(r){return r.json()}).then(function(ws){
+ var tb=document.getElementById("walletTable");
+ if(!ws.length){tb.innerHTML='<tr><td colspan="5" class="px-5 py-8 text-center text-gray-600">Гаманців поки немає</td></tr>';return}
+ var h="";for(var i=0;i<ws.length;i++){var w=ws[i];
+  h+='<tr class="border-b border-white/[.03] hover:bg-white/[0.02] transition">'
+  +'<td class="px-5 py-3.5"><span class="text-emerald-400 font-mono text-xs">'+w.address+'</span></td>'
+  +'<td class="px-5 py-3.5 text-white">'+(w.label||"—")+'</td>'
+  +'<td class="px-5 py-3.5"><span class="badge badge-CRYPTO">'+w.blockchain+'</span></td>'
+  +'<td class="px-5 py-3.5 text-gray-400">'+(w.asset||"—")+'</td>'
+  +'<td class="px-5 py-3.5 text-right text-white font-medium">'+(w.last_price?"$"+w.last_price.toFixed(6):"—")+"</td></tr>"}
+ tb.innerHTML=h}).catch(function(e){console.error(e)})}
+
+/* ── Hunter Status ── */
+function updateHunterStatus(){fetch("/api/status").then(function(r){return r.json()}).then(function(d){
+ var h=d.hunter||{},el=document.getElementById("hunterInfo"),hdr=document.getElementById("headerStatus");
+ if(h.last_run){
+  var time=h.last_run.slice(11,19);
+  el.textContent="Мисливець: "+time+" UTC · вполювано: "+h.last_count;
+  el.classList.add("text-emerald-500");el.classList.remove("text-gray-600");
+  hdr.textContent="Hunter: "+h.last_count+" assets";}
+}).catch(function(){})}
+
+/* ── Analytics ── */
+var huntChartInstance=null,catChartInstance=null;
+
+function loadAnalytics(){
+ fetch("/api/portfolio/summary").then(function(r){return r.json()}).then(function(d){
+  document.getElementById("totalInvested").textContent="$"+d.total_invested.toLocaleString();
+  document.getElementById("totalCurrent").textContent="$"+d.total_current.toLocaleString();
+  var pnlEl=document.getElementById("totalPnl");
+  pnlEl.textContent=(d.unrealized_pnl>=0?"+":"")+d.unrealized_pnl.toLocaleString()+" ("+d.unrealized_pnl_pct+"%)";
+  pnlEl.className="text-2xl font-bold "+(d.unrealized_pnl>=0?"text-emerald-400":"text-red-400");
+  document.getElementById("statPortfolio").textContent=d.open_count;
+ }).catch(function(){});
+
+ fetch("/api/hunt_history?limit=20").then(function(r){return r.json()}).then(function(items){
+  items.reverse();
+  var labels=[],data1=[],data2=[];
+  for(var i=0;i<items.length;i++){
+   labels.push(items[i].scanned_at?items[i].scanned_at.slice(11,16):"");
+   data1.push(items[i].crypto_count||0);
+   data2.push(items[i].stocks_count||0);
+  }
+  if(huntChartInstance)huntChartInstance.destroy();
+  var ctx=document.getElementById("huntChart").getContext("2d");
+  huntChartInstance=new Chart(ctx,{type:"bar",data:{labels:labels,datasets:[
+   {label:"Крипто",data:data1,backgroundColor:"rgba(16,185,129,.6)",borderRadius:4},
+   {label:"Акції",data:data2,backgroundColor:"rgba(59,130,246,.6)",borderRadius:4}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#9ca3af",font:{size:11}}}},scales:{
+   x:{ticks:{color:"#6b7280",font:{size:10}},grid:{color:"rgba(255,255,255,.03)"}},
+   y:{ticks:{color:"#6b7280"},grid:{color:"rgba(255,255,255,.05)"}}}}});
+ }).catch(function(){});
+
+ fetch("/api/analytics").then(function(r){return r.json()}).then(function(d){
+  var cats=d.by_category||{};
+  if(catChartInstance)catChartInstance.destroy();
+  var ctx2=document.getElementById("categoryChart").getContext("2d");
+  catChartInstance=new Chart(ctx2,{type:"doughnut",data:{labels:["Крипто","Акції","Копалини"],datasets:[{
+   data:[cats.CRYPTO||0,cats.STOCKS||0,cats.COMMODITIES||0],
+   backgroundColor:["rgba(16,185,129,.7)","rgba(59,130,246,.7)","rgba(251,191,36,.7)"],
+   borderWidth:0,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:"65%",
+   plugins:{legend:{position:"bottom",labels:{color:"#9ca3af",font:{size:11},padding:16}}}}});
+
+  var mv=d.top_movers||[],mh="";
+  if(mv.length===0){mh='<p class="text-gray-600 text-sm">Немає даних</p>'}
+  else{mh='<div class="grid grid-cols-1 sm:grid-cols-5 gap-3">';
+   for(var i=0;i<mv.length;i++){var m=mv[i];var ch=m.change_pct||0;
+    mh+='<div class="bg-white/5 rounded-xl p-4 text-center"><p class="font-bold text-white">'+m.symbol+'</p><span class="badge badge-'+m.category+' text-[10px]">'+m.category+'</span><p class="text-lg font-bold mt-2 '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</p><p class="text-xs text-gray-500">'+fmtPrice(m.price_usd)+'</p></div>'}
+   mh+='</div>'}
+  document.getElementById("topMovers").innerHTML=mh;
+ }).catch(function(){});
+}
+
+function loadPortfolio(status){
+ status=status||"open";
+ fetch("/api/portfolio?status="+status).then(function(r){return r.json()}).then(function(items){
+  var el=document.getElementById("portfolioTable");
+  if(!items.length){el.innerHTML='<p class="text-gray-600 text-sm text-center py-6">Позицій немає</p>';return}
+  var h='<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-white/5 text-[11px] text-gray-500 uppercase tracking-wider">'
+   +'<th class="px-4 py-3 text-left">Символ</th><th class="px-4 py-3 text-right">Ціна входу</th>'
+   +'<th class="px-4 py-3 text-right">К-сть</th><th class="px-4 py-3 text-right">Поточна</th>'
+   +'<th class="px-4 py-3 text-right">P&L $</th><th class="px-4 py-3 text-right">P&L %</th>'
+   +'<th class="px-4 py-3 text-center">Статус</th></tr></thead><tbody>';
+  for(var i=0;i<items.length;i++){var p=items[i];var pnl=p.pnl_pct||0;
+   h+='<tr class="border-b border-white/[.03] hover:bg-white/[0.02] transition">'
+   +'<td class="px-4 py-3"><span class="font-bold text-white">'+p.symbol+'</span><span class="badge badge-'+p.category+' ml-2 text-[10px]">'+p.category+'</span></td>'
+   +'<td class="px-4 py-3 text-right text-gray-400">'+fmtPrice(p.buy_price)+'</td>'
+   +'<td class="px-4 py-3 text-right text-gray-400">'+p.quantity+'</td>'
+   +'<td class="px-4 py-3 text-right text-white">'+fmtPrice(p.current_price)+'</td>'
+   +'<td class="px-4 py-3 text-right font-semibold '+chC(p.pnl_usd||0)+'">'+(p.pnl_usd>=0?"+":"")+(p.pnl_usd||0).toFixed(2)+'</td>'
+   +'<td class="px-4 py-3 text-right font-semibold '+chC(pnl)+'">'+chIcon(pnl)+' '+chS(pnl)+'</td>'
+   +'<td class="px-4 py-3 text-center"><span class="badge '+(p.status==="open"?"badge-CRYPTO":"badge-STOCKS")+'">'+p.status+'</span></td></tr>'}
+  h+="</tbody></table></div>";el.innerHTML=h;
+ }).catch(function(e){console.error(e)})
+}
+
+function addPosition(){
+ var sym=document.getElementById("posSymbol").value.trim();
+ var bp=parseFloat(document.getElementById("posBuyPrice").value);
+ var qty=parseFloat(document.getElementById("posQty").value)||1;
+ var cat=document.getElementById("posCat").value;
+ if(!sym||!bp){showToast("Заповніть символ і ціну",false);return}
+ var b=document.getElementById("addPosBtn");b.textContent="Додаю...";b.disabled=true;
+ fetch("/api/portfolio",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({symbol:sym,category:cat,buy_price:bp,quantity:qty})})
+ .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+ .then(function(res){
+  if(res.ok){showToast("Позицію "+res.data.position.symbol+" додано",true);document.getElementById("posSymbol").value="";document.getElementById("posBuyPrice").value="";loadPortfolio();loadAnalytics()}
+  else{showToast(res.data.detail||"Помилка",false)}
+  b.textContent="+ Додати позицію";b.disabled=false})
+ .catch(function(e){showToast(e.message,false);b.textContent="+ Додати позицію";b.disabled=false})
+}
+
+/* ── Init ── */
+/* ── Advisor ── */
+function loadAdvisor(){
+ var el=document.getElementById("advisorContent");
+ el.innerHTML='<div class="card p-8 text-center"><div class="text-2xl mb-2">🧠</div><p class="text-gray-400 text-sm">Аналізую ваш портфель та ринок...</p></div>';
+ fetch("/api/advisor").then(function(r){return r.json()}).then(function(d){
+  if(d.error){el.innerHTML='<div class="card p-8 text-center text-red-400">'+d.error+'</div>';return}
+  var html='';
+  // Health score
+  var scoreColor=d.health_score>=70?'#10b981':d.health_score>=40?'#f59e0b':'#ef4444';
+  var scoreLabel=d.health_score>=70?'Добре':d.health_score>=40?'Середньо':'Потребує уваги';
+  html+='<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">';
+  html+='<div class="card p-6 text-center" style="border-color:'+scoreColor+'30">'
+   +'<div style="font-size:48px;font-weight:800;color:'+scoreColor+'">'+d.health_score+'</div>'
+   +'<div class="text-xs text-gray-500 mt-1">Здоров\'я портфелю</div>'
+   +'<div style="font-size:12px;color:'+scoreColor+';margin-top:4px;font-weight:600">'+scoreLabel+'</div></div>';
+  html+='<div class="card p-6 text-center">'
+   +'<div style="font-size:28px;margin-bottom:4px">'+(d.risk_profile==="conservative"?"🛡️":d.risk_profile==="aggressive"?"🚀":"⚖️")+'</div>'
+   +'<div class="text-white font-semibold text-sm">'+d.risk_label+'</div>'
+   +'<div class="text-xs text-gray-600 mt-1">Ваш стиль</div>'
+   +'<a href="/profile" class="text-[10px] text-cyan-400 hover:underline">Змінити →</a></div>';
+  var pp=d.portfolio||{};
+  var ppnl=pp.pnl_pct||0;
+  html+='<div class="card p-6 text-center">'
+   +'<div class="text-2xl font-bold text-white">'+fmtPrice(pp.total_current||0)+'</div>'
+   +'<div class="text-xs text-gray-500 mt-1">Вартість портфелю</div>'
+   +'<div class="text-sm font-semibold mt-1 '+chC(ppnl)+'">'+chIcon(ppnl)+' '+chS(ppnl)+'</div></div>';
+  html+='</div>';
+
+  // Alerts
+  if(d.alerts&&d.alerts.length>0){
+   html+='<div class="mb-5">';
+   for(var i=0;i<d.alerts.length;i++){
+    var a=d.alerts[i];
+    var ac=a.type==='danger'?'border-red-500/30 bg-red-500/5 text-red-400':a.type==='warning'?'border-amber-500/30 bg-amber-500/5 text-amber-400':'border-blue-500/30 bg-blue-500/5 text-blue-400';
+    var ai=a.type==='danger'?'🚨':a.type==='warning'?'⚠️':'ℹ️';
+    html+='<div class="card p-4 mb-2 border '+ac+'"><span>'+ai+' '+a.msg+'</span></div>';
+   }
+   html+='</div>';
+  }
+
+  // Sell/Hold recommendations
+  if(d.sell_hold&&d.sell_hold.length>0){
+   html+='<h3 class="text-white font-semibold mb-3">Ваші позиції</h3>';
+   html+='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">';
+   for(var i=0;i<d.sell_hold.length;i++){
+    var r=d.sell_hold[i];
+    var actionColor=r.action==='SELL'?'from-red-600 to-red-500':'from-emerald-600 to-emerald-500';
+    var actionBg=r.action==='SELL'?'bg-red-500/10 border-red-500/20':'bg-emerald-500/10 border-emerald-500/20';
+    html+='<div class="card p-4 '+actionBg+'">'
+     +'<div class="flex items-center justify-between mb-2">'
+     +'<span class="text-white font-bold">'+r.symbol+'</span>'
+     +'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r '+actionColor+' text-white">'+r.action+'</span></div>'
+     +'<p class="text-xs text-gray-400">'+r.reason+'</p>'
+     +'<div class="text-xs text-gray-600 mt-2">'+fmtPrice(r.current_price)+'</div></div>';
+   }
+   html+='</div>';
+  }
+
+  // Buy opportunities
+  if(d.buy_opportunities&&d.buy_opportunities.length>0){
+   html+='<h3 class="text-white font-semibold mb-3">Можливості для покупки</h3>';
+   html+='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">';
+   for(var i=0;i<d.buy_opportunities.length;i++){
+    var b=d.buy_opportunities[i];
+    var urg=b.urgency==='high'?'border-emerald-400/30 glow-green':'';
+    html+='<div class="card p-4 bg-emerald-500/5 border-emerald-500/15 '+urg+'">'
+     +'<div class="flex items-center justify-between mb-2">'
+     +'<span class="text-white font-bold">'+b.symbol+'</span>'
+     +'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-600 to-cyan-500 text-white">BUY</span></div>'
+     +'<span class="badge badge-'+b.category+' text-[10px] mb-2 inline-block">'+b.category+'</span>'
+     +'<p class="text-xs text-gray-400">'+b.reason+'</p>'
+     +'<div class="flex justify-between mt-2 text-xs"><span class="text-gray-600">'+fmtPrice(b.price)+'</span>'
+     +'<span class="'+chC(b.change_pct||0)+'">'+chS(b.change_pct||0)+'</span></div></div>';
+   }
+   html+='</div>';
+  }
+
+  // Disclaimer
+  html+='<div class="card p-4 text-center border-amber-500/10"><p class="text-[11px] text-gray-600">⚠️ '+(d.disclaimer||'Це не фінансова порада.')+'</p></div>';
+  el.innerHTML=html;
+ }).catch(function(e){el.innerHTML='<div class="card p-8 text-center text-red-400">Помилка: '+e.message+'</div>'})
+}
+
+/* ── Price Chart Modal ── */
+var priceChart=null;
+function openChart(symbol,category){
+ document.getElementById("chartModal").style.display="flex";
+ document.getElementById("chartTitle").textContent=symbol;
+ document.getElementById("chartSub").textContent=category+" · Історія цін";
+ var ctx=document.getElementById("priceChartCanvas").getContext("2d");
+ if(priceChart) priceChart.destroy();
+ fetch("/api/price_history/"+encodeURIComponent(symbol)+"?category="+category).then(function(r){return r.json()}).then(function(data){
+  if(!data||data.length===0){
+   priceChart=new Chart(ctx,{type:"line",data:{labels:["Немає даних"],datasets:[{data:[0],borderColor:"#666"}]},options:{plugins:{legend:{display:false}}}});
+   return;
+  }
+  var labels=data.map(function(d){var t=new Date(d.time);return t.getHours()+":"+String(t.getMinutes()).padStart(2,"0")});
+  var prices=data.map(function(d){return d.price});
+  var color=prices[prices.length-1]>=prices[0]?"#10b981":"#ef4444";
+  priceChart=new Chart(ctx,{type:"line",data:{labels:labels,datasets:[{label:"Ціна ($)",data:prices,borderColor:color,backgroundColor:color+"20",fill:true,tension:.3,pointRadius:1,borderWidth:2}]},
+   options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#555",maxTicksLimit:8},grid:{color:"#ffffff08"}},y:{ticks:{color:"#555"},grid:{color:"#ffffff08"}}}}});
+ })
+}
+function closeChartModal(){document.getElementById("chartModal").style.display="none";if(priceChart){priceChart.destroy();priceChart=null}}
+
+/* ── Watchlist ── */
+function loadWatchlist(){
+ fetch("/api/watchlist").then(function(r){return r.json()}).then(function(items){
+  var el=document.getElementById("watchlistContent");
+  if(!items||items.length===0){el.innerHTML='<div class="card p-8 text-center"><p class="text-gray-500 text-sm">Watchlist порожній</p><p class="text-gray-700 text-xs mt-1">Додайте активи для спостереження</p></div>';return}
+  var html='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
+  for(var i=0;i<items.length;i++){
+   var w=items[i],ch=w.change_pct||0;
+   var triggered=w.triggered?'border-emerald-400/40 glow-green':'';
+   var trigIcon=w.triggered?'<span class="text-emerald-400 text-xs font-bold ml-2">✓ ДОСЯГНУТО</span>':'';
+   html+='<div class="card p-5 '+triggered+' cursor-pointer" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')">'
+    +'<div class="flex items-center justify-between mb-2">'
+    +'<span class="text-white font-bold text-lg">'+w.symbol+'</span>'
+    +'<div class="flex items-center gap-2"><span class="badge badge-'+w.category+' text-[10px]">'+w.category+'</span>'
+    +'<button onclick="event.stopPropagation();removeWatchlist('+w.id+')" class="text-red-500/50 hover:text-red-400 text-sm">✕</button></div></div>'
+    +'<div class="flex items-end justify-between mb-2">'
+    +'<span class="text-xl font-bold text-white">'+fmtPrice(w.current_price)+'</span>'
+    +'<span class="text-sm '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>';
+   if(w.target_price){
+    html+='<div class="text-xs text-gray-500">Ціль: <span class="text-amber-400 font-semibold">'+fmtPrice(w.target_price)+'</span> '+(w.direction==='above'?'↑':'↓')+trigIcon+'</div>';
+   }
+   if(w.note) html+='<p class="text-[11px] text-gray-600 mt-1">'+w.note+'</p>';
+   html+='</div>';
+  }
+  html+='</div>';el.innerHTML=html;
+ })
+}
+function addWatchlistItem(){
+ var sym=document.getElementById("wlSymbol").value.trim();
+ var cat=document.getElementById("wlCat").value;
+ var tp=parseFloat(document.getElementById("wlTarget").value)||null;
+ var dir=document.getElementById("wlDir").value;
+ if(!sym){showToast("Введіть символ",false);return}
+ fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({symbol:sym,category:cat,target_price:tp,direction:dir})})
+ .then(function(r){return r.json()}).then(function(d){
+  if(d.status==="added"){showToast(sym+" додано в Watchlist",true);document.getElementById("wlSymbol").value="";document.getElementById("wlTarget").value="";loadWatchlist()}
+  else showToast(d.detail||"Помилка",false)
+ }).catch(function(e){showToast(e.message,false)})
+}
+function removeWatchlist(id){
+ fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(){loadWatchlist();showToast("Видалено",true)})
+}
+
+loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
+setInterval(function(){loadHunted();updateHunterStatus();loadAnalytics()},30000);
+</script>
+</body>
+</html>

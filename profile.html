@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omni-Vision — Профіль</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+    min-height:100vh;
+    background:#0a0e17;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    color:#fff;
+}
+body::before{
+    content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+    background:radial-gradient(ellipse at 30% 20%,rgba(0,224,255,.06) 0%,transparent 50%),
+               radial-gradient(ellipse at 70% 80%,rgba(0,255,136,.04) 0%,transparent 50%);
+    z-index:0;
+}
+.container{
+    position:relative;z-index:1;
+    max-width:600px;margin:0 auto;padding:40px 20px;
+}
+.back-link{
+    display:inline-flex;align-items:center;gap:6px;
+    color:#00e0ff;text-decoration:none;font-size:14px;
+    margin-bottom:24px;
+}
+.back-link:hover{text-decoration:underline}
+
+.profile-card{
+    background:rgba(15,20,35,.85);
+    border:1px solid rgba(0,224,255,.15);
+    border-radius:20px;padding:36px;
+    backdrop-filter:blur(20px);
+    box-shadow:0 0 40px rgba(0,224,255,.04);
+    margin-bottom:24px;
+}
+.profile-header{
+    display:flex;align-items:center;gap:20px;margin-bottom:28px;
+    padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.06);
+}
+.avatar{
+    width:72px;height:72px;border-radius:50%;
+    background:linear-gradient(135deg,#00e0ff,#00ff88);
+    display:flex;align-items:center;justify-content:center;
+    font-size:28px;font-weight:800;color:#0a0e17;
+    flex-shrink:0;
+}
+.user-info h2{font-size:22px;font-weight:700;margin-bottom:4px}
+.user-info p{color:rgba(255,255,255,.4);font-size:13px}
+
+.stats{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+    margin-bottom:28px;
+}
+.stat-box{
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+    border-radius:12px;padding:16px;text-align:center;
+}
+.stat-box .val{font-size:24px;font-weight:700;color:#00e0ff}
+.stat-box .lbl{font-size:11px;color:rgba(255,255,255,.4);margin-top:4px}
+
+.section-title{
+    font-size:15px;font-weight:600;margin-bottom:16px;
+    padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.form-group{margin-bottom:14px}
+.form-group label{
+    display:block;color:rgba(255,255,255,.5);font-size:12px;
+    margin-bottom:5px;font-weight:500;
+}
+.form-group input{
+    width:100%;padding:11px 14px;
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:10px;color:#fff;font-size:14px;
+    transition:all .3s;outline:none;
+}
+.form-group input:focus{
+    border-color:#00e0ff;
+    box-shadow:0 0 15px rgba(0,224,255,.12);
+}
+.form-group input:disabled{
+    opacity:.5;cursor:not-allowed;
+}
+.form-group input::placeholder{color:rgba(255,255,255,.2)}
+
+.btn{
+    padding:11px 24px;border:none;border-radius:10px;
+    font-size:14px;font-weight:600;cursor:pointer;transition:all .3s;
+}
+.btn-primary{
+    background:linear-gradient(135deg,#00e0ff,#00ff88);
+    color:#0a0e17;
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,224,255,.25)}
+
+.alert{
+    padding:10px 14px;border-radius:10px;font-size:13px;
+    margin-bottom:16px;display:none;
+}
+.alert.show{display:block}
+.alert-error{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:#ff6b6b}
+.alert-success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#10b981}
+</style>
+</head>
+<body>
+<div class="container">
+    <a href="/" class="back-link">← Назад до дашборду</a>
+
+    <div class="profile-card">
+        <div class="profile-header">
+            <div class="avatar" id="avatarEl"></div>
+            <div class="user-info">
+                <h2>{{USERNAME}}</h2>
+                <p>{{EMAIL}} · з {{CREATED}}</p>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="val">{{WALLET_COUNT}}</div>
+                <div class="lbl">Гаманців</div>
+            </div>
+            <div class="stat-box">
+                <div class="val">{{POS_COUNT}}</div>
+                <div class="lbl">Позицій</div>
+            </div>
+            <div class="stat-box">
+                <div class="val">v0.9</div>
+                <div class="lbl">Версія</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-card">
+        <div class="section-title">Стиль інвестування</div>
+        <p style="color:rgba(255,255,255,.4);font-size:12px;margin-bottom:14px">Впливає на рекомендації AI Радника</p>
+        <form method="POST" action="/profile/risk" style="display:flex;gap:10px;flex-wrap:wrap">
+            <label style="flex:1;min-width:120px;cursor:pointer">
+                <input type="radio" name="risk_profile" value="conservative" style="display:none" onchange="this.form.submit()">
+                <div class="risk-opt" id="risk-conservative" style="padding:14px;border-radius:12px;text-align:center;border:2px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);transition:all .3s">
+                    <div style="font-size:24px;margin-bottom:6px">🛡️</div>
+                    <div style="font-size:13px;font-weight:600;color:#fff">Консервативний</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Менший ризик</div>
+                </div>
+            </label>
+            <label style="flex:1;min-width:120px;cursor:pointer">
+                <input type="radio" name="risk_profile" value="balanced" style="display:none" onchange="this.form.submit()">
+                <div class="risk-opt" id="risk-balanced" style="padding:14px;border-radius:12px;text-align:center;border:2px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);transition:all .3s">
+                    <div style="font-size:24px;margin-bottom:6px">⚖️</div>
+                    <div style="font-size:13px;font-weight:600;color:#fff">Збалансований</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Оптимальний</div>
+                </div>
+            </label>
+            <label style="flex:1;min-width:120px;cursor:pointer">
+                <input type="radio" name="risk_profile" value="aggressive" style="display:none" onchange="this.form.submit()">
+                <div class="risk-opt" id="risk-aggressive" style="padding:14px;border-radius:12px;text-align:center;border:2px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);transition:all .3s">
+                    <div style="font-size:24px;margin-bottom:6px">🚀</div>
+                    <div style="font-size:13px;font-weight:600;color:#fff">Агресивний</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">Макс. прибуток</div>
+                </div>
+            </label>
+        </form>
+    </div>
+
+    <div class="profile-card">
+        <div class="section-title">Змінити пароль</div>
+
+        <div class="alert alert-error" id="errorMsg"></div>
+        <div class="alert alert-success" id="successMsg"></div>
+
+        <form method="POST" action="/profile/password">
+            <div class="form-group">
+                <label>Поточний пароль</label>
+                <input type="password" name="old_password" placeholder="Введіть поточний пароль" required>
+            </div>
+            <div class="form-group">
+                <label>Новий пароль</label>
+                <input type="password" name="new_password" placeholder="Мінімум 6 символів" required minlength="6">
+            </div>
+            <div class="form-group">
+                <label>Підтвердіть новий пароль</label>
+                <input type="password" name="new_password2" placeholder="Повторіть новий пароль" required minlength="6">
+            </div>
+            <button type="submit" class="btn btn-primary">Змінити пароль</button>
+        </form>
+    </div>
+
+    <div class="profile-card" style="text-align:center">
+        <a href="/logout" style="color:#ff6b6b;text-decoration:none;font-size:14px;font-weight:600">Вийти з акаунту</a>
+    </div>
+</div>
+
+<script>
+// Avatar initials
+var name="{{USERNAME}}";
+document.getElementById("avatarEl").textContent=(name[0]||"?").toUpperCase();
+
+// Highlight active risk profile
+var currentRisk="{{RISK_PROFILE}}";
+var riskEl=document.getElementById("risk-"+currentRisk);
+if(riskEl){riskEl.style.borderColor="#00e0ff";riskEl.style.background="rgba(0,224,255,.08)";riskEl.style.boxShadow="0 0 20px rgba(0,224,255,.15)"}
+
+// Messages
+var errors={
+    'mismatch':'Нові паролі не співпадають',
+    'short':'Пароль занадто короткий (мін. 6 символів)',
+    'wrong_old':'Поточний пароль невірний',
+    'bad_risk':'Невірний стиль інвестування'
+};
+var successes={'password':'Пароль успішно змінено!','risk':'Стиль інвестування оновлено!'};
+var params=new URLSearchParams(location.search);
+var err=params.get('error');
+var suc=params.get('success');
+if(err && errors[err]){
+    var el=document.getElementById('errorMsg');
+    el.textContent=errors[err]; el.classList.add('show');
+}
+if(suc && successes[suc]){
+    var el=document.getElementById('successMsg');
+    el.textContent=successes[suc]; el.classList.add('show');
+}
+</script>
+</body>
+</html>
