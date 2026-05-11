@@ -964,18 +964,22 @@ function loadTVScript(callback) {
 }
 function createTVChart(containerId, symbol, exchange) {
  var fullSymbol = (exchange ? exchange + ':' : '') + symbol;
+ var container = document.getElementById(containerId);
+ var w = container.offsetWidth || 800;
+ var h = container.offsetHeight || 480;
  loadTVScript(function() {
-  document.getElementById(containerId).innerHTML = '';
+  container.innerHTML = '';
   new TradingView.widget({
    container_id: containerId,
-   autosize: true,
+   width: w,
+   height: h,
    symbol: fullSymbol,
    interval: '15',
    timezone: 'Etc/UTC',
    theme: 'dark',
    style: '1',
    locale: 'ru',
-   toolbar_bg: 'rgba(6,8,13,0)',
+   toolbar_bg: '#06080d',
    enable_publishing: false,
    allow_symbol_change: true,
    save_image: false,
