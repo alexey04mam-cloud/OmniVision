@@ -953,40 +953,41 @@ function removeWatchlist(id){
  fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(){loadWatchlist();showToast("Видалено",true)})
 }
 
-/* ── TradingView Dynamic Charts (tv.js constructor) ── */
-var tvScriptLoaded = false;
-function loadTVScript(callback) {
- if (tvScriptLoaded) { callback(); return; }
- var s = document.createElement('script');
- s.src = 'https://s3.tradingview.com/tv.js';
- s.onload = function() { tvScriptLoaded = true; callback(); };
- document.head.appendChild(s);
-}
+/* ── TradingView Dynamic Charts (srcdoc iframe) ── */
 function createTVChart(containerId, symbol, exchange) {
  var fullSymbol = (exchange ? exchange + ':' : '') + symbol;
  var container = document.getElementById(containerId);
- var w = container.offsetWidth || 800;
- var h = container.offsetHeight || 480;
- loadTVScript(function() {
-  container.innerHTML = '';
-  new TradingView.widget({
-   container_id: containerId,
-   width: w,
-   height: h,
-   symbol: fullSymbol,
-   interval: '15',
-   timezone: 'Etc/UTC',
-   theme: 'dark',
-   style: '1',
-   locale: 'ru',
-   toolbar_bg: '#06080d',
-   enable_publishing: false,
-   allow_symbol_change: true,
-   save_image: false,
-   hide_volume: false,
-   studies: ['RSI@tv-basicstudies','MASimple@tv-basicstudies']
-  });
- });
+ container.innerHTML = '';
+ var iframe = document.createElement('iframe');
+ iframe.style.cssText = 'width:100%;height:100%;border:none;border-radius:12px';
+ iframe.setAttribute('frameborder', '0');
+ iframe.setAttribute('allowtransparency', 'true');
+ var html = '<!DOCTYPE html><html><head><style>body{margin:0;overflow:hidden;background:transparent}</style></head><body>'
+  + '<div class="tradingview-widget-container" style="width:100%;height:100%">'
+  + '<div class="tradingview-widget-container__widget" style="width:100%;height:100%"></div>'
+  + '<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">'
+  + JSON.stringify({
+     autosize: true,
+     symbol: fullSymbol,
+     interval: "15",
+     timezone: "Etc/UTC",
+     theme: "dark",
+     style: "1",
+     locale: "ru",
+     backgroundColor: "rgba(6,8,13,1)",
+     gridColor: "rgba(255,255,255,0.03)",
+     hide_top_toolbar: false,
+     hide_legend: false,
+     allow_symbol_change: true,
+     save_image: false,
+     calendar: false,
+     hide_volume: false,
+     support_host: "https://www.tradingview.com",
+     studies: ["RSI@tv-basicstudies","MASimple@tv-basicstudies"]
+    })
+  + '<\/script></div></body></html>';
+ iframe.srcdoc = html;
+ container.appendChild(iframe);
 }
 
 function setCryptoChart(pair) {
