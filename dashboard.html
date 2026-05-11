@@ -953,41 +953,29 @@ function removeWatchlist(id){
  fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(){loadWatchlist();showToast("Видалено",true)})
 }
 
-/* ── TradingView Dynamic Charts (srcdoc iframe) ── */
+/* ── TradingView Dynamic Charts (symbol-overview, proven working) ── */
 function createTVChart(containerId, symbol, exchange) {
  var fullSymbol = (exchange ? exchange + ':' : '') + symbol;
  var container = document.getElementById(containerId);
- container.innerHTML = '';
- var iframe = document.createElement('iframe');
- iframe.style.cssText = 'width:100%;height:100%;border:none;border-radius:12px';
- iframe.setAttribute('frameborder', '0');
- iframe.setAttribute('allowtransparency', 'true');
- var html = '<!DOCTYPE html><html><head><style>body{margin:0;overflow:hidden;background:transparent}</style></head><body>'
-  + '<div class="tradingview-widget-container" style="width:100%;height:100%">'
-  + '<div class="tradingview-widget-container__widget" style="width:100%;height:100%"></div>'
-  + '<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">'
-  + JSON.stringify({
-     autosize: true,
-     symbol: fullSymbol,
-     interval: "15",
-     timezone: "Etc/UTC",
-     theme: "dark",
-     style: "1",
-     locale: "ru",
-     backgroundColor: "rgba(6,8,13,1)",
-     gridColor: "rgba(255,255,255,0.03)",
-     hide_top_toolbar: false,
-     hide_legend: false,
-     allow_symbol_change: true,
-     save_image: false,
-     calendar: false,
-     hide_volume: false,
-     support_host: "https://www.tradingview.com",
-     studies: ["RSI@tv-basicstudies","MASimple@tv-basicstudies"]
-    })
-  + '<\/script></div></body></html>';
- iframe.srcdoc = html;
- container.appendChild(iframe);
+ container.innerHTML = '<div class="tradingview-widget-container"><div class="tradingview-widget-container__widget"></div></div>';
+ var widgetContainer = container.querySelector('.tradingview-widget-container');
+ widgetContainer.style.height = '100%';
+ var script = document.createElement('script');
+ script.type = 'text/javascript';
+ script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+ script.async = true;
+ script.textContent = JSON.stringify({
+  symbol: fullSymbol,
+  width: "100%",
+  height: "100%",
+  locale: "ru",
+  dateRange: "1M",
+  colorTheme: "dark",
+  isTransparent: true,
+  autosize: true,
+  largeChartUrl: "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(fullSymbol)
+ });
+ widgetContainer.appendChild(script);
 }
 
 function setCryptoChart(pair) {
