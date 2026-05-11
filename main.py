@@ -248,6 +248,7 @@ class PortfolioClose(BaseModel):
 hunt_status = {"running": False, "last_run": None, "last_count": 0, "errors": []}
 
 async def background_hunter():
+    await asyncio.sleep(30)  # delay first scan to pass healthcheck
     while True:
         try:
             hunt_status["running"] = True
