@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 log = logging.getLogger("omni-pro")
 
 
-def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal):
+def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal, WatchlistItem=None):
     """Register all pro feature endpoints on the FastAPI app."""
     from fastapi import Depends, Request
     from sqlalchemy.orm import Session
@@ -254,4 +254,384 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
         allocations.sort(key=lambda x: x["value_usd"], reverse=True)
         return {"allocations": allocations, "total_value": round(total_val, 2)}
 
-    log.info("Pro features registered: 8 modules active")
+    # ──── 9. Ticker Tape (own data) ────
+    @app.get("/api/ticker")
+    def api_ticker(db: Session = Depends(get_db)):
+        assets = db.query(MarketAsset).filter(
+            MarketAsset.price_usd != None
+        ).order_by(MarketAsset.volume_1h.desc().nullslast()).limit(30).all()
+        result = []
+        for a in assets:
+            result.append({
+                "symbol": a.symbol, "name": a.name,
+                "price": a.price_usd, "change": a.change_pct or 0,
+                "category": a.category
+            })
+        return result
+
+    # ──── 10. Chart data (OHLC-style) ────
+    @app.get("/api/chart/{symbol}")
+    def api_chart(symbol: str, period: str = "1d", db: Session = Depends(get_db)):
+        limit_map = {"1h": 12, "4h": 48, "1d": 96, "1w": 168, "1m": 720}
+        limit = limit_map.get(period, 96)
+        prices = db.query(PriceHistory).filter(
+            PriceHistory.symbol.contains(symbol.upper())
+        ).order_by(PriceHistory.recorded_at.desc()).limit(limit).all()
+        prices.reverse()
+        data = []
+        for p in prices:
+            if p.price_usd:
+                data.append({
+                    "time": p.recorded_at.isoformat() if p.recorded_at else None,
+                    "price": p.price_usd
+                })
+        # Compute basic indicators
+        if len(data) >= 14:
+            # Simple MA-14
+            for i in range(13, len(data)):
+                avg = sum(d["price"] for d in data[i-13:i+1]) / 14
+                data[i]["ma14"] = round(avg, 6)
+            # RSI-14
+            for i in range(14, len(data)):
+                gains, losses = 0, 0
+                for j in range(i-13, i+1):
+                    diff = data[j]["price"] - data[j-1]["price"]
+                    if diff > 0: gains += diff
+                    else: losses -= diff
+                avg_gain = gains / 14
+                avg_loss = losses / 14
+                if avg_loss == 0:
+                    data[i]["rsi"] = 100
+                else:
+                    rs = avg_gain / avg_loss
+                    data[i]["rsi"] = round(100 - (100 / (1 + rs)), 1)
+        current = data[-1]["price"] if data else 0
+        prev = data[0]["price"] if data else 0
+        change_pct = ((current - prev) / prev * 100) if prev else 0
+        return {
+            "symbol": symbol.upper(), "period": period,
+            "data": data, "current_price": current,
+            "change_pct": round(change_pct, 2),
+            "point_count": len(data)
+        }
+
+    # ──── 11. Market Heatmap Data ────
+    @app.get("/api/heatmap/{category}")
+    def api_heatmap(category: str, db: Session = Depends(get_db)):
+        assets = db.query(MarketAsset).filter(
+            MarketAsset.category == category.upper(),
+            MarketAsset.price_usd != None
+        ).order_by(MarketAsset.volume_1h.desc().nullslast()).limit(40).all()
+        result = []
+        for a in assets:
+            result.append({
+                "symbol": a.symbol, "name": a.name or a.symbol,
+                "price": a.price_usd, "change": a.change_pct or 0,
+                "volume": a.volume_1h or 0
+            })
+        return {"category": category.upper(), "assets": result}
+
+    # ──── 12. Asset Detail Page ────
+    @app.get("/api/asset/{symbol}")
+    async def api_asset_detail(symbol: str, request: Request, db: Session = Depends(get_db)):
+        """Full TradingView-style asset page: price, chart, metrics, analysis, liquidations, news."""
+        sym = symbol.upper()
+        user = get_current_user(request)
+
+        # ── Basic info from DB ──
+        asset = db.query(MarketAsset).filter(
+            MarketAsset.symbol.contains(sym)
+        ).first()
+
+        basic = {}
+        if asset:
+            basic = {
+                "symbol": asset.symbol, "name": asset.name or asset.symbol,
+                "category": asset.category, "price_usd": asset.price_usd,
+                "change_pct": asset.change_pct or 0, "volume_1h": asset.volume_1h or 0,
+                "volume_24h": asset.volume or 0, "chain": asset.chain,
+                "capture_reason": asset.capture_reason,
+                "last_updated": asset.last_updated.isoformat() if asset.last_updated else None
+            }
+        else:
+            basic = {"symbol": sym, "name": sym, "category": "CRYPTO",
+                     "price_usd": 0, "change_pct": 0, "volume_1h": 0,
+                     "volume_24h": 0, "chain": None, "capture_reason": None,
+                     "last_updated": None}
+
+        # ── Price history (chart data) ──
+        prices_raw = db.query(PriceHistory).filter(
+            PriceHistory.symbol.contains(sym)
+        ).order_by(PriceHistory.recorded_at.desc()).limit(200).all()
+        prices_raw.reverse()
+        chart_data = []
+        for p in prices_raw:
+            if p.price_usd:
+                chart_data.append({
+                    "time": p.recorded_at.isoformat() if p.recorded_at else None,
+                    "price": p.price_usd
+                })
+
+        # Indicators: MA-14, MA-50, RSI-14, Bollinger Bands
+        if len(chart_data) >= 14:
+            for i in range(13, len(chart_data)):
+                avg14 = sum(d["price"] for d in chart_data[i-13:i+1]) / 14
+                chart_data[i]["ma14"] = round(avg14, 6)
+            for i in range(14, len(chart_data)):
+                gains, losses = 0, 0
+                for j in range(i-13, i+1):
+                    diff = chart_data[j]["price"] - chart_data[j-1]["price"]
+                    if diff > 0: gains += diff
+                    else: losses -= diff
+                avg_gain = gains / 14
+                avg_loss = losses / 14
+                if avg_loss == 0:
+                    chart_data[i]["rsi"] = 100
+                else:
+                    rs = avg_gain / avg_loss
+                    chart_data[i]["rsi"] = round(100 - (100 / (1 + rs)), 1)
+        if len(chart_data) >= 50:
+            for i in range(49, len(chart_data)):
+                avg50 = sum(d["price"] for d in chart_data[i-49:i+1]) / 50
+                chart_data[i]["ma50"] = round(avg50, 6)
+        # Bollinger (20-period, 2 std dev)
+        if len(chart_data) >= 20:
+            for i in range(19, len(chart_data)):
+                window = [d["price"] for d in chart_data[i-19:i+1]]
+                ma20 = sum(window) / 20
+                std = math.sqrt(sum((x - ma20)**2 for x in window) / 20)
+                chart_data[i]["bb_upper"] = round(ma20 + 2*std, 6)
+                chart_data[i]["bb_lower"] = round(ma20 - 2*std, 6)
+                chart_data[i]["bb_mid"] = round(ma20, 6)
+        # Volume estimation per candle
+        for i, d in enumerate(chart_data):
+            if i > 0:
+                d["volume_est"] = round(abs(d["price"] - chart_data[i-1]["price"]) * 1000, 2)
+            else:
+                d["volume_est"] = 0
+
+        # ── Key metrics ──
+        current = chart_data[-1]["price"] if chart_data else (basic["price_usd"] or 0)
+        all_prices = [d["price"] for d in chart_data]
+        high_24h = max(all_prices[-96:]) if len(all_prices) >= 1 else current
+        low_24h = min(all_prices[-96:]) if len(all_prices) >= 1 else current
+        high_all = max(all_prices) if all_prices else current
+        low_all = min(all_prices) if all_prices else current
+        price_range_pct = round((high_24h - low_24h) / low_24h * 100, 2) if low_24h else 0
+        from_ath_pct = round((current - high_all) / high_all * 100, 2) if high_all else 0
+        from_atl_pct = round((current - low_all) / low_all * 100, 2) if low_all else 0
+
+        # Volatility (std of returns)
+        returns = []
+        for i in range(1, len(all_prices)):
+            if all_prices[i-1]:
+                returns.append((all_prices[i] - all_prices[i-1]) / all_prices[i-1])
+        volatility = round(math.sqrt(sum(r**2 for r in returns) / max(len(returns),1)) * 100, 2) if returns else 0
+
+        # RSI latest
+        latest_rsi = None
+        for d in reversed(chart_data):
+            if "rsi" in d:
+                latest_rsi = d["rsi"]
+                break
+
+        # Trend detection
+        if len(all_prices) >= 20:
+            recent_avg = sum(all_prices[-10:]) / 10
+            older_avg = sum(all_prices[-20:-10]) / 10
+            if recent_avg > older_avg * 1.02:
+                trend = "bullish"
+            elif recent_avg < older_avg * 0.98:
+                trend = "bearish"
+            else:
+                trend = "sideways"
+        else:
+            trend = "unknown"
+
+        metrics = {
+            "current_price": current,
+            "high_24h": high_24h, "low_24h": low_24h,
+            "high_all": high_all, "low_all": low_all,
+            "price_range_pct": price_range_pct,
+            "from_ath_pct": from_ath_pct,
+            "from_atl_pct": from_atl_pct,
+            "volatility": volatility,
+            "rsi": latest_rsi,
+            "trend": trend,
+            "data_points": len(chart_data)
+        }
+
+        # ── Liquidation levels (for this asset) ──
+        liq_levels = []
+        if current > 0:
+            for pct in [-20, -15, -10, -7, -5, -3, -2, -1, 1, 2, 3, 5, 7, 10, 15, 20]:
+                price = current * (1 + pct / 100)
+                intensity = max(10, 100 - abs(pct) * 4)
+                side = "LONG" if pct < 0 else "SHORT"
+                liq_levels.append({
+                    "price": round(price, 2), "pct": pct,
+                    "intensity": intensity, "side": side,
+                    "est_usd_m": round(intensity * 0.8, 1)
+                })
+
+        # ── Correlations with top assets ──
+        top_syms_q = db.query(
+            PriceHistory.symbol, sqlfunc.count(PriceHistory.id).label("cnt")
+        ).group_by(PriceHistory.symbol).order_by(
+            sqlfunc.count(PriceHistory.id).desc()
+        ).limit(8).all()
+        corr_symbols = [s[0] for s in top_syms_q if s[0]]
+
+        def get_returns(s, lim=50):
+            pp = [p.price_usd for p in db.query(PriceHistory).filter(
+                PriceHistory.symbol.contains(s)
+            ).order_by(PriceHistory.recorded_at.desc()).limit(lim).all() if p.price_usd]
+            if len(pp) < 5: return []
+            return [(pp[i] - pp[i+1]) / pp[i+1] for i in range(len(pp)-1)]
+
+        def pearson(x, y):
+            n = min(len(x), len(y))
+            if n < 3: return None
+            x, y = x[:n], y[:n]
+            mx, my = sum(x)/n, sum(y)/n
+            sx = math.sqrt(sum((xi-mx)**2 for xi in x)/n)
+            sy = math.sqrt(sum((yi-my)**2 for yi in y)/n)
+            if sx == 0 or sy == 0: return None
+            cov = sum((x[i]-mx)*(y[i]-my) for i in range(n))/n
+            return round(cov/(sx*sy), 3)
+
+        my_returns = get_returns(sym)
+        correlations = []
+        for cs in corr_symbols:
+            if sym in cs: continue
+            cr = get_returns(cs)
+            p = pearson(my_returns, cr)
+            if p is not None:
+                correlations.append({"symbol": cs, "correlation": p})
+        correlations.sort(key=lambda x: abs(x["correlation"]), reverse=True)
+
+        # ── AI Analysis — почему вырос/упал, стоит ли вкладывать ──
+        ch = basic["change_pct"]
+        analysis = {"verdict": "", "reasons": [], "risk_level": "", "recommendation": ""}
+
+        # Determine verdict
+        if ch > 10:
+            analysis["verdict"] = "Сильний ріст"
+            analysis["reasons"].append(f"Ціна зросла на {ch:+.1f}% — активний бичачий тренд.")
+        elif ch > 3:
+            analysis["verdict"] = "Помірний ріст"
+            analysis["reasons"].append(f"Ціна піднялась на {ch:+.1f}%. Позитивна динаміка.")
+        elif ch > -3:
+            analysis["verdict"] = "Стабільність"
+            analysis["reasons"].append(f"Ціна змінилась на {ch:+.1f}%. Ринок у фазі консолідації.")
+        elif ch > -10:
+            analysis["verdict"] = "Корекція"
+            analysis["reasons"].append(f"Ціна впала на {ch:+.1f}%. Можлива корекція після росту.")
+        else:
+            analysis["verdict"] = "Сильне падіння"
+            analysis["reasons"].append(f"Ціна впала на {ch:+.1f}%. Ведмежий тиск.")
+
+        # RSI analysis
+        if latest_rsi is not None:
+            if latest_rsi > 70:
+                analysis["reasons"].append(f"RSI = {latest_rsi} — зона перекупленості. Можливий відкат.")
+            elif latest_rsi < 30:
+                analysis["reasons"].append(f"RSI = {latest_rsi} — зона перепроданості. Потенційний вхід.")
+            else:
+                analysis["reasons"].append(f"RSI = {latest_rsi} — нейтральна зона.")
+
+        # Volatility analysis
+        if volatility > 5:
+            analysis["reasons"].append(f"Волатильність {volatility}% — високий ризик, великі рухи ціни.")
+        elif volatility > 2:
+            analysis["reasons"].append(f"Волатильність {volatility}% — помірна, нормальний рівень.")
+        else:
+            analysis["reasons"].append(f"Волатильність {volatility}% — низька, стабільний актив.")
+
+        # Trend
+        if trend == "bullish":
+            analysis["reasons"].append("Тренд: бичачий ↑. Середня ціна за 10 свічок вища за попередні 10.")
+        elif trend == "bearish":
+            analysis["reasons"].append("Тренд: ведмежий ↓. Середня ціна знижується.")
+        else:
+            analysis["reasons"].append("Тренд: боковий →. Ціна в коридорі.")
+
+        # Volume analysis
+        vol_1h = basic["volume_1h"]
+        if vol_1h > 5_000_000:
+            analysis["reasons"].append(f"Об'єм/год ${vol_1h:,.0f} — дуже високий. Інституційний інтерес.")
+        elif vol_1h > 1_000_000:
+            analysis["reasons"].append(f"Об'єм/год ${vol_1h:,.0f} — значний. Активна торгівля.")
+        elif vol_1h > 100_000:
+            analysis["reasons"].append(f"Об'єм/год ${vol_1h:,.0f} — помірний.")
+
+        # ATH/ATL distance
+        if from_ath_pct < -50:
+            analysis["reasons"].append(f"Ціна на {abs(from_ath_pct):.0f}% нижче історичного максимуму. Глибокий дисконт.")
+        elif from_ath_pct > -5:
+            analysis["reasons"].append(f"Ціна біля історичного максимуму ({from_ath_pct:+.1f}%). Обережно з входом.")
+
+        # Risk level
+        if volatility > 5 or (latest_rsi and latest_rsi > 75):
+            analysis["risk_level"] = "HIGH"
+        elif volatility > 2 or (latest_rsi and (latest_rsi > 65 or latest_rsi < 35)):
+            analysis["risk_level"] = "MEDIUM"
+        else:
+            analysis["risk_level"] = "LOW"
+
+        # Recommendation
+        if trend == "bullish" and latest_rsi and latest_rsi < 65 and volatility < 5:
+            analysis["recommendation"] = "CONSIDER_BUY"
+            analysis["rec_text"] = "Бичачий тренд при помірному RSI. Можна розглядати вхід з стоп-лосом."
+        elif latest_rsi and latest_rsi < 30:
+            analysis["recommendation"] = "OVERSOLD_OPPORTUNITY"
+            analysis["rec_text"] = "Перепроданість. Потенційна можливість для входу, але перевірте фундаментал."
+        elif latest_rsi and latest_rsi > 75:
+            analysis["recommendation"] = "OVERBOUGHT_CAUTION"
+            analysis["rec_text"] = "Перекупленість. Розгляньте фіксацію прибутку або зачекайте відкату."
+        elif trend == "bearish":
+            analysis["recommendation"] = "WAIT"
+            analysis["rec_text"] = "Ведмежий тренд. Краще зачекати підтвердження розвороту."
+        else:
+            analysis["recommendation"] = "NEUTRAL"
+            analysis["rec_text"] = "Немає чіткого сигналу. Спостерігайте за подальшим розвитком."
+
+        analysis["disclaimer"] = "⚠️ Це не фінансова порада. Завжди проводьте власне дослідження (DYOR)."
+
+        # ── Portfolio position (if user logged in) ──
+        position = None
+        in_watchlist = False
+        if user:
+            pos = db.query(Portfolio).filter(
+                Portfolio.user_id == user["uid"],
+                Portfolio.symbol == (asset.symbol if asset else sym),
+                Portfolio.status == "open"
+            ).first()
+            if pos:
+                position = {
+                    "buy_price": pos.buy_price, "quantity": pos.quantity,
+                    "current_price": pos.current_price or current,
+                    "pnl_pct": pos.pnl_pct or 0,
+                    "pnl_usd": pos.pnl_usd or 0,
+                    "opened_at": pos.opened_at.isoformat() if pos.opened_at else None
+                }
+            from sqlalchemy import and_
+            wl = db.query(WatchlistItem).filter(and_(
+                WatchlistItem.user_id == user["uid"],
+                WatchlistItem.symbol == (asset.symbol if asset else sym)
+            )).first()
+            in_watchlist = wl is not None
+
+        return {
+            "basic": basic,
+            "chart": chart_data,
+            "metrics": metrics,
+            "liquidations": liq_levels,
+            "correlations": correlations[:6],
+            "analysis": analysis,
+            "position": position,
+            "in_watchlist": in_watchlist,
+            "status": "ok"
+        }
+
+    log.info("Pro features registered: 12 modules active")

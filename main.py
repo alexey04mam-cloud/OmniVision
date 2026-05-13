@@ -339,7 +339,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ──── Pro Features ────
-pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal)
+pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal, WatchlistItem)
 
 # ──── Rate Limiter ────
 
