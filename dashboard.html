@@ -157,6 +157,11 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
   <button onclick="showTab('advisor')" id="tab-advisor" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">🧠 Радник</button>
   <button onclick="showTab('watchlist')" id="tab-watchlist" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">👁 Watchlist</button>
   <button onclick="showTab('wallets')" id="tab-wallets" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">💎 Гаманці</button>
+  <button onclick="showTab('sentiment')" id="tab-sentiment" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">🌡️ Настрій</button>
+  <button onclick="showTab('whales')" id="tab-whales" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">🐋 Кити</button>
+  <button onclick="showTab('dex')" id="tab-dex" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">📡 DEX</button>
+  <button onclick="showTab('onchain')" id="tab-onchain" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">⛓️ On-Chain</button>
+  <button onclick="showTab('news')" id="tab-news" class="tab-btn px-5 py-3 text-sm font-medium whitespace-nowrap">📰 Новини</button>
  </div>
 
  <!-- ═══════ HUNTED TAB ═══════ -->
@@ -513,6 +518,106 @@ body{background:#06080d;font-family:'Inter','Segoe UI',system-ui,sans-serif}
    </table>
   </div>
  </div>
+ <!-- ═══════ SENTIMENT TAB ═══════ -->
+ <div id="panel-sentiment" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">Fear & Greed Index</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Індекс страху та жадності крипторинку (alternative.me)</p>
+   </div>
+   <button onclick="loadSentiment()" class="bg-gradient-to-r from-orange-600 to-red-500 hover:from-orange-500 hover:to-red-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">⟳ Оновити</button>
+  </div>
+  <!-- Gauge -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+   <div class="card p-8 text-center lg:col-span-1">
+    <div id="fgGauge" style="position:relative;width:200px;height:120px;margin:0 auto">
+     <canvas id="fgCanvas" width="200" height="120"></canvas>
+    </div>
+    <p id="fgValue" class="text-5xl font-black text-white mt-4">—</p>
+    <p id="fgLabel" class="text-lg font-semibold mt-1 text-gray-400">Завантаження...</p>
+    <p id="fgUpdate" class="text-[11px] text-gray-700 mt-2"></p>
+   </div>
+   <div class="card p-6 lg:col-span-2">
+    <h3 class="text-sm text-white font-semibold mb-3">Історія (30 днів)</h3>
+    <canvas id="fgChart" height="180"></canvas>
+   </div>
+  </div>
+  <!-- Sentiment cards -->
+  <div id="sentimentCards" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+ </div>
+
+ <!-- ═══════ WHALES TAB ═══════ -->
+ <div id="panel-whales" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">Whale Tracker</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Великі транзакції та рух капіталу (об'єм &gt; $50K/год)</p>
+   </div>
+   <button onclick="loadWhales()" class="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">🐋 Сканувати</button>
+  </div>
+  <div id="whalesList">
+   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="card p-5 skeleton h-36"></div><div class="card p-5 skeleton h-36"></div><div class="card p-5 skeleton h-36"></div>
+   </div>
+  </div>
+ </div>
+
+ <!-- ═══════ DEX TAB ═══════ -->
+ <div id="panel-dex" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">DEX Screener & Signals</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Нові пари, тренди, pump-сигнали з DexScreener</p>
+   </div>
+   <div class="flex gap-2">
+    <button onclick="loadDexTrending()" class="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">🔥 Trending</button>
+    <button onclick="loadDexNew()" class="bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">🆕 Нові</button>
+   </div>
+  </div>
+  <div id="dexContent">
+   <p class="text-gray-600 text-sm text-center py-8">Натисніть кнопку для завантаження</p>
+  </div>
+ </div>
+
+ <!-- ═══════ ON-CHAIN TAB ═══════ -->
+ <div id="panel-onchain" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">On-Chain Analytics</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Блокчейн-метрики BTC, кореляції, ліквідації</p>
+   </div>
+   <button onclick="loadOnchain()" class="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">⟳ Оновити</button>
+  </div>
+  <!-- BTC On-Chain Stats -->
+  <div id="onchainStats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6"></div>
+  <!-- Correlation Matrix -->
+  <div class="card p-6 mb-6">
+   <h3 class="text-white font-semibold mb-3">Кореляційна матриця</h3>
+   <p class="text-xs text-gray-600 mb-4">Pearson кореляція між активами на основі цінової історії</p>
+   <div id="corrMatrix" class="overflow-x-auto"><p class="text-gray-600 text-sm text-center py-4">Завантаження...</p></div>
+  </div>
+  <!-- Liquidation Heatmap -->
+  <div class="card p-6">
+   <h3 class="text-white font-semibold mb-3">Ліквідаційна теплокарта (BTC)</h3>
+   <p class="text-xs text-gray-600 mb-4">Оцінка рівнів ліквідації лонгів та шортів</p>
+   <div id="liqHeatmap"><p class="text-gray-600 text-sm text-center py-4">Завантаження...</p></div>
+  </div>
+ </div>
+
+ <!-- ═══════ NEWS TAB ═══════ -->
+ <div id="panel-news" class="tab-panel hidden">
+  <div class="flex items-center justify-between mb-5">
+   <div>
+    <h2 class="text-white font-semibold">News & Trends</h2>
+    <p class="text-xs text-gray-600 mt-0.5">Новини, тренди та настрій ринку в реальному часі</p>
+   </div>
+   <button onclick="loadNews()" class="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all">⟳ Оновити</button>
+  </div>
+  <div id="newsContent">
+   <div class="card p-5 skeleton h-24 mb-3"></div><div class="card p-5 skeleton h-24 mb-3"></div><div class="card p-5 skeleton h-24 mb-3"></div>
+  </div>
+ </div>
+
 </main>
 
 <footer class="text-center text-gray-800 text-[11px] py-8 border-t border-white/[.03]">
@@ -937,9 +1042,255 @@ function removeWatchlist(id){
  fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(r){return r.json()}).then(function(){loadWatchlist();showToast("Видалено",true)})
 }
 
+/* ── Sentiment / Fear & Greed ── */
+var fgChartInstance=null;
+function drawGauge(val){
+ var c=document.getElementById("fgCanvas");if(!c)return;
+ var ctx=c.getContext("2d"),w=200,h=120,cx=w/2,cy=h-10,r=80;
+ ctx.clearRect(0,0,w,h);
+ var grad=ctx.createLinearGradient(0,0,w,0);
+ grad.addColorStop(0,"#ef4444");grad.addColorStop(0.25,"#f97316");
+ grad.addColorStop(0.5,"#eab308");grad.addColorStop(0.75,"#22c55e");grad.addColorStop(1,"#10b981");
+ ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,0,false);
+ ctx.lineWidth=18;ctx.strokeStyle="rgba(255,255,255,.05)";ctx.stroke();
+ ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,Math.PI+(val/100)*Math.PI,false);
+ ctx.lineWidth=18;ctx.strokeStyle=grad;ctx.lineCap="round";ctx.stroke();
+ var angle=Math.PI+(val/100)*Math.PI;
+ var nx=cx+Math.cos(angle)*(r-30),ny=cy+Math.sin(angle)*(r-30);
+ ctx.beginPath();ctx.arc(nx,ny,5,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();
+}
+function loadSentiment(){
+ fetch("/api/fear-greed").then(function(r){return r.json()}).then(function(d){
+  var items=d.data||[];if(!items.length)return;
+  var cur=items[0],val=parseInt(cur.value)||50;
+  drawGauge(val);
+  document.getElementById("fgValue").textContent=val;
+  var lbl=cur.value_classification||"";
+  var el=document.getElementById("fgLabel");el.textContent=lbl;
+  el.className="text-lg font-semibold mt-1 "+(val<=25?"text-red-400":val<=45?"text-orange-400":val<=55?"text-yellow-400":val<=75?"text-green-400":"text-emerald-400");
+  document.getElementById("fgUpdate").textContent="Оновлено: "+new Date(cur.timestamp*1000).toLocaleString();
+  // History chart
+  var labels=[],data=[];
+  for(var i=Math.min(items.length-1,29);i>=0;i--){
+   labels.push(new Date(items[i].timestamp*1000).toLocaleDateString("uk",{day:"numeric",month:"short"}));
+   data.push(parseInt(items[i].value));
+  }
+  if(fgChartInstance)fgChartInstance.destroy();
+  var ctx2=document.getElementById("fgChart").getContext("2d");
+  fgChartInstance=new Chart(ctx2,{type:"line",data:{labels:labels,datasets:[{
+   label:"Fear & Greed",data:data,
+   borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,.1)",fill:true,tension:.3,pointRadius:2,borderWidth:2,
+   segment:{borderColor:function(c){var v=c.p1.parsed.y;return v<=25?"#ef4444":v<=45?"#f97316":v<=55?"#eab308":v<=75?"#22c55e":"#10b981"}}
+  }]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+  scales:{x:{ticks:{color:"#555",maxTicksLimit:10,font:{size:10}},grid:{color:"rgba(255,255,255,.03)"}},
+  y:{min:0,max:100,ticks:{color:"#555",stepSize:25},grid:{color:"rgba(255,255,255,.05)"}}}}});
+  // Sentiment cards
+  var sc=document.getElementById("sentimentCards");
+  var zones=[{l:"Extreme Fear",r:"0-25",c:"bg-red-500/10 border-red-500/20 text-red-400",i:"😱"},
+   {l:"Fear",r:"26-45",c:"bg-orange-500/10 border-orange-500/20 text-orange-400",i:"😨"},
+   {l:"Neutral",r:"46-55",c:"bg-yellow-500/10 border-yellow-500/20 text-yellow-400",i:"😐"},
+   {l:"Greed",r:"56-75",c:"bg-green-500/10 border-green-500/20 text-green-400",i:"😏"},
+   {l:"Extreme Greed",r:"76-100",c:"bg-emerald-500/10 border-emerald-500/20 text-emerald-400",i:"🤑"}];
+  var activeIdx=val<=25?0:val<=45?1:val<=55?2:val<=75?3:4;
+  var sh="";for(var z=0;z<zones.length;z++){
+   sh+='<div class="card p-4 border '+zones[z].c+(z===activeIdx?" ring-2 ring-white/20":"")+'"><div class="text-2xl mb-1">'+zones[z].i+'</div><p class="text-sm font-semibold">'+zones[z].l+'</p><p class="text-xs opacity-60">'+zones[z].r+'</p></div>';
+  }sc.innerHTML=sh;
+  showToast("Fear & Greed: "+val+" ("+lbl+")",true);
+ }).catch(function(e){showToast("Sentiment error: "+e.message,false)})
+}
+
+/* ── Whales ── */
+function loadWhales(){
+ fetch("/api/whales").then(function(r){return r.json()}).then(function(items){
+  var el=document.getElementById("whalesList");
+  if(!items||!items.length){el.innerHTML='<div class="card p-8 text-center"><p class="text-gray-500 text-sm">Китів поки не виявлено</p><p class="text-gray-700 text-xs mt-1">Дані з\'являться після сканування ринку</p></div>';return}
+  var h='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
+  for(var i=0;i<items.length;i++){
+   var w=items[i],ch=w.change_pct||0,vol=w.volume_1h||0;
+   var tierIcon=w.tier==="whale"?"🐋":w.tier==="shark"?"🦈":"🐟";
+   var tierClass=w.tier==="whale"?"border-cyan-400/30 glow-blue":w.tier==="shark"?"border-blue-400/20":"";
+   h+='<div class="card p-5 hunt-card '+tierClass+'" style="animation-delay:'+Math.min(i*0.04,0.4)+'s">'
+    +'<div class="flex items-center justify-between mb-2">'
+    +'<div class="flex items-center gap-2"><span class="text-2xl">'+tierIcon+'</span><span class="text-white font-bold text-lg">'+w.symbol+'</span></div>'
+    +'<span class="badge badge-'+w.category+'">'+w.category+'</span></div>'
+    +'<p class="text-xs text-gray-500 mb-3 truncate">'+(w.name||"")+'</p>'
+    +'<div class="flex items-end justify-between mb-2">'
+    +'<span class="text-xl font-bold text-white">'+fmtPrice(w.price_usd)+'</span>'
+    +'<span class="text-sm font-semibold '+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
+    +'<div class="flex items-center justify-between pt-2 border-t border-white/5">'
+    +'<span class="text-[11px] text-gray-600">Об\'єм/год</span>'
+    +'<span class="text-[11px] text-cyan-400 font-semibold">'+fmtVol(vol)+'</span></div></div>';
+  }
+  h+='</div>';el.innerHTML=h;
+  showToast("Whale Tracker: "+items.length+" активів",true);
+ }).catch(function(e){showToast("Whales error: "+e.message,false)})
+}
+
+/* ── DEX Screener ── */
+function loadDexTrending(){
+ var el=document.getElementById("dexContent");
+ el.innerHTML='<div class="card p-8 text-center"><p class="text-gray-400 text-sm">Завантажую trending токени...</p></div>';
+ fetch("/api/dex/trending").then(function(r){return r.json()}).then(function(d){
+  var tokens=d.tokens||[];
+  if(!tokens.length){el.innerHTML='<div class="card p-8 text-center text-gray-500">Немає даних</div>';return}
+  var h='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
+  for(var i=0;i<tokens.length;i++){
+   var t=tokens[i];
+   var icon=t.icon||"";
+   var desc=t.description||"";
+   if(desc.length>80)desc=desc.slice(0,80)+"...";
+   var chain=t.chainId||"unknown";
+   var addr=(t.tokenAddress||"").slice(0,10)+"...";
+   h+='<div class="card p-4 hunt-card" style="animation-delay:'+Math.min(i*0.03,0.3)+'s">'
+    +'<div class="flex items-center gap-3 mb-2">'
+    +(icon?'<img src="'+icon+'" class="w-8 h-8 rounded-full" onerror="this.style.display=\'none\'">':'<div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-xs">DEX</div>')
+    +'<div><p class="text-white font-semibold text-sm truncate" style="max-width:180px">'+(t.url?'<a href="'+t.url+'" target="_blank" class="hover:text-purple-400">'+addr+'</a>':addr)+'</p>'
+    +'<p class="text-[10px] text-gray-600">'+chain+'</p></div></div>'
+    +(desc?'<p class="text-xs text-gray-500 truncate">'+desc+'</p>':'')
+    +'</div>';
+  }
+  h+='</div>';el.innerHTML=h;
+  showToast("DEX Trending: "+tokens.length+" токенів",true);
+ }).catch(function(e){el.innerHTML='<div class="card p-8 text-center text-red-400">Помилка: '+e.message+'</div>'})
+}
+function loadDexNew(){
+ var el=document.getElementById("dexContent");
+ el.innerHTML='<div class="card p-8 text-center"><p class="text-gray-400 text-sm">Завантажую нові пари...</p></div>';
+ fetch("/api/dex/new-pairs").then(function(r){return r.json()}).then(function(d){
+  var pairs=d.pairs||[];
+  if(!pairs.length){el.innerHTML='<div class="card p-8 text-center text-gray-500">Немає нових пар</div>';return}
+  var h='<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
+  for(var i=0;i<pairs.length;i++){
+   var p=pairs[i];
+   var chain=p.chainId||"";
+   var addr=(p.tokenAddress||"").slice(0,10)+"...";
+   h+='<div class="card p-4 hunt-card bg-gradient-to-br from-green-500/5 to-transparent" style="animation-delay:'+Math.min(i*0.03,0.3)+'s">'
+    +'<div class="flex items-center gap-2 mb-2"><span class="text-emerald-400 text-lg">🆕</span>'
+    +'<span class="text-white font-semibold text-sm">'+addr+'</span></div>'
+    +'<p class="text-[11px] text-gray-600">Chain: <span class="text-gray-400">'+chain+'</span></p>'
+    +(p.description?'<p class="text-xs text-gray-500 mt-1 truncate">'+p.description.slice(0,60)+'</p>':'')
+    +'</div>';
+  }
+  h+='</div>';el.innerHTML=h;
+  showToast("Нових пар: "+pairs.length,true);
+ }).catch(function(e){el.innerHTML='<div class="card p-8 text-center text-red-400">Помилка: '+e.message+'</div>'})
+}
+
+/* ── On-Chain ── */
+function fmtBig(v){if(!v)return"—";if(v>=1e12)return(v/1e12).toFixed(2)+"T";if(v>=1e9)return(v/1e9).toFixed(2)+"B";if(v>=1e6)return(v/1e6).toFixed(1)+"M";if(v>=1e3)return(v/1e3).toFixed(1)+"K";return v.toFixed(0)}
+function loadOnchain(){
+ // BTC stats
+ fetch("/api/onchain/btc").then(function(r){return r.json()}).then(function(d){
+  if(d.status!=="ok"){document.getElementById("onchainStats").innerHTML='<p class="text-red-400 text-sm col-span-4">On-Chain data unavailable</p>';return}
+  var cards=[
+   {l:"BTC Price",v:"$"+fmtBig(d.market_price_usd),i:"₿",c:"text-amber-400"},
+   {l:"Hash Rate",v:fmtBig(d.hash_rate)+" GH/s",i:"⛏️",c:"text-blue-400"},
+   {l:"Transactions (24h)",v:fmtBig(d.n_tx),i:"📊",c:"text-emerald-400"},
+   {l:"Blocks Mined",v:d.n_blocks_mined||"—",i:"🧱",c:"text-purple-400"},
+   {l:"Block Time",v:(d.minutes_between_blocks||0).toFixed(1)+" min",i:"⏱️",c:"text-cyan-400"},
+   {l:"Difficulty",v:fmtBig(d.difficulty),i:"🎯",c:"text-orange-400"},
+   {l:"Miner Revenue",v:"$"+fmtBig(d.miners_revenue_usd),i:"💰",c:"text-yellow-400"},
+   {l:"Trade Volume",v:"$"+fmtBig(d.trade_volume_usd),i:"📈",c:"text-green-400"},
+   {l:"TX Volume",v:"$"+fmtBig(d.estimated_transaction_volume_usd),i:"🔄",c:"text-pink-400"},
+   {l:"Total BTC",v:fmtBig(d.totalbc/1e8)+" BTC",i:"🪙",c:"text-amber-300"},
+   {l:"Mempool",v:fmtBig(d.mempool_size)+" bytes",i:"📦",c:"text-indigo-400"},
+   {l:"Total Blocks",v:fmtBig(d.n_blocks_total),i:"🏗️",c:"text-teal-400"}
+  ];
+  var h="";for(var i=0;i<cards.length;i++){
+   h+='<div class="card p-4"><div class="flex items-center gap-2 mb-2"><span class="text-lg">'+cards[i].i+'</span><span class="text-[11px] text-gray-500 uppercase tracking-wider">'+cards[i].l+'</span></div><p class="text-lg font-bold '+cards[i].c+'">'+cards[i].v+'</p></div>';
+  }
+  document.getElementById("onchainStats").innerHTML=h;
+ }).catch(function(){});
+ // Correlations
+ fetch("/api/correlations").then(function(r){return r.json()}).then(function(d){
+  var el=document.getElementById("corrMatrix");
+  if(!d.symbols||d.symbols.length<2){el.innerHTML='<p class="text-gray-600 text-sm text-center py-4">'+(d.note||"Недостатньо даних")+'</p>';return}
+  var syms=d.symbols,m=d.matrix;
+  var h='<table class="w-full text-sm"><thead><tr><th class="px-3 py-2 text-gray-600 text-xs"></th>';
+  for(var i=0;i<syms.length;i++) h+='<th class="px-3 py-2 text-gray-400 text-xs font-bold">'+syms[i]+'</th>';
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<syms.length;i++){
+   h+='<tr><td class="px-3 py-2 text-gray-400 text-xs font-bold">'+syms[i]+'</td>';
+   for(var j=0;j<syms.length;j++){
+    var val=m[syms[i]]?m[syms[i]][syms[j]]:null;
+    var bg="transparent",txt="#9ca3af";
+    if(val!==null){
+     if(val>0.7){bg="rgba(16,185,129,.3)";txt="#34d399"}
+     else if(val>0.3){bg="rgba(16,185,129,.15)";txt="#6ee7b7"}
+     else if(val>-0.3){bg="rgba(255,255,255,.05)";txt="#9ca3af"}
+     else if(val>-0.7){bg="rgba(239,68,68,.15)";txt="#fca5a5"}
+     else{bg="rgba(239,68,68,.3)";txt="#f87171"}
+     if(i===j){bg="rgba(59,130,246,.2)";txt="#60a5fa"}
+    }
+    h+='<td class="px-3 py-2 text-center text-xs font-mono" style="background:'+bg+';color:'+txt+'">'+(val!==null?val.toFixed(2):"—")+'</td>';
+   }
+   h+='</tr>';
+  }
+  h+='</tbody></table>';el.innerHTML=h;
+ }).catch(function(){});
+ // Liquidations
+ fetch("/api/liquidations").then(function(r){return r.json()}).then(function(d){
+  var el=document.getElementById("liqHeatmap");
+  if(!d.levels||!d.levels.length){el.innerHTML='<p class="text-gray-600 text-sm text-center py-4">Немає даних для ліквідацій</p>';return}
+  var cp=d.current_price;
+  var h='<div class="flex items-center gap-2 mb-4"><span class="text-white font-semibold">Поточна ціна:</span><span class="text-amber-400 font-bold text-lg">$'+cp.toLocaleString()+'</span></div>';
+  h+='<div class="space-y-1.5">';
+  for(var i=0;i<d.levels.length;i++){
+   var lv=d.levels[i];
+   var isLong=lv.side==="LONG";
+   var barColor=isLong?"bg-red-500":"bg-green-500";
+   var barBg=isLong?"bg-red-500/10":"bg-green-500/10";
+   var w=Math.min(lv.intensity,100);
+   h+='<div class="flex items-center gap-3 text-xs">'
+    +'<span class="w-16 text-right font-mono '+(isLong?"text-red-400":"text-green-400")+'">$'+lv.price.toLocaleString()+'</span>'
+    +'<span class="w-12 text-center font-semibold '+(isLong?"text-red-400":"text-green-400")+'">'+(lv.pct>0?"+":"")+lv.pct+'%</span>'
+    +'<div class="flex-1 '+barBg+' rounded-full h-5 overflow-hidden"><div class="'+barColor+' h-full rounded-full transition-all" style="width:'+w+'%;opacity:0.7"></div></div>'
+    +'<span class="w-10 text-gray-500 text-[10px]">'+lv.side+'</span>'
+    +'<span class="w-16 text-right text-gray-400">$'+lv.est_usd_m+'M</span></div>';
+  }
+  h+='</div>';
+  h+='<p class="text-[10px] text-gray-700 mt-4">* Оцінні дані на основі цінової історії. Не є фінансовою порадою.</p>';
+  el.innerHTML=h;
+ }).catch(function(){});
+ showToast("On-Chain дані оновлено",true);
+}
+
+/* ── News ── */
+function loadNews(){
+ fetch("/api/news").then(function(r){return r.json()}).then(function(d){
+  var el=document.getElementById("newsContent");
+  var items=d.news||[];
+  if(!items.length){el.innerHTML='<div class="card p-8 text-center text-gray-500">Немає новин</div>';return}
+  var h="";
+  for(var i=0;i<items.length;i++){
+   var n=items[i];
+   var sentColor=n.sentiment==="bullish"?"border-emerald-500/20 bg-emerald-500/5":n.sentiment==="bearish"?"border-red-500/20 bg-red-500/5":"border-white/5";
+   var sentIcon=n.sentiment==="bullish"?"📈":n.sentiment==="bearish"?"📉":"➖";
+   var typeIcon=n.type==="market"?"📊":n.type==="trending"?"🔥":n.type==="nft"?"🎨":"📰";
+   h+='<div class="card p-5 mb-3 border '+sentColor+' hunt-card" style="animation-delay:'+Math.min(i*0.05,0.5)+'s">'
+    +'<div class="flex items-start gap-3">';
+   if(n.thumb) h+='<img src="'+n.thumb+'" class="w-10 h-10 rounded-full mt-0.5" onerror="this.style.display=\'none\'">';
+   else h+='<span class="text-2xl mt-0.5">'+typeIcon+'</span>';
+   h+='<div class="flex-1 min-w-0">'
+    +'<div class="flex items-center gap-2 mb-1">'
+    +'<span class="text-white font-semibold text-sm">'+n.title+'</span>'
+    +'<span class="text-sm">'+sentIcon+'</span></div>'
+    +'<p class="text-xs text-gray-400">'+n.detail+'</p>'
+    +'<div class="flex items-center gap-3 mt-2">'
+    +'<span class="text-[10px] text-gray-600">'+n.source+'</span>'
+    +'<span class="text-[10px] text-gray-700">'+(n.time?new Date(n.time).toLocaleTimeString("uk",{hour:"2-digit",minute:"2-digit"}):"")+'</span>'
+    +'</div></div></div></div>';
+  }
+  el.innerHTML=h;
+  showToast("Новин: "+items.length,true);
+ }).catch(function(e){document.getElementById("newsContent").innerHTML='<div class="card p-8 text-center text-red-400">Помилка: '+e.message+'</div>'})
+}
+
 /* ── Init ── */
 loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
+loadSentiment();loadWhales();loadNews();
 setInterval(function(){loadHunted();updateHunterStatus();loadAnalytics()},30000);
+setInterval(function(){loadSentiment();loadWhales();loadNews()},60000);
 </script>
 </body>
 </html>

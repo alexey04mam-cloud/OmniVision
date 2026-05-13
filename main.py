@@ -23,6 +23,7 @@ from scanners import (
     crypto_scanner, stocks_scanner, commodities_scanner,
     flow_detector, global_hunter,
 )
+import pro_api
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("omni-vision")
@@ -336,6 +337,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# ──── Pro Features ────
+pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal)
 
 # ──── Rate Limiter ────
 
