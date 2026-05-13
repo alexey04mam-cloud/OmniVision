@@ -140,6 +140,11 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 
 /* ─── Mini bar ─── */
 .mini-bar{display:inline-block;width:3px;margin-right:1px;border-radius:1px;vertical-align:bottom;background:#30d158;opacity:.6;transition:height .3s}
+
+/* Block TradingView external links on all embedded widgets */
+.tv-no-click{position:relative}
+.tv-no-click::after{content:'';position:absolute;inset:0;z-index:5;cursor:default}
+.tradingview-widget-container iframe{pointer-events:auto}
 </style>
 </head>
 <body>
@@ -251,12 +256,14 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
   </div>
  </header>
 
- <!-- TradingView Ticker Tape -->
- <div class="tradingview-widget-container" style="width:100%;border-bottom:1px solid var(--border-primary)">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {"symbols":[{"proName":"BINANCE:BTCUSDT","title":"BTC"},{"proName":"BINANCE:ETHUSDT","title":"ETH"},{"proName":"BINANCE:SOLUSDT","title":"SOL"},{"proName":"BINANCE:BNBUSDT","title":"BNB"},{"proName":"BINANCE:XRPUSDT","title":"XRP"},{"proName":"BINANCE:DOGEUSDT","title":"DOGE"},{"proName":"NASDAQ:NVDA","title":"NVDA"},{"proName":"NASDAQ:AAPL","title":"AAPL"},{"proName":"NASDAQ:TSLA","title":"TSLA"},{"proName":"NASDAQ:MSFT","title":"MSFT"},{"proName":"NASDAQ:AMZN","title":"AMZN"},{"proName":"NASDAQ:META","title":"META"},{"proName":"TVC:GOLD","title":"Gold"},{"proName":"TVC:SILVER","title":"Silver"},{"proName":"NYMEX:CL1!","title":"Oil"},{"proName":"NYMEX:NG1!","title":"Gas"},{"proName":"SP:SPX","title":"S&P500"},{"proName":"NASDAQ:QQQ","title":"QQQ"}],"showSymbolLogo":true,"isTransparent":true,"displayMode":"adaptive","colorTheme":"dark","locale":"ru"}
-  </script>
+ <!-- TradingView Ticker Tape (no external links) -->
+ <div style="position:relative;width:100%;border-bottom:1px solid var(--border-primary)">
+  <div class="tradingview-widget-container" style="width:100%;pointer-events:none">
+   <div class="tradingview-widget-container__widget"></div>
+   <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+   {"symbols":[{"proName":"BINANCE:BTCUSDT","title":"BTC"},{"proName":"BINANCE:ETHUSDT","title":"ETH"},{"proName":"BINANCE:SOLUSDT","title":"SOL"},{"proName":"BINANCE:BNBUSDT","title":"BNB"},{"proName":"BINANCE:XRPUSDT","title":"XRP"},{"proName":"BINANCE:DOGEUSDT","title":"DOGE"},{"proName":"NASDAQ:NVDA","title":"NVDA"},{"proName":"NASDAQ:AAPL","title":"AAPL"},{"proName":"NASDAQ:TSLA","title":"TSLA"},{"proName":"NASDAQ:MSFT","title":"MSFT"},{"proName":"NASDAQ:AMZN","title":"AMZN"},{"proName":"NASDAQ:META","title":"META"},{"proName":"TVC:GOLD","title":"Gold"},{"proName":"TVC:SILVER","title":"Silver"},{"proName":"NYMEX:CL1!","title":"Oil"},{"proName":"NYMEX:NG1!","title":"Gas"},{"proName":"SP:SPX","title":"S&P500"},{"proName":"NASDAQ:QQQ","title":"QQQ"}],"showSymbolLogo":true,"isTransparent":true,"displayMode":"adaptive","colorTheme":"dark","locale":"ru"}
+   </script>
+  </div>
  </div>
 
  <!-- Page Content -->
@@ -777,6 +784,54 @@ function chS(v){return(v>=0?"+":"")+v.toFixed(2)+"%"}
 function fmtVol(v){if(!v)return"—";if(v>=1e9)return"$"+(v/1e9).toFixed(1)+"B";if(v>=1e6)return"$"+(v/1e6).toFixed(1)+"M";if(v>=1e3)return"$"+(v/1e3).toFixed(0)+"K";return"$"+v.toFixed(0)}
 function fmtPrice(p){if(!p)return"—";p=parseFloat(p);if(p>=100)return"$"+p.toFixed(2);if(p>=1)return"$"+p.toFixed(4);return"$"+p.toFixed(6)}
 
+/* ── Symbol aliases for search (short → full forms) ── */
+var symbolAliases={
+ "btc":["bitcoin","btcusdt","btc-usd","xbt"],
+ "eth":["ethereum","ethusdt","eth-usd","ether"],
+ "sol":["solana","solusdt","sol-usd"],
+ "bnb":["binancecoin","bnbusdt","bnb-usd"],
+ "xrp":["ripple","xrpusdt","xrp-usd"],
+ "doge":["dogecoin","dogeusdt","doge-usd"],
+ "ada":["cardano","adausdt","ada-usd"],
+ "dot":["polkadot","dotusdt"],
+ "avax":["avalanche","avaxusdt"],
+ "matic":["polygon","maticusdt","pol"],
+ "link":["chainlink","linkusdt"],
+ "ltc":["litecoin","ltcusdt"],
+ "atom":["cosmos","atomusdt"],
+ "uni":["uniswap","uniusdt"],
+ "nvda":["nvidia"],
+ "aapl":["apple"],
+ "tsla":["tesla"],
+ "msft":["microsoft"],
+ "amzn":["amazon"],
+ "meta":["facebook"],
+ "goog":["google","googl","alphabet"],
+ "gold":["xauusd","gc","gold futures"],
+ "oil":["crude","wti","cl","brent","bz"],
+ "gas":["natgas","natural gas","ng"],
+ "silver":["xagusd","si"]
+};
+function matchesSearch(symbol,name,query){
+ var sym=(symbol||"").toLowerCase(),nm=(name||"").toLowerCase();
+ if(sym.indexOf(query)!==-1||nm.indexOf(query)!==-1) return true;
+ // Check if query matches any alias that maps to this symbol
+ for(var key in symbolAliases){
+  var aliases=symbolAliases[key];
+  var allForms=[key].concat(aliases);
+  var queryMatchesGroup=false;
+  for(var i=0;i<allForms.length;i++){
+   if(allForms[i].indexOf(query)!==-1||query.indexOf(allForms[i])!==-1){queryMatchesGroup=true;break}
+  }
+  if(queryMatchesGroup){
+   for(var j=0;j<allForms.length;j++){
+    if(sym.indexOf(allForms[j])!==-1||nm.indexOf(allForms[j])!==-1) return true;
+   }
+  }
+ }
+ return false;
+}
+
 /* ── Hunted ── */
 var allHuntedItems=[];
 function loadHunted(){
@@ -792,7 +847,7 @@ function applyHuntFilters(){
  var sort=document.getElementById("huntSortBy").value;
  var filtered=allHuntedItems.filter(function(a){
   if(cat&&a.category!==cat) return false;
-  if(search&&(a.symbol||"").toLowerCase().indexOf(search)===-1&&(a.name||"").toLowerCase().indexOf(search)===-1) return false;
+  if(search&&!matchesSearch(a.symbol,a.name,search)) return false;
   return true;
  });
  if(sort==="change_desc") filtered.sort(function(a,b){return(b.change_pct||0)-(a.change_pct||0)});
@@ -1398,6 +1453,24 @@ function loadNews(){
   showToast("Новин: "+items.length,true);
  }).catch(function(e){document.getElementById("newsContent").innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">Помилка: '+e.message+'</div>'})
 }
+
+/* ── Block all navigation to TradingView ── */
+document.addEventListener("click",function(e){
+ var link=e.target.closest("a");
+ if(link&&link.href&&link.href.indexOf("tradingview.com")!==-1){
+  e.preventDefault();e.stopPropagation();return false;
+ }
+},true);
+// Block window.open to tradingview
+var origOpen=window.open;
+window.open=function(url){
+ if(url&&typeof url==="string"&&url.indexOf("tradingview.com")!==-1) return null;
+ return origOpen.apply(window,arguments);
+};
+// Prevent iframes from navigating parent to tradingview
+window.addEventListener("beforeunload",function(e){
+ if(document.activeElement&&document.activeElement.tagName==="IFRAME") return;
+});
 
 /* ── Init ── */
 loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
