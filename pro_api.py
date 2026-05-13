@@ -372,6 +372,37 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                     "price": p.price_usd
                 })
 
+        # Fallback: if <5 local points, fetch from CoinGecko (crypto only)
+        if len(chart_data) < 5 and basic.get("category") == "CRYPTO":
+            try:
+                cg_id_map = {
+                    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+                    "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
+                    "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
+                    "MATIC": "matic-network", "LINK": "chainlink", "UNI": "uniswap",
+                    "ATOM": "cosmos", "LTC": "litecoin", "NEAR": "near",
+                    "APT": "aptos", "ARB": "arbitrum", "OP": "optimism",
+                    "SUI": "sui", "FIL": "filecoin", "PEPE": "pepe",
+                    "SHIB": "shiba-inu", "TRX": "tron", "TON": "the-open-network",
+                    "HBAR": "hedera-hashgraph", "INJ": "injective-protocol",
+                }
+                clean = sym.replace("USDT","").replace("USD","").replace("BUSD","")
+                cg_id = cg_id_map.get(clean, clean.lower())
+                import httpx as _hx
+                _r = _hx.get(f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=7", timeout=8)
+                if _r.status_code == 200:
+                    _prices = _r.json().get("prices", [])
+                    if _prices:
+                        chart_data = []
+                        for _pt in _prices:
+                            chart_data.append({
+                                "time": datetime.fromtimestamp(_pt[0]/1000, tz=timezone.utc).isoformat(),
+                                "price": _pt[1]
+                            })
+                        log.info(f"CoinGecko fallback: {len(chart_data)} points for {sym}")
+            except Exception as _e:
+                log.warning(f"CoinGecko fallback failed for {sym}: {_e}")
+
         # Indicators: MA-14, MA-50, RSI-14, Bollinger Bands
         if len(chart_data) >= 14:
             for i in range(13, len(chart_data)):

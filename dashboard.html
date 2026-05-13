@@ -1079,8 +1079,9 @@ function buildAssetChart(data){
   bbU.push(d.bb_upper||null);bbL.push(d.bb_lower||null);
  }
  var color=prices[prices.length-1]>=prices[0]?"#30d158":"#ff453a";
+ var pr=data.length<10?4:data.length<30?2:0;
  var datasets=[
-  {label:"Ціна",data:prices,borderColor:color,backgroundColor:color+"15",fill:true,tension:.3,pointRadius:0,borderWidth:2,order:2},
+  {label:"Ціна",data:prices,borderColor:color,backgroundColor:color+"15",fill:true,tension:.3,pointRadius:pr,pointHoverRadius:5,borderWidth:2,order:2},
   {label:"MA14",data:ma14,borderColor:"rgba(10,132,255,.6)",borderWidth:1.5,pointRadius:0,tension:.3,fill:false,order:3},
   {label:"MA50",data:ma50,borderColor:"rgba(191,90,242,.5)",borderWidth:1.5,pointRadius:0,tension:.3,fill:false,order:4},
   {label:"BB Upper",data:bbU,borderColor:"rgba(255,214,10,.25)",borderWidth:1,borderDash:[4,4],pointRadius:0,tension:.3,fill:false,order:5},
@@ -1098,7 +1099,7 @@ function buildAssetRSI(data){
   rsi.push(data[i].rsi||null);
  }
  assetRsiChartI=new Chart(document.getElementById("assetRsiChart").getContext("2d"),{type:"line",data:{labels:labels,datasets:[
-  {label:"RSI",data:rsi,borderColor:"#ff9f0a",backgroundColor:"rgba(255,159,10,.08)",fill:true,tension:.3,pointRadius:0,borderWidth:1.5}
+  {label:"RSI",data:rsi,borderColor:"#ff9f0a",backgroundColor:"rgba(255,159,10,.08)",fill:true,tension:.3,pointRadius:data.length<10?4:0,pointHoverRadius:5,borderWidth:1.5}
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},annotation:{}},scales:{x:{display:false},y:{min:0,max:100,ticks:{color:"#6e6e73",stepSize:30,font:{size:10}},grid:{color:"rgba(255,255,255,.06)"}}}}})
 }
 
