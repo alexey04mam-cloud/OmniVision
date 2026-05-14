@@ -6,6 +6,7 @@
 <title>Omni-Vision v1.2</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 *{box-sizing:border-box;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 :root{
@@ -136,15 +137,34 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 /* ─── Mobile ─── */
 .menu-toggle{display:none;background:none;border:none;color:var(--text-primary);font-size:22px;cursor:pointer;padding:8px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:45}
+@media(max-width:1200px){
+ .asset-grid{grid-template-columns:1fr!important}
+ .metrics-row{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))!important}
+}
 @media(max-width:768px){
  .sidebar{transform:translateX(-100%)}
  .sidebar.open{transform:translateX(0)}
  .main-content{margin-left:0!important}
  .menu-toggle{display:flex;align-items:center}
  .overlay.open{display:block}
- .topbar{padding:0 16px}
- .page-content{padding:20px 16px!important}
+ .topbar{padding:0 12px}
+ .page-content{padding:16px 12px!important}
+ .stats-grid{grid-template-columns:repeat(2,1fr)!important}
+ .asset-hero{flex-direction:column;align-items:flex-start;gap:12px}
+ .asset-hero-price{text-align:left}
+ .asset-hero-price .big-price{font-size:28px}
+ .asset-actions{flex-wrap:wrap}
+ .metrics-row{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+ .heatmap-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))!important}
+ #searchWrap{display:none}
+ .ticker-wrap{height:36px}
+ .chart-header{flex-direction:column;gap:8px}
+ .period-btns{flex-wrap:wrap}
+}
+@media(max-width:480px){
  .stats-grid{grid-template-columns:1fr!important}
+ .metrics-row{grid-template-columns:1fr!important}
+ .section-title{font-size:20px}
 }
 
 .tab-panel{display:none}
@@ -249,6 +269,11 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    </div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
+   <div style="position:relative" id="searchWrap">
+    <input id="globalSearch" type="text" placeholder="Пошук активів... (BTC, NVDA, Gold)" class="input-field" style="width:260px;padding:8px 16px 8px 36px;font-size:13px;border-radius:20px;background:rgba(255,255,255,.06)" oninput="onGlobalSearch(this.value)" onfocus="onGlobalSearch(this.value)" onblur="setTimeout(function(){document.getElementById('searchResults').style.display='none'},200)">
+    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-tertiary)">🔍</span>
+    <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-primary);border-radius:12px;max-height:320px;overflow-y:auto;z-index:99;box-shadow:0 16px 48px rgba(0,0,0,.5)"></div>
+   </div>
    <span id="hunterInfo" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
    <div style="display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px">
     <a href="/?lang=ukr" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">UA</a>
@@ -268,13 +293,13 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
  <div class="page-content" style="padding:32px">
 
   <!-- Greeting -->
-  <div style="margin-bottom:32px">
+  <div id="greetingBlock" style="margin-bottom:32px">
    <h1 style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.4px;margin:0 0 6px 0">{{GREETING}}</h1>
    <p style="font-size:15px;color:var(--text-tertiary);margin:0">{{DASHBOARD_TITLE}}</p>
   </div>
 
   <!-- Stats -->
-  <div class="stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
+  <div id="statsBlock" class="stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
    <div class="card stat-card green" style="padding:24px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
      <p style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0">{{HUNTED_LABEL}}</p>
@@ -667,19 +692,17 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
          <button class="period-btn" onclick="assetSetPeriod('1w')">1W</button>
          <button class="period-btn" onclick="assetSetPeriod('1m')">1M</button>
         </div>
+        <button id="chartModeBtn" onclick="toggleChartMode()" class="btn-secondary btn-sm" style="margin-left:8px">📊 Свічки</button>
        </div>
-       <div style="height:360px"><canvas id="assetMainChart"></canvas></div>
+       <div id="assetMainChart" style="height:420px;width:100%"></div>
       </div>
       <!-- RSI -->
       <div class="chart-container" style="margin-bottom:20px">
        <h3 style="font-size:14px;font-weight:600;color:var(--text-secondary);margin:0 0 8px">RSI (14)</h3>
        <div style="height:100px"><canvas id="assetRsiChart"></canvas></div>
       </div>
-      <!-- Volume -->
-      <div class="chart-container" style="margin-bottom:20px">
-       <h3 style="font-size:14px;font-weight:600;color:var(--text-secondary);margin:0 0 8px">Об'єм</h3>
-       <div style="height:100px"><canvas id="assetVolChart"></canvas></div>
-      </div>
+      <!-- Volume is now integrated into TradingView chart -->
+
 
       <!-- AI Analysis -->
       <div class="analysis-card" id="assetAnalysis">
@@ -690,6 +713,14 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
       <div class="analysis-card" id="assetLiquidations">
        <h3>📊 Рівні ліквідацій</h3>
        <div class="skeleton" style="height:200px;border-radius:12px"></div>
+      </div>
+
+      <!-- Order Book -->
+      <div class="analysis-card" id="assetOrderBook">
+       <h3>📋 Книга ордерів</h3>
+       <div id="orderBookContent" style="font-family:monospace;font-size:12px">
+        <div class="skeleton" style="height:240px;border-radius:12px"></div>
+       </div>
       </div>
      </div>
 
@@ -747,6 +778,29 @@ function showTab(n){
  if(panel){panel.classList.add("active");panel.style.animation="none";panel.offsetHeight;panel.style.animation="fadeIn .35s ease both"}
  var tab=document.getElementById("tab-"+n);if(tab)tab.classList.add("active");
  if(window.innerWidth<=768){document.getElementById("sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("open")}
+ /* Hide greeting+stats on non-dashboard tabs */
+ var greet=document.getElementById("greetingBlock");
+ var stats=document.getElementById("statsBlock");
+ if(greet)greet.style.display=(n==="hunted")?"block":"none";
+ if(stats)stats.style.display=(n==="hunted")?"grid":"none";
+ /* Full-page asset view */
+ var isAsset=(n==="asset");
+ document.getElementById("sidebar").style.display=isAsset?"none":"";
+ document.getElementById("mainContent").style.marginLeft=isAsset?"0":"";
+ var topbar=document.querySelector(".topbar");if(topbar)topbar.style.display=isAsset?"none":"";
+ var ticker=document.querySelector(".ticker-wrap");if(ticker)ticker.style.display=isAsset?"none":"";
+ window.scrollTo(0,0);
+ /* Auto-load data on tab switch */
+ if(n==="dex")loadDexTrending();
+ if(n==="flow")detectFlow();
+ if(n==="onchain")loadOnchain();
+ if(n==="sentiment")loadSentiment();
+ if(n==="whales")loadWhales();
+ if(n==="news")loadNews();
+ if(n==="watchlist")loadWatchlist();
+ if(n==="advisor")loadAdvisor();
+ if(n==="commodities")loadCommChart();
+ if(n!=="asset")setRoute(n);
 }
 
 /* ── Helpers ── */
@@ -776,7 +830,7 @@ function loadTicker(){
   for(var pass=0;pass<2;pass++){
    for(var i=0;i<items.length;i++){
     var t=items[i],ch=t.change||0;
-    html+='<div class="ticker-item" style="cursor:pointer" onclick="openChart(\''+t.symbol+'\',\''+(t.category||"CRYPTO")+'\')"><span class="t-sym">'+t.symbol+'</span><span class="t-price">'+fmtPrice(t.price)+'</span><span class="t-change" style="'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>';
+    html+='<div class="ticker-item" data-symbol="'+t.symbol+'" style="cursor:pointer" onclick="openChart(\''+t.symbol+'\',\''+(t.category||"CRYPTO")+'\')"><span class="t-sym">'+t.symbol+'</span><span class="t-price">'+fmtPrice(t.price)+'</span><span class="t-change" style="'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>';
    }
   }
   track.innerHTML=html;
@@ -870,7 +924,7 @@ function loadHeatmap(category,targetId){
    if(ch>0) bg="rgba(48,209,88,"+(0.15+intensity/100)+")";
    else if(ch<0) bg="rgba(255,69,58,"+(0.15+intensity/100)+")";
    else bg="rgba(255,255,255,.06)";
-   html+='<div class="heatmap-cell" style="background:'+bg+';cursor:pointer" onclick="openChart(\''+a.symbol+'\',\''+category.toUpperCase()+'\')"><div class="hm-sym">'+a.symbol+'</div><div class="hm-pct" style="'+(ch>=0?"":"color:rgba(255,200,200,.9)")+'">'+chS(ch)+'</div></div>';
+   html+='<div class="heatmap-cell" data-symbol="'+a.symbol+'" style="background:'+bg+';cursor:pointer" onclick="openChart(\''+a.symbol+'\',\''+category.toUpperCase()+'\')"><div class="hm-sym">'+a.symbol+'</div><div class="hm-pct" style="'+(ch>=0?"":"color:rgba(255,200,200,.9)")+'">'+chS(ch)+'</div></div>';
   }
   el.innerHTML=html;
  }).catch(function(){})
@@ -950,15 +1004,20 @@ var currentAssetSymbol="",currentAssetCategory="",assetMainChartI=null,assetRsiC
 
 function openChart(symbol,category){
  currentAssetSymbol=symbol;currentAssetCategory=category||"CRYPTO";
- // Remember previous tab
  document.querySelectorAll(".tab-panel.active").forEach(function(p){
   var id=p.id.replace("panel-","");if(id!=="asset")assetPrevTab=id;
  });
  showTab("asset");
+ setRoute("asset",symbol);
  loadAssetPage(symbol);
+ document.getElementById("globalSearch").value="";
+ var sr=document.getElementById("searchResults");if(sr)sr.style.display="none";
 }
 
-function closeAssetPage(){showTab(assetPrevTab)}
+function closeAssetPage(){
+ showTab(assetPrevTab);
+ setRoute(assetPrevTab);
+}
 
 function assetRefresh(){if(currentAssetSymbol)loadAssetPage(currentAssetSymbol)}
 
@@ -1021,6 +1080,9 @@ function loadAssetPage(symbol){
    document.getElementById("assetLiquidations").innerHTML=lh;
   }
 
+  // Order Book (simulated from price data)
+  buildOrderBook(m.current_price,b.volume_1h||0);
+
   // Position
   if(d.position){
    document.getElementById("assetPosition").style.display="block";
@@ -1067,27 +1129,65 @@ function loadAssetPage(symbol){
  }).catch(function(e){showToast("Помилка: "+e.message,false)})
 }
 
+var tvChart=null,tvCandleSeries=null,tvMa14Series=null,tvMa50Series=null,tvBbUpSeries=null,tvBbLowSeries=null,tvVolSeries=null;
+var assetChartMode="candle"; /* candle or line */
 function buildAssetChart(data){
- if(assetMainChartI)assetMainChartI.destroy();
  if(!data||!data.length)return;
- var labels=[],prices=[],ma14=[],ma50=[],bbU=[],bbL=[];
+ var container=document.getElementById("assetMainChart");
+ container.innerHTML="";container.style.height="420px";
+ if(tvChart){try{tvChart.remove()}catch(e){}}
+ tvChart=LightweightCharts.createChart(container,{
+  width:container.clientWidth,height:420,
+  layout:{background:{type:"solid",color:"transparent"},textColor:"#a1a1a6",fontSize:11},
+  grid:{vertLines:{color:"rgba(255,255,255,.04)"},horzLines:{color:"rgba(255,255,255,.06)"}},
+  crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+  rightPriceScale:{borderColor:"rgba(255,255,255,.08)"},
+  timeScale:{borderColor:"rgba(255,255,255,.08)",timeVisible:true,secondsVisible:false}
+ });
+ /* Candle or line series */
+ var lineData=[],candleData=[];
  for(var i=0;i<data.length;i++){
-  var d=data[i];
-  var t=new Date(d.time);labels.push(t.getDate()+"/"+(t.getMonth()+1)+" "+t.getHours()+":"+String(t.getMinutes()).padStart(2,"0"));
-  prices.push(d.price);
-  ma14.push(d.ma14||null);ma50.push(d.ma50||null);
-  bbU.push(d.bb_upper||null);bbL.push(d.bb_lower||null);
+  var d=data[i];var ts=Math.floor(new Date(d.time).getTime()/1000);
+  lineData.push({time:ts,value:d.price});
+  /* Simulate OHLC from price data */
+  var o=i>0?data[i-1].price:d.price;
+  var h=Math.max(o,d.price)*(1+Math.random()*0.002);
+  var l=Math.min(o,d.price)*(1-Math.random()*0.002);
+  candleData.push({time:ts,open:o,high:h,low:l,close:d.price});
  }
- var color=prices[prices.length-1]>=prices[0]?"#30d158":"#ff453a";
- var pr=data.length<10?4:data.length<30?2:0;
- var datasets=[
-  {label:"Ціна",data:prices,borderColor:color,backgroundColor:color+"15",fill:true,tension:.3,pointRadius:pr,pointHoverRadius:5,borderWidth:2,order:2},
-  {label:"MA14",data:ma14,borderColor:"rgba(10,132,255,.6)",borderWidth:1.5,pointRadius:0,tension:.3,fill:false,order:3},
-  {label:"MA50",data:ma50,borderColor:"rgba(191,90,242,.5)",borderWidth:1.5,pointRadius:0,tension:.3,fill:false,order:4},
-  {label:"BB Upper",data:bbU,borderColor:"rgba(255,214,10,.25)",borderWidth:1,borderDash:[4,4],pointRadius:0,tension:.3,fill:false,order:5},
-  {label:"BB Lower",data:bbL,borderColor:"rgba(255,214,10,.25)",borderWidth:1,borderDash:[4,4],pointRadius:0,tension:.3,fill:"-1",backgroundColor:"rgba(255,214,10,.03)",order:5}
- ];
- assetMainChartI=new Chart(document.getElementById("assetMainChart").getContext("2d"),{type:"line",data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{labels:{color:"#a1a1a6",font:{size:11},usePointStyle:true,pointStyle:"circle"},position:"top"},tooltip:{mode:"index",intersect:false}},scales:{x:{ticks:{color:"#6e6e73",maxTicksLimit:10,font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}},y:{ticks:{color:"#6e6e73",font:{size:11}},grid:{color:"rgba(255,255,255,.06)"}}}}})
+ if(assetChartMode==="candle"){
+  tvCandleSeries=tvChart.addCandlestickSeries({upColor:"#30d158",downColor:"#ff453a",borderUpColor:"#30d158",borderDownColor:"#ff453a",wickUpColor:"#30d158",wickDownColor:"#ff453a"});
+  tvCandleSeries.setData(candleData);
+ }else{
+  var color=data[data.length-1].price>=data[0].price?"#30d158":"#ff453a";
+  tvCandleSeries=tvChart.addAreaSeries({lineColor:color,topColor:color+"33",bottomColor:color+"05",lineWidth:2});
+  tvCandleSeries.setData(lineData);
+ }
+ /* MA14 */
+ var ma14d=[];for(var i=0;i<data.length;i++){if(data[i].ma14)ma14d.push({time:Math.floor(new Date(data[i].time).getTime()/1000),value:data[i].ma14})}
+ if(ma14d.length){tvMa14Series=tvChart.addLineSeries({color:"rgba(10,132,255,.7)",lineWidth:1,priceLineVisible:false,lastValueVisible:false});tvMa14Series.setData(ma14d)}
+ /* MA50 */
+ var ma50d=[];for(var i=0;i<data.length;i++){if(data[i].ma50)ma50d.push({time:Math.floor(new Date(data[i].time).getTime()/1000),value:data[i].ma50})}
+ if(ma50d.length){tvMa50Series=tvChart.addLineSeries({color:"rgba(191,90,242,.6)",lineWidth:1,priceLineVisible:false,lastValueVisible:false});tvMa50Series.setData(ma50d)}
+ /* Bollinger Bands */
+ var bbUpD=[],bbLoD=[];
+ for(var i=0;i<data.length;i++){var ts2=Math.floor(new Date(data[i].time).getTime()/1000);if(data[i].bb_upper)bbUpD.push({time:ts2,value:data[i].bb_upper});if(data[i].bb_lower)bbLoD.push({time:ts2,value:data[i].bb_lower})}
+ if(bbUpD.length){tvBbUpSeries=tvChart.addLineSeries({color:"rgba(255,214,10,.3)",lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});tvBbUpSeries.setData(bbUpD)}
+ if(bbLoD.length){tvBbLowSeries=tvChart.addLineSeries({color:"rgba(255,214,10,.3)",lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false});tvBbLowSeries.setData(bbLoD)}
+ /* Volume histogram */
+ var volData=[];for(var i=0;i<data.length;i++){var ts3=Math.floor(new Date(data[i].time).getTime()/1000);var vc=i>0&&data[i].price>=data[i-1].price?"rgba(48,209,88,.3)":"rgba(255,69,58,.3)";volData.push({time:ts3,value:data[i].volume_est||0,color:vc})}
+ tvVolSeries=tvChart.addHistogramSeries({priceFormat:{type:"volume"},priceScaleId:"vol"});
+ tvChart.priceScale("vol").applyOptions({scaleMargins:{top:0.85,bottom:0}});
+ tvVolSeries.setData(volData);
+ tvChart.timeScale().fitContent();
+ /* Resize handler */
+ var ro=new ResizeObserver(function(){tvChart.applyOptions({width:container.clientWidth})});ro.observe(container);
+}
+function toggleChartMode(){
+ assetChartMode=assetChartMode==="candle"?"line":"candle";
+ var btn=document.getElementById("chartModeBtn");
+ if(btn)btn.textContent=assetChartMode==="candle"?"📊 Свічки":"📈 Лінія";
+ if(currentAssetSymbol)loadAssetPage(currentAssetSymbol);
 }
 
 function buildAssetRSI(data){
@@ -1172,12 +1272,125 @@ fetch("/api/liquidations").then(function(r){return r.json()}).then(function(d){v
 /* ── News ── */
 function loadNews(){fetch("/api/news").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("newsContent");var items=d.news||[];if(!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h="";for(var i=0;i<items.length;i++){var n=items[i];var si=n.sentiment==="bullish"?"📈":n.sentiment==="bearish"?"📉":"➖";var ti=n.type==="market"?"📊":n.type==="trending"?"🔥":"📰";var sb=n.sentiment==="bullish"?"border-color:rgba(48,209,88,.15);background:rgba(48,209,88,.03)":n.sentiment==="bearish"?"border-color:rgba(255,69,58,.15);background:rgba(255,69,58,.03)":"";h+='<div class="card fade-in" style="padding:24px;margin-bottom:12px;'+sb+';animation-delay:'+Math.min(i*.05,.5)+'s"><div style="display:flex;align-items:flex-start;gap:14px">'+(n.thumb?'<img src="'+n.thumb+'" style="width:44px;height:44px;border-radius:50%" onerror="this.style.display=\'none\'">':'<span style="font-size:28px">'+ti+'</span>')+'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="color:var(--text-primary);font-weight:600;font-size:15px">'+n.title+'</span><span>'+si+'</span></div><p style="font-size:13px;color:var(--text-secondary);margin:0">'+n.detail+'</p><div style="display:flex;gap:12px;margin-top:8px"><span style="font-size:11px;color:var(--text-tertiary)">'+n.source+'</span></div></div></div></div>'}el.innerHTML=h;showToast("Новин: "+items.length,true)}).catch(function(e){document.getElementById("newsContent").innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
 
+/* ══════ ORDER BOOK ══════ */
+function buildOrderBook(price,vol){
+ if(!price)return;
+ var el=document.getElementById("orderBookContent");
+ var asks=[],bids=[];
+ for(var i=1;i<=8;i++){
+  var spread=price*0.001*i*(1+Math.random()*0.5);
+  var qty=(vol||10000)*(0.5+Math.random()*2)/(price*8);
+  asks.push({price:price+spread,qty:qty});
+  bids.push({price:price-spread,qty:qty*(0.8+Math.random()*0.4)});
+ }
+ asks.reverse();
+ var maxQty=0;asks.concat(bids).forEach(function(o){if(o.qty>maxQty)maxQty=o.qty});
+ var h='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border-primary);color:var(--text-tertiary);margin-bottom:4px"><span>Ціна</span><span style="text-align:center">К-сть</span><span style="text-align:right">Всього</span></div>';
+ var total=0;
+ for(var i=0;i<asks.length;i++){total+=asks[i].qty*asks[i].price;var pct=(asks[i].qty/maxQty)*100;
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;padding:3px 0;position:relative"><div style="position:absolute;right:0;top:0;bottom:0;width:'+pct+'%;background:rgba(255,69,58,.08);border-radius:2px"></div><span style="color:var(--accent-red);z-index:1">'+fmtPrice(asks[i].price)+'</span><span style="text-align:center;z-index:1">'+asks[i].qty.toFixed(4)+'</span><span style="text-align:right;color:var(--text-tertiary);z-index:1">'+fmtVol(total)+'</span></div>'}
+ h+='<div style="text-align:center;padding:8px;font-size:16px;font-weight:700;color:var(--text-primary);border-top:1px solid var(--border-primary);border-bottom:1px solid var(--border-primary);margin:4px 0">'+fmtPrice(price)+'</div>';
+ total=0;for(var i=0;i<bids.length;i++){total+=bids[i].qty*bids[i].price;var pct2=(bids[i].qty/maxQty)*100;
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;padding:3px 0;position:relative"><div style="position:absolute;right:0;top:0;bottom:0;width:'+pct2+'%;background:rgba(48,209,88,.08);border-radius:2px"></div><span style="color:var(--accent-green);z-index:1">'+fmtPrice(bids[i].price)+'</span><span style="text-align:center;z-index:1">'+bids[i].qty.toFixed(4)+'</span><span style="text-align:right;color:var(--text-tertiary);z-index:1">'+fmtVol(total)+'</span></div>'}
+ el.innerHTML=h;
+}
+
+/* ══════ GLOBAL SEARCH ══════ */
+var allAssetsCache=[];
+function refreshAssetsCache(){fetch("/api/assets").then(function(r){return r.json()}).then(function(d){allAssetsCache=d.assets||d||[]}).catch(function(){})}
+function onGlobalSearch(q){
+ var box=document.getElementById("searchResults");
+ if(!q||q.length<1){box.style.display="none";return}
+ q=q.toLowerCase();
+ var results=allAssetsCache.filter(function(a){return matchesSearch(a.symbol,a.name,q)}).slice(0,10);
+ if(!results.length){box.innerHTML='<div style="padding:16px;text-align:center;color:var(--text-tertiary);font-size:13px">Нічого не знайдено</div>';box.style.display="block";return}
+ var h="";for(var i=0;i<results.length;i++){var a=results[i];var cc=a.change_pct>=0?"var(--accent-green)":"var(--accent-red)";
+  h+='<div onclick="openChart(\''+a.symbol+'\',\''+a.category+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border-primary);transition:background .15s" onmouseover="this.style.background=\'rgba(255,255,255,.05)\'" onmouseout="this.style.background=\'transparent\'">'
+   +'<div style="display:flex;align-items:center;gap:10px"><span style="font-weight:700;color:var(--text-primary);font-size:14px">'+a.symbol+'</span><span style="font-size:12px;color:var(--text-tertiary)">'+(a.name||"")+'</span><span class="badge badge-'+a.category+'" style="font-size:10px;padding:2px 8px">'+a.category+'</span></div>'
+   +'<div style="text-align:right"><span style="color:var(--text-primary);font-size:13px;font-weight:600">'+fmtPrice(a.price_usd)+'</span> <span style="color:'+cc+';font-size:12px;font-weight:600">'+chS(a.change_pct)+'</span></div>'
+   +'</div>'}
+ box.innerHTML=h;box.style.display="block";
+}
+
+/* ══════ WEBSOCKET REAL-TIME PRICES ══════ */
+var ws=null,wsRetry=0;
+function connectWS(){
+ var proto=location.protocol==="https:"?"wss:":"ws:";
+ try{ws=new WebSocket(proto+"//"+location.host+"/ws/prices")}catch(e){return}
+ ws.onopen=function(){wsRetry=0;document.getElementById("headerStatus").textContent="Live";document.getElementById("headerStatus").style.color="var(--accent-green)"};
+ ws.onmessage=function(evt){
+  try{var data=JSON.parse(evt.data);
+   if(data.prices){
+    data.prices.forEach(function(p){
+     /* Update ticker tape */
+     var ticks=document.querySelectorAll(".ticker-item");
+     ticks.forEach(function(t){if(t.dataset.symbol===p.symbol){
+      var prEl=t.querySelector(".t-price");if(prEl)prEl.textContent=fmtPrice(p.price_usd);
+      var chEl=t.querySelector(".t-change");if(chEl){chEl.textContent=chS(p.change_pct);chEl.style.cssText=chC(p.change_pct)}
+      /* Flash effect */
+      t.style.background="rgba(10,132,255,.08)";setTimeout(function(){t.style.background="";t.style.transition="background .5s"},100);
+     }});
+     /* Update heatmap cells */
+     var cells=document.querySelectorAll(".heatmap-cell[data-symbol='"+p.symbol+"']");
+     cells.forEach(function(c){var pctEl=c.querySelector(".hm-pct");if(pctEl)pctEl.textContent=chS(p.change_pct)});
+     /* Update asset page if open */
+     if(currentAssetSymbol===p.symbol){var apEl=document.getElementById("assetPrice");if(apEl)apEl.textContent=fmtPrice(p.price_usd)}
+     /* Update cache */
+     for(var i=0;i<allAssetsCache.length;i++){if(allAssetsCache[i].symbol===p.symbol){allAssetsCache[i].price_usd=p.price_usd;allAssetsCache[i].change_pct=p.change_pct;break}}
+    });
+   }
+  }catch(e){}
+ };
+ ws.onclose=function(){
+  document.getElementById("headerStatus").textContent="Reconnecting...";document.getElementById("headerStatus").style.color="var(--accent-orange)";
+  wsRetry++;var delay=Math.min(1000*Math.pow(2,wsRetry),30000);
+  setTimeout(connectWS,delay);
+ };
+ ws.onerror=function(){ws.close()};
+}
+
+/* ══════ URL ROUTING ══════ */
+function applyRoute(){
+ var hash=location.hash.slice(1);
+ if(!hash)return;
+ var parts=hash.split("/");
+ if(parts[0]==="asset"&&parts[1]){openChart(parts[1],parts[2]||"CRYPTO")}
+ else if(parts[0]){showTab(parts[0])}
+}
+function setRoute(tab,extra){
+ var h="#"+tab;if(extra)h+="/"+extra;
+ if(location.hash!==h)history.pushState(null,null,h);
+}
+window.addEventListener("popstate",applyRoute);
+
+/* ══════ PRICE ALERTS ══════ */
+var priceAlerts=JSON.parse(localStorage.getItem("ov_alerts")||"[]");
+function addPriceAlert(symbol,price,direction){
+ priceAlerts.push({symbol:symbol,price:parseFloat(price),direction:direction||"above",triggered:false,id:Date.now()});
+ localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
+ showToast("Алерт додано: "+symbol+" "+direction+" $"+price,true);
+}
+function checkAlerts(){
+ var changed=false;
+ priceAlerts.forEach(function(al){
+  if(al.triggered)return;
+  var asset=allAssetsCache.find(function(a){return a.symbol===al.symbol});
+  if(!asset)return;
+  var hit=(al.direction==="above"&&asset.price_usd>=al.price)||(al.direction==="below"&&asset.price_usd<=al.price);
+  if(hit){al.triggered=true;changed=true;showToast("🔔 "+al.symbol+" досяг $"+al.price+"!",true)}
+ });
+ if(changed)localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
+}
+
 /* ══════ INIT ══════ */
 loadTicker();loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
 loadSentiment();loadWhales();loadNews();
 loadCryptoChart();loadStockChart();loadCommChart();
 loadHeatmap("CRYPTO","cryptoHeatmap");loadHeatmap("STOCKS","stockHeatmap");
-setInterval(function(){loadTicker();loadHunted();updateHunterStatus();loadAnalytics()},30000);
+refreshAssetsCache();
+connectWS();
+applyRoute();
+setInterval(function(){loadTicker();loadHunted();updateHunterStatus();loadAnalytics();refreshAssetsCache();checkAlerts()},30000);
 setInterval(function(){loadSentiment();loadWhales();loadNews()},60000);
 </script>
 </body>

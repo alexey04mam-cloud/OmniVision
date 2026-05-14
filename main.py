@@ -9,7 +9,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from collections import defaultdict
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Query, Form, Response
+from fastapi import FastAPI, Request, HTTPException, Depends, Query, Form, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -340,6 +340,39 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # ──── Pro Features ────
 pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal, WatchlistItem)
+
+# ──── Assets Search API ────
+@app.get("/api/assets")
+async def api_all_assets(db: Session = Depends(get_db)):
+    assets = db.query(MarketAsset).order_by(MarketAsset.volume.desc().nullslast()).all()
+    return {"assets": [
+        {"symbol": a.symbol, "name": a.name or a.symbol, "category": a.category,
+         "price_usd": float(a.price_usd or 0), "change_pct": float(a.change_pct or 0),
+         "volume": float(a.volume or 0), "chain": a.chain}
+        for a in assets
+    ]}
+
+# ──── WebSocket Real-Time Prices ────
+ws_clients = set()
+
+@app.websocket("/ws/prices")
+async def ws_prices(websocket: WebSocket):
+    await websocket.accept()
+    ws_clients.add(websocket)
+    try:
+        while True:
+            # Send price updates every 5 seconds
+            await asyncio.sleep(5)
+            db = SessionLocal()
+            try:
+                assets = db.query(MarketAsset).all()
+                prices = [{"symbol": a.symbol, "price_usd": float(a.price_usd or 0),
+                           "change_pct": float(a.change_pct or 0)} for a in assets]
+                await websocket.send_json({"prices": prices, "ts": datetime.now(timezone.utc).isoformat()})
+            finally:
+                db.close()
+    except (WebSocketDisconnect, Exception):
+        ws_clients.discard(websocket)
 
 # ──── Rate Limiter ────
 
