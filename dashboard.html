@@ -686,11 +686,11 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
         <div><h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">Графік ціни</h3>
         <p style="font-size:12px;color:var(--text-tertiary);margin:2px 0 0">MA14 · MA50 · Bollinger Bands</p></div>
         <div class="period-btns">
-         <button class="period-btn" onclick="assetSetPeriod('1h')">1H</button>
-         <button class="period-btn" onclick="assetSetPeriod('4h')">4H</button>
-         <button class="period-btn active" onclick="assetSetPeriod('1d')" id="assetPeriod1d">1D</button>
-         <button class="period-btn" onclick="assetSetPeriod('1w')">1W</button>
-         <button class="period-btn" onclick="assetSetPeriod('1m')">1M</button>
+         <button class="period-btn" onclick="assetSetPeriod('1h',this)">1H</button>
+         <button class="period-btn" onclick="assetSetPeriod('4h',this)">4H</button>
+         <button class="period-btn active" onclick="assetSetPeriod('1d',this)" id="assetPeriod1d">1D</button>
+         <button class="period-btn" onclick="assetSetPeriod('1w',this)">1W</button>
+         <button class="period-btn" onclick="assetSetPeriod('1m',this)">1M</button>
         </div>
         <button id="chartModeBtn" onclick="toggleChartMode()" class="btn-secondary btn-sm" style="margin-left:8px">📊 Свічки</button>
        </div>
@@ -1438,18 +1438,23 @@ function _renderChartData(data){
  try{buildAssetRSI(data)}catch(e){}
  try{buildAssetVolume(data)}catch(e){}
 }
-function assetSetPeriod(p){
+function assetSetPeriod(p,btn){
+ /* Highlight active button */
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
- if(event&&event.target)event.target.classList.add("active");
+ if(btn)btn.classList.add("active");
 
  /* Map UI period to Binance kline interval */
  var binanceIntervalMap={"1h":"1m","4h":"5m","1d":"15m","1w":"1h","1m":"4h"};
  _liveInterval=binanceIntervalMap[p]||"1m";
 
+ /* Show loading */
+ var container=document.getElementById("assetMainChart");
+ if(container)container.style.opacity="0.4";
+
  /* Reconnect kline WS with new interval */
- if(_liveKlineWS&&currentAssetCategory==="CRYPTO"){
-  try{_liveKlineWS.close()}catch(e){}
+ function _attachKlineWS(){
   var pair=_cleanSymbolForBinance(currentAssetSymbol);
+  try{if(_liveKlineWS)_liveKlineWS.close()}catch(e){}
   _liveKlineWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@kline_"+_liveInterval);
   _liveKlineWS.onmessage=function(e){
    try{
@@ -1460,6 +1465,7 @@ function assetSetPeriod(p){
     if(tvVolSeries)tvVolSeries.update(vol);
    }catch(err){}
   };
+  _liveKlineWS.onerror=function(){};
  }
 
  /* Load historical candles from Binance REST for this interval */
@@ -1467,11 +1473,20 @@ function assetSetPeriod(p){
   var pair2=_cleanSymbolForBinance(currentAssetSymbol).toUpperCase();
   fetch("https://api.binance.com/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit=500")
    .then(function(r){return r.json()}).then(function(klines){
-    if(!klines||!klines.length||klines.error)return;
-    var container=document.getElementById("assetMainChart");
+    if(!klines||!klines.length||klines.error){
+     if(container)container.style.opacity="1";
+     showToast("Немає даних для цього таймфрейму",false);
+     return;
+    }
     _createProChart(container,currentAssetSymbol);
     _setBinanceData(klines);
-   }).catch(function(){});
+    container.style.opacity="1";
+    _attachKlineWS();
+    showToast(_liveInterval.toUpperCase()+" завантажено",true);
+   }).catch(function(err){
+    if(container)container.style.opacity="1";
+    showToast("Помилка: "+err.message,false);
+   });
  } else {
   /* Non-crypto: use local data */
   if(_loadedChartData&&_loadedChartData.length>=2){
@@ -1480,6 +1495,7 @@ function assetSetPeriod(p){
    var sliced=_loadedChartData.slice(-Math.min(n,_loadedChartData.length));
    _addIndicators(sliced);_renderChartData(sliced);
   }
+  if(container)container.style.opacity="1";
  }
 }
 
