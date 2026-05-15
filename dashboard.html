@@ -2,7 +2,10 @@
 <html lang="{{LANG}}">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
 <title>Omni-Vision v1.2</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -30,7 +33,7 @@
  --sidebar-w:260px;
  --header-h:56px;
 }
-body{background:var(--bg-primary);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;color:var(--text-secondary);margin:0;overflow-x:hidden}
+body{background:var(--bg-primary);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;color:var(--text-secondary);margin:0;overflow-x:hidden;-webkit-tap-highlight-color:transparent;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
@@ -147,24 +150,50 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
  .main-content{margin-left:0!important}
  .menu-toggle{display:flex;align-items:center}
  .overlay.open{display:block}
- .topbar{padding:0 12px}
- .page-content{padding:16px 12px!important}
- .stats-grid{grid-template-columns:repeat(2,1fr)!important}
- .asset-hero{flex-direction:column;align-items:flex-start;gap:12px}
+ .topbar{padding:0 10px;height:48px}
+ .page-content{padding:12px 10px!important}
+ .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px}
+ .asset-hero{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:16px!important}
+ .asset-hero-left{gap:10px}
+ .asset-icon{width:40px!important;height:40px!important;border-radius:12px!important;font-size:16px!important}
+ .asset-hero-info h1{font-size:22px!important}
+ .asset-hero-info .asset-name{font-size:12px!important}
  .asset-hero-price{text-align:left}
- .asset-hero-price .big-price{font-size:28px}
- .asset-actions{flex-wrap:wrap}
- .metrics-row{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+ .asset-hero-price .big-price{font-size:26px!important;letter-spacing:-.5px}
+ .asset-hero-price .big-change{font-size:14px!important}
+ .asset-actions{flex-wrap:wrap;gap:6px!important;margin-bottom:16px!important}
+ .asset-actions .btn-secondary{padding:6px 12px!important;font-size:12px!important}
+ .metrics-row{grid-template-columns:repeat(2,1fr)!important;gap:8px;margin-bottom:14px!important}
+ .metric-card{padding:12px!important;border-radius:10px!important}
+ .metric-card .mc-label{font-size:10px!important;margin-bottom:4px!important}
+ .metric-card .mc-value{font-size:15px!important}
+ .asset-grid{gap:12px!important}
+ .analysis-card{padding:14px!important;border-radius:12px!important;margin-bottom:12px!important}
+ .analysis-card h3{font-size:15px!important;margin-bottom:10px!important}
+ .chart-container{padding:10px 8px 6px!important;border-radius:10px!important}
+ .chart-header{flex-direction:column;gap:6px;margin-bottom:6px!important}
+ .period-btns{flex-wrap:wrap;gap:2px}
+ .period-btn{padding:5px 10px!important;font-size:11px!important}
  .heatmap-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))!important}
  #searchWrap{display:none}
- .ticker-wrap{height:36px}
- .chart-header{flex-direction:column;gap:8px}
- .period-btns{flex-wrap:wrap}
+ .ticker-wrap{height:32px}
+ .hide-mobile{display:none!important}
+ .lang-switch a{padding:4px 8px!important;font-size:11px!important}
+ .stat-card{padding:16px!important}
+ .stat-card p:nth-child(2){font-size:24px!important}
+ .corr-row{padding:8px 12px!important;font-size:13px!important}
+ .liq-bar-row{gap:6px!important;font-size:11px!important}
+ .rec-badge{padding:6px 10px!important;font-size:11px!important}
+ .analysis-reason{font-size:13px!important;gap:8px!important;padding:8px 0!important}
 }
 @media(max-width:480px){
  .stats-grid{grid-template-columns:1fr!important}
  .metrics-row{grid-template-columns:1fr!important}
  .section-title{font-size:20px}
+ .asset-hero-info h1{font-size:20px!important}
+ .asset-hero-price .big-price{font-size:22px!important}
+ .period-btn{padding:4px 8px!important;font-size:10px!important}
+ .metric-card .mc-value{font-size:14px!important}
 }
 
 .tab-panel{display:none}
@@ -186,6 +215,13 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 .asset-actions{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
 .asset-grid{display:grid;grid-template-columns:1fr 340px;gap:20px}
 @media(max-width:1100px){.asset-grid{grid-template-columns:1fr}}
+@media(max-width:768px){
+ .ob-trades-grid{grid-template-columns:1fr!important;gap:10px!important}
+ #assetMainChart{height:320px!important}
+}
+@media(max-width:480px){
+ #assetMainChart{height:260px!important}
+}
 .metrics-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:20px}
 .metric-card{background:var(--bg-card);border:1px solid var(--border-primary);border-radius:14px;padding:18px;transition:border-color .2s}
 .metric-card:hover{border-color:var(--border-hover)}
@@ -274,8 +310,8 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-tertiary)">🔍</span>
     <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-primary);border-radius:12px;max-height:320px;overflow-y:auto;z-index:99;box-shadow:0 16px 48px rgba(0,0,0,.5)"></div>
    </div>
-   <span id="hunterInfo" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
-   <div style="display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px">
+   <span id="hunterInfo" class="hide-mobile" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
+   <div class="lang-switch" style="display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px">
     <a href="/?lang=ukr" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">UA</a>
     <a href="/?lang=eng" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">EN</a>
     <a href="/?lang=rus" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">RU</a>
@@ -344,7 +380,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
      <span style="font-size:13px;color:var(--text-tertiary);white-space:nowrap"><span id="huntResultCount">0</span> знайдено</span>
     </div>
    </div>
-   <div id="huntedList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px"><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div></div></div>
+   <div id="huntedList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px"><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div></div></div>
   </div>
 
   <!-- ═══ CRYPTO ═══ -->
@@ -607,7 +643,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     <div><h2 class="section-title">Whale Tracker</h2><p class="section-subtitle" style="margin-bottom:0">Об'єм > $50K/год</p></div>
     <button onclick="loadWhales()" class="btn-primary" style="background:var(--accent-cyan)">🐋 Сканувати</button>
    </div>
-   <div id="whalesList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px"><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div></div></div>
+   <div id="whalesList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px"><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div></div></div>
   </div>
 
   <!-- ═══ DEX ═══ -->
@@ -716,7 +752,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
       </div>
 
       <!-- Order Book + Trades side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div class="ob-trades-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
        <div class="analysis-card" id="assetOrderBook" style="margin-bottom:0">
         <h3>📋 Книга ордерів <span id="liveBookDot" style="display:none;color:var(--accent-green);font-size:10px">● LIVE</span></h3>
         <div id="orderBookContent" style="font-family:monospace;font-size:12px">
@@ -972,7 +1008,7 @@ function applyHuntFilters(){
 function renderHunted(items){
  var el=document.getElementById("huntedList");
  if(!items||items.length===0){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Нічого не знайдено</p></div>';return}
- var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">';
+ var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px">';
  for(var i=0;i<items.length;i++){var a=items[i],ch=a.change_pct||0;
   html+='<div class="card card-interactive fade-in" style="padding:24px;cursor:pointer;animation-delay:'+Math.min(i*.04,.4)+'s" onclick="openChart(\''+a.symbol+'\',\''+a.category+'\')">'
   +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+a.symbol+'</span><span class="badge badge-'+a.category+'">'+a.category+'</span></div>'
@@ -1161,7 +1197,7 @@ function loadAssetPage(symbol){
  _assetLoading=true;
  var sym=symbol.replace(/[^A-Za-z0-9_.-]/g,"");
  /* Show loading state */
- var mc=document.getElementById("assetMainChart");if(mc)mc.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:520px;color:var(--text-tertiary)"><div class="skeleton" style="width:100%;height:100%;border-radius:12px"></div></div>';
+ var mc=document.getElementById("assetMainChart");if(mc)mc.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:260px;color:var(--text-tertiary)"><div class="skeleton" style="width:100%;height:100%;border-radius:12px"></div></div>';
  fetch("/api/asset/"+encodeURIComponent(sym)).then(function(r){return r.json()}).then(function(d){
   _assetLoading=false;
   if(d.status!=="ok"){showToast("Помилка завантаження",false);return}
@@ -1346,9 +1382,11 @@ function _binanceFetch(path,ms){
 /* ── Binance-style chart factory ── */
 function _createProChart(container,symbol){
  destroyTvChart();
- container.innerHTML="";container.style.height="520px";
+ container.innerHTML="";
+ var chartH=container.clientWidth<500?280:container.clientWidth<800?360:520;
+ container.style.height=chartH+"px";
  tvChart=LightweightCharts.createChart(container,{
-  width:container.clientWidth,height:520,
+  width:container.clientWidth,height:chartH,
   layout:{background:{type:"solid",color:"#0b0e11"},textColor:"#848e9c",fontSize:12,fontFamily:"'SF Mono','Fira Code','Consolas',monospace"},
   grid:{vertLines:{color:"rgba(255,255,255,.03)"},horzLines:{color:"rgba(255,255,255,.05)"}},
   crosshair:{mode:LightweightCharts.CrosshairMode.Normal,
@@ -1374,7 +1412,12 @@ function _createProChart(container,symbol){
   priceLineVisible:false,lastValueVisible:false
  });
  tvChart.priceScale("vol").applyOptions({scaleMargins:{top:0.82,bottom:0}});
- tvResizeObs=new ResizeObserver(function(){if(tvChart)tvChart.applyOptions({width:container.clientWidth})});
+ tvResizeObs=new ResizeObserver(function(){
+  if(!tvChart)return;
+  var newH=container.clientWidth<500?280:container.clientWidth<800?360:520;
+  tvChart.applyOptions({width:container.clientWidth,height:newH});
+  container.style.height=newH+"px";
+ });
  tvResizeObs.observe(container);
  return tvChart;
 }
@@ -1540,15 +1583,19 @@ function _loadHistoricalPerf(symbol,category,currentPrice){
     {label:"1 рік",days:365}
    ];
 
+   var isMob=window.innerWidth<600;
+   var cols=isMob?"1fr 1fr 1fr":"1fr 1fr 1fr 1fr 1fr";
    var h='<div style="display:flex;flex-direction:column;gap:0">';
 
    /* Header */
-   h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px">';
+   h+='<div style="display:grid;grid-template-columns:'+cols+';gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px">';
    h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600">Період</span>';
-   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Ціна тоді</span>';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Ціна</span>';
    h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Зміна</span>';
-   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Мін</span>';
-   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Макс</span>';
+   if(!isMob){
+    h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Мін</span>';
+    h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Макс</span>';
+   }
    h+='</div>';
 
    for(var i=0;i<periods.length;i++){
@@ -1563,12 +1610,14 @@ function _loadHistoricalPerf(symbol,category,currentPrice){
     var chgColor=chg>=0?"#2ebd85":"#f6465d";
     var chgSign=chg>=0?"+":"";
 
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);align-items:center">';
+    h+='<div style="display:grid;grid-template-columns:'+cols+';gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);align-items:center">';
     h+='<span style="font-size:13px;color:var(--text-primary);font-weight:600">'+p.label+'</span>';
     h+='<span style="font-size:12px;color:var(--text-secondary);text-align:right;font-family:monospace">'+fmtPrice(oldPrice)+'</span>';
     h+='<span style="font-size:13px;font-weight:700;text-align:right;color:'+chgColor+';font-family:monospace">'+chgSign+chg.toFixed(2)+'%</span>';
-    h+='<span style="font-size:11px;color:var(--accent-red);text-align:right;font-family:monospace">'+fmtPrice(stats.min)+'</span>';
-    h+='<span style="font-size:11px;color:#2ebd85;text-align:right;font-family:monospace">'+fmtPrice(stats.max)+'</span>';
+    if(!isMob){
+     h+='<span style="font-size:11px;color:#f6465d;text-align:right;font-family:monospace">'+fmtPrice(stats.min)+'</span>';
+     h+='<span style="font-size:11px;color:#2ebd85;text-align:right;font-family:monospace">'+fmtPrice(stats.max)+'</span>';
+    }
     h+='</div>';
    }
 
@@ -1682,7 +1731,7 @@ function assetAddToWatchlist(){
 }
 
 /* ── Watchlist ── */
-function loadWatchlist(){fetch("/api/watchlist").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("watchlistContent");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Порожній</p></div>';return}var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;html+='<div class="card card-interactive" style="padding:24px;cursor:pointer" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span><div style="display:flex;align-items:center;gap:8px"><span class="badge badge-'+w.category+'" style="font-size:11px">'+w.category+'</span><button onclick="event.stopPropagation();removeWatchlist('+w.id+')" style="background:none;border:none;color:rgba(255,69,58,.5);cursor:pointer;font-size:14px">&times;</button></div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.current_price)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div>';if(w.target_price)html+='<div style="font-size:13px;color:var(--text-tertiary)">Ціль: <span style="color:var(--accent-orange);font-weight:600">'+fmtPrice(w.target_price)+'</span> '+(w.direction==='above'?'↑':'↓')+(w.triggered?'<span style="color:var(--accent-green);font-weight:700;margin-left:8px">✓</span>':'')+'</div>';html+='</div>'}html+='</div>';el.innerHTML=html})}
+function loadWatchlist(){fetch("/api/watchlist").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("watchlistContent");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Порожній</p></div>';return}var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;html+='<div class="card card-interactive" style="padding:24px;cursor:pointer" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span><div style="display:flex;align-items:center;gap:8px"><span class="badge badge-'+w.category+'" style="font-size:11px">'+w.category+'</span><button onclick="event.stopPropagation();removeWatchlist('+w.id+')" style="background:none;border:none;color:rgba(255,69,58,.5);cursor:pointer;font-size:14px">&times;</button></div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.current_price)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div>';if(w.target_price)html+='<div style="font-size:13px;color:var(--text-tertiary)">Ціль: <span style="color:var(--accent-orange);font-weight:600">'+fmtPrice(w.target_price)+'</span> '+(w.direction==='above'?'↑':'↓')+(w.triggered?'<span style="color:var(--accent-green);font-weight:700;margin-left:8px">✓</span>':'')+'</div>';html+='</div>'}html+='</div>';el.innerHTML=html})}
 function addWatchlistItem(){var sym=document.getElementById("wlSymbol").value.trim(),cat=document.getElementById("wlCat").value,tp=parseFloat(document.getElementById("wlTarget").value)||null,dir=document.getElementById("wlDir").value;if(!sym){showToast("Введіть символ",false);return}fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:sym,category:cat,target_price:tp,direction:dir})}).then(function(r){return r.json()}).then(function(d){if(d.status==="added"){showToast(sym+" додано",true);document.getElementById("wlSymbol").value="";document.getElementById("wlTarget").value="";loadWatchlist()}else showToast(d.detail||"Помилка",false)}).catch(function(e){showToast(e.message,false)})}
 function removeWatchlist(id){fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(){loadWatchlist();showToast("Видалено",true)})}
 
@@ -1692,11 +1741,11 @@ function drawGauge(val){var c=document.getElementById("fgCanvas");if(!c)return;v
 function loadSentiment(){fetch("/api/fear-greed").then(function(r){return r.json()}).then(function(d){var items=d.data||[];if(!items.length)return;var cur=items[0],val=parseInt(cur.value)||50;drawGauge(val);document.getElementById("fgValue").textContent=val;var lbl=cur.value_classification||"";var el=document.getElementById("fgLabel");el.textContent=lbl;el.style.color=val<=25?"var(--accent-red)":val<=45?"var(--accent-orange)":val<=55?"var(--accent-yellow)":"var(--accent-green)";document.getElementById("fgUpdate").textContent="Оновлено: "+new Date(cur.timestamp*1000).toLocaleString();var labels=[],data=[];for(var i=Math.min(items.length-1,29);i>=0;i--){labels.push(new Date(items[i].timestamp*1000).toLocaleDateString("uk",{day:"numeric",month:"short"}));data.push(parseInt(items[i].value))}if(fgChartInstance)fgChartInstance.destroy();fgChartInstance=new Chart(document.getElementById("fgChart").getContext("2d"),{type:"line",data:{labels:labels,datasets:[{label:"F&G",data:data,borderColor:"#ff9f0a",backgroundColor:"rgba(255,159,10,.08)",fill:true,tension:.35,pointRadius:2,borderWidth:2,segment:{borderColor:function(c){var v=c.p1.parsed.y;return v<=25?"#ff453a":v<=45?"#ff9f0a":v<=55?"#ffd60a":"#30d158"}}}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#6e6e73",maxTicksLimit:10,font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}},y:{min:0,max:100,ticks:{color:"#6e6e73",stepSize:25},grid:{color:"rgba(255,255,255,.06)"}}}}});var sc=document.getElementById("sentimentCards");var zones=[{l:"Extreme Fear",r:"0-25",c:"background:rgba(246,70,93,.1);border-color:rgba(255,69,58,.15);color:var(--accent-red)",i:"😱"},{l:"Fear",r:"26-45",c:"background:rgba(255,159,10,.08);border-color:rgba(255,159,10,.15);color:var(--accent-orange)",i:"😨"},{l:"Neutral",r:"46-55",c:"background:rgba(255,214,10,.08);border-color:rgba(255,214,10,.15);color:var(--accent-yellow)",i:"😐"},{l:"Greed",r:"56-75",c:"background:rgba(46,189,133,.1);border-color:rgba(48,209,88,.15);color:var(--accent-green)",i:"😏"},{l:"Extreme Greed",r:"76-100",c:"background:rgba(48,209,88,.12);border-color:rgba(48,209,88,.2);color:var(--accent-green)",i:"🤑"}];var idx=val<=25?0:val<=45?1:val<=55?2:val<=75?3:4;var sh="";for(var z=0;z<zones.length;z++){sh+='<div class="card" style="padding:20px;text-align:center;'+zones[z].c+(z===idx?";box-shadow:0 0 0 2px rgba(255,255,255,.15)":"")+'"><div style="font-size:28px;margin-bottom:6px">'+zones[z].i+'</div><p style="font-size:14px;font-weight:600;margin:0">'+zones[z].l+'</p><p style="font-size:12px;opacity:.6;margin:4px 0 0">'+zones[z].r+'</p></div>'}sc.innerHTML=sh;showToast("Fear & Greed: "+val,true)}).catch(function(e){showToast("Error: "+e.message,false)})}
 
 /* ── Whales ── */
-function loadWhales(){fetch("/api/whales").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("whalesList");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Немає даних</p></div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;var tierIcon=w.tier==="whale"?"🐋":w.tier==="shark"?"🦈":"🐟";h+='<div class="card card-interactive fade-in" style="padding:24px;cursor:pointer;animation-delay:'+Math.min(i*.04,.4)+'s" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:28px">'+tierIcon+'</span><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span></div><span class="badge badge-'+w.category+'">'+w.category+'</span></div><p style="font-size:13px;color:var(--text-tertiary);margin:0 0 12px">'+(w.name||"")+'</p><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.price_usd)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div><div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border-primary)"><span style="font-size:12px;color:var(--text-tertiary)">Об\'єм/год</span><span style="font-size:12px;color:var(--accent-cyan);font-weight:600">'+fmtVol(w.volume_1h||0)+'</span></div></div>'}h+='</div>';el.innerHTML=h;showToast("Whales: "+items.length,true)}).catch(function(e){showToast(e.message,false)})}
+function loadWhales(){fetch("/api/whales").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("whalesList");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Немає даних</p></div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;var tierIcon=w.tier==="whale"?"🐋":w.tier==="shark"?"🦈":"🐟";h+='<div class="card card-interactive fade-in" style="padding:24px;cursor:pointer;animation-delay:'+Math.min(i*.04,.4)+'s" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:28px">'+tierIcon+'</span><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span></div><span class="badge badge-'+w.category+'">'+w.category+'</span></div><p style="font-size:13px;color:var(--text-tertiary);margin:0 0 12px">'+(w.name||"")+'</p><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.price_usd)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div><div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border-primary)"><span style="font-size:12px;color:var(--text-tertiary)">Об\'єм/год</span><span style="font-size:12px;color:var(--accent-cyan);font-weight:600">'+fmtVol(w.volume_1h||0)+'</span></div></div>'}h+='</div>';el.innerHTML=h;showToast("Whales: "+items.length,true)}).catch(function(e){showToast(e.message,false)})}
 
 /* ── DEX ── */
-function loadDexTrending(){var el=document.getElementById("dexContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Завантажую...</p></div>';fetch("/api/dex/trending").then(function(r){return r.json()}).then(function(d){var tokens=d.tokens||[];if(!tokens.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">';for(var i=0;i<tokens.length;i++){var t=tokens[i];var chain=t.chainId||"";var addr=(t.tokenAddress||"").slice(0,10)+"...";h+='<div class="card card-interactive fade-in" style="padding:20px;animation-delay:'+Math.min(i*.03,.3)+'s"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'+(t.icon?'<img src="'+t.icon+'" style="width:36px;height:36px;border-radius:50%" onerror="this.style.display=\'none\'">':'<div style="width:36px;height:36px;border-radius:50%;background:rgba(191,90,242,.15);display:flex;align-items:center;justify-content:center;color:var(--accent-purple);font-size:12px;font-weight:600">DEX</div>')+'<div><p style="color:var(--text-primary);font-weight:600;font-size:14px;margin:0">'+addr+'</p><p style="font-size:11px;color:var(--text-tertiary);margin:2px 0 0">'+chain+'</p></div></div>'+(t.description?'<p style="font-size:13px;color:var(--text-tertiary);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.description.slice(0,80)+'</p>':'')+'</div>'}h+='</div>';el.innerHTML=h;showToast("Trending: "+tokens.length,true)}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
-function loadDexNew(){var el=document.getElementById("dexContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Завантажую...</p></div>';fetch("/api/dex/new-pairs").then(function(r){return r.json()}).then(function(d){var pairs=d.pairs||[];if(!pairs.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">';for(var i=0;i<pairs.length;i++){var p=pairs[i];h+='<div class="card card-interactive fade-in" style="padding:20px;animation-delay:'+Math.min(i*.03,.3)+'s"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="color:var(--accent-green);font-size:20px">🆕</span><span style="color:var(--text-primary);font-weight:600;font-size:14px">'+(p.tokenAddress||"").slice(0,10)+'...</span></div><p style="font-size:12px;color:var(--text-tertiary);margin:0">Chain: '+(p.chainId||"")+'</p></div>'}h+='</div>';el.innerHTML=h;showToast("Нових: "+pairs.length,true)}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
+function loadDexTrending(){var el=document.getElementById("dexContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Завантажую...</p></div>';fetch("/api/dex/trending").then(function(r){return r.json()}).then(function(d){var tokens=d.tokens||[];if(!tokens.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:16px">';for(var i=0;i<tokens.length;i++){var t=tokens[i];var chain=t.chainId||"";var addr=(t.tokenAddress||"").slice(0,10)+"...";h+='<div class="card card-interactive fade-in" style="padding:20px;animation-delay:'+Math.min(i*.03,.3)+'s"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'+(t.icon?'<img src="'+t.icon+'" style="width:36px;height:36px;border-radius:50%" onerror="this.style.display=\'none\'">':'<div style="width:36px;height:36px;border-radius:50%;background:rgba(191,90,242,.15);display:flex;align-items:center;justify-content:center;color:var(--accent-purple);font-size:12px;font-weight:600">DEX</div>')+'<div><p style="color:var(--text-primary);font-weight:600;font-size:14px;margin:0">'+addr+'</p><p style="font-size:11px;color:var(--text-tertiary);margin:2px 0 0">'+chain+'</p></div></div>'+(t.description?'<p style="font-size:13px;color:var(--text-tertiary);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.description.slice(0,80)+'</p>':'')+'</div>'}h+='</div>';el.innerHTML=h;showToast("Trending: "+tokens.length,true)}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
+function loadDexNew(){var el=document.getElementById("dexContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Завантажую...</p></div>';fetch("/api/dex/new-pairs").then(function(r){return r.json()}).then(function(d){var pairs=d.pairs||[];if(!pairs.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:16px">';for(var i=0;i<pairs.length;i++){var p=pairs[i];h+='<div class="card card-interactive fade-in" style="padding:20px;animation-delay:'+Math.min(i*.03,.3)+'s"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="color:var(--accent-green);font-size:20px">🆕</span><span style="color:var(--text-primary);font-weight:600;font-size:14px">'+(p.tokenAddress||"").slice(0,10)+'...</span></div><p style="font-size:12px;color:var(--text-tertiary);margin:0">Chain: '+(p.chainId||"")+'</p></div>'}h+='</div>';el.innerHTML=h;showToast("Нових: "+pairs.length,true)}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
 
 /* ── On-Chain ── */
 function loadOnchain(){fetch("/api/onchain/btc").then(function(r){return r.json()}).then(function(d){if(d.status!=="ok"){document.getElementById("onchainStats").innerHTML='<p style="color:var(--accent-red);grid-column:1/-1">Unavailable</p>';return}var cards=[{l:"BTC Price",v:"$"+fmtBig(d.market_price_usd),c:"var(--accent-orange)"},{l:"Hash Rate",v:fmtBig(d.hash_rate)+" GH/s",c:"var(--accent-blue)"},{l:"TX (24h)",v:fmtBig(d.n_tx),c:"var(--accent-green)"},{l:"Block Time",v:(d.minutes_between_blocks||0).toFixed(1)+" min",c:"var(--accent-cyan)"},{l:"Difficulty",v:fmtBig(d.difficulty),c:"var(--accent-orange)"},{l:"Miner Revenue",v:"$"+fmtBig(d.miners_revenue_usd),c:"var(--accent-yellow)"},{l:"Trade Vol",v:"$"+fmtBig(d.trade_volume_usd),c:"var(--accent-green)"},{l:"Mempool",v:fmtBig(d.mempool_size)+" B",c:"var(--accent-blue)"}];var h="";for(var i=0;i<cards.length;i++){h+='<div class="card" style="padding:20px"><p style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin:0 0 10px">'+cards[i].l+'</p><p style="font-size:18px;font-weight:700;color:'+cards[i].c+';margin:0">'+cards[i].v+'</p></div>'}document.getElementById("onchainStats").innerHTML=h}).catch(function(){});
