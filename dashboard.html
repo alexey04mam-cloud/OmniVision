@@ -1132,7 +1132,8 @@ function loadAssetPage(symbol){
 var tvChart=null,tvCandleSeries=null,tvMa14Series=null,tvMa50Series=null,tvBbUpSeries=null,tvBbLowSeries=null,tvVolSeries=null;
 var assetChartMode="candle"; /* candle or line */
 function buildAssetChart(data){
- if(!data||!data.length)return;
+ var container=document.getElementById("assetMainChart");
+ if(!data||!data.length){container.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text-tertiary);font-size:15px">📊 Недостатньо даних для графіка. Дані оновляться кожні 15 хвилин.</div>';return}
  var container=document.getElementById("assetMainChart");
  container.innerHTML="";container.style.height="420px";
  if(tvChart){try{tvChart.remove()}catch(e){}}
@@ -1192,12 +1193,15 @@ function toggleChartMode(){
 
 function buildAssetRSI(data){
  if(assetRsiChartI)assetRsiChartI.destroy();
- if(!data||!data.length)return;
- var labels=[],rsi=[];
+ var rsiCanvas=document.getElementById("assetRsiChart");
+ if(!data||!data.length){return}
+ var labels=[],rsi=[],hasRsi=false;
  for(var i=0;i<data.length;i++){
   var t=new Date(data[i].time);labels.push(t.getHours()+":"+String(t.getMinutes()).padStart(2,"0"));
   rsi.push(data[i].rsi||null);
+  if(data[i].rsi)hasRsi=true;
  }
+ if(!hasRsi){var p=rsiCanvas.parentElement;if(p)p.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:13px">RSI потребує мінімум 14 точок даних</div>';return}
  assetRsiChartI=new Chart(document.getElementById("assetRsiChart").getContext("2d"),{type:"line",data:{labels:labels,datasets:[
   {label:"RSI",data:rsi,borderColor:"#ff9f0a",backgroundColor:"rgba(255,159,10,.08)",fill:true,tension:.3,pointRadius:data.length<10?4:0,pointHoverRadius:5,borderWidth:1.5}
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},annotation:{}},scales:{x:{display:false},y:{min:0,max:100,ticks:{color:"#6e6e73",stepSize:30,font:{size:10}},grid:{color:"rgba(255,255,255,.06)"}}}}})

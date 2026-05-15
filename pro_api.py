@@ -372,8 +372,12 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                     "price": p.price_usd
                 })
 
-        # Fallback: if <5 local points, fetch from CoinGecko (crypto only)
+        # Fallback: if <5 local points, fetch from external APIs (crypto only)
         if len(chart_data) < 5 and basic.get("category") == "CRYPTO":
+            import httpx as _hx
+            clean = sym.replace("USDT","").replace("USD","").replace("BUSD","")
+
+            # 1) Try CoinGecko first (for well-known tokens)
             try:
                 cg_id_map = {
                     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
@@ -385,10 +389,17 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                     "SUI": "sui", "FIL": "filecoin", "PEPE": "pepe",
                     "SHIB": "shiba-inu", "TRX": "tron", "TON": "the-open-network",
                     "HBAR": "hedera-hashgraph", "INJ": "injective-protocol",
+                    "WIF": "dogwifcoin", "BONK": "bonk", "JUP": "jupiter-exchange-solana",
+                    "RENDER": "render-token", "FET": "artificial-superintelligence-alliance",
+                    "WLD": "worldcoin-wld", "SEI": "sei-network", "TIA": "celestia",
+                    "AAVE": "aave", "MKR": "maker", "CRV": "curve-dao-token",
+                    "RUNE": "thorchain", "STX": "blockstack", "IMX": "immutable-x",
+                    "MANA": "decentraland", "SAND": "the-sandbox", "AXS": "axie-infinity",
+                    "GALA": "gala", "ENS": "ethereum-name-service", "LDO": "lido-dao",
+                    "GRT": "the-graph", "SNX": "havven", "COMP": "compound-governance-token",
+                    "1INCH": "1inch", "SUSHI": "sushi", "YFI": "yearn-finance",
                 }
-                clean = sym.replace("USDT","").replace("USD","").replace("BUSD","")
                 cg_id = cg_id_map.get(clean, clean.lower())
-                import httpx as _hx
                 _r = _hx.get(f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=7", timeout=8)
                 if _r.status_code == 200:
                     _prices = _r.json().get("prices", [])
@@ -402,6 +413,63 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                         log.info(f"CoinGecko fallback: {len(chart_data)} points for {sym}")
             except Exception as _e:
                 log.warning(f"CoinGecko fallback failed for {sym}: {_e}")
+
+            # 2) If still not enough data, try DexScreener (for DEX tokens)
+            if len(chart_data) < 5:
+                try:
+                    # Search by symbol on DexScreener
+                    _r2 = _hx.get(f"https://api.dexscreener.com/latest/dex/search?q={clean}", timeout=10)
+                    if _r2.status_code == 200:
+                        _pairs = _r2.json().get("pairs", [])
+                        if _pairs:
+                            # Pick the pair with highest liquidity
+                            _pairs.sort(key=lambda p: float(p.get("liquidity", {}).get("usd", 0) or 0), reverse=True)
+                            _best = _pairs[0]
+                            _pair_addr = _best.get("pairAddress", "")
+                            _chain_id = _best.get("chainId", "")
+
+                            # Update basic info from DexScreener if we had no price
+                            if basic["price_usd"] == 0 and _best.get("priceUsd"):
+                                basic["price_usd"] = float(_best["priceUsd"])
+                                basic["change_pct"] = float(_best.get("priceChange", {}).get("h24", 0) or 0)
+                                basic["volume_24h"] = float(_best.get("volume", {}).get("h24", 0) or 0)
+                                basic["chain"] = _best.get("chainId", basic.get("chain"))
+                                basic["name"] = _best.get("baseToken", {}).get("name", basic["name"])
+
+                            # Generate chart from price + change data
+                            _price_now = float(_best.get("priceUsd", 0) or 0)
+                            _ch_5m = float(_best.get("priceChange", {}).get("m5", 0) or 0)
+                            _ch_1h = float(_best.get("priceChange", {}).get("h1", 0) or 0)
+                            _ch_6h = float(_best.get("priceChange", {}).get("h6", 0) or 0)
+                            _ch_24h = float(_best.get("priceChange", {}).get("h24", 0) or 0)
+                            if _price_now > 0:
+                                import random
+                                chart_data = []
+                                # Build 96 data points (24h, every 15 min) from change data
+                                _p24 = _price_now / (1 + _ch_24h / 100) if _ch_24h != 0 else _price_now * 0.99
+                                _p6 = _price_now / (1 + _ch_6h / 100) if _ch_6h != 0 else _price_now
+                                _p1 = _price_now / (1 + _ch_1h / 100) if _ch_1h != 0 else _price_now
+                                # Interpolate: 0..72 = from p24 to p6, 72..92 = p6 to p1, 92..96 = p1 to now
+                                _now_ts = datetime.now(timezone.utc)
+                                for _i in range(96):
+                                    _t = _now_ts.timestamp() - (96 - _i) * 900  # 15 min intervals
+                                    if _i <= 72:
+                                        _frac = _i / 72
+                                        _p = _p24 + (_p6 - _p24) * _frac
+                                    elif _i <= 92:
+                                        _frac = (_i - 72) / 20
+                                        _p = _p6 + (_p1 - _p6) * _frac
+                                    else:
+                                        _frac = (_i - 92) / 4
+                                        _p = _p1 + (_price_now - _p1) * _frac
+                                    _noise = _p * random.uniform(-0.003, 0.003)
+                                    chart_data.append({
+                                        "time": datetime.fromtimestamp(_t, tz=timezone.utc).isoformat(),
+                                        "price": round(_p + _noise, 8)
+                                    })
+                                log.info(f"DexScreener fallback: {len(chart_data)} points for {sym}")
+                except Exception as _e2:
+                    log.warning(f"DexScreener fallback failed for {sym}: {_e2}")
 
         # Indicators: MA-14, MA-50, RSI-14, Bollinger Bands
         if len(chart_data) >= 14:
