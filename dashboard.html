@@ -691,6 +691,9 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
          <button class="period-btn" onclick="assetSetPeriod('1d',this)">1D</button>
          <button class="period-btn" onclick="assetSetPeriod('1w',this)">1W</button>
          <button class="period-btn" onclick="assetSetPeriod('1m',this)">1M</button>
+         <button class="period-btn" onclick="assetSetPeriod('3m',this)">3M</button>
+         <button class="period-btn" onclick="assetSetPeriod('6m',this)">6M</button>
+         <button class="period-btn" onclick="assetSetPeriod('1y',this)">1Y</button>
         </div>
         <button id="chartModeBtn" onclick="toggleChartMode()" class="btn-secondary btn-sm" style="margin-left:8px">📊 Свічки</button>
        </div>
@@ -1477,9 +1480,11 @@ function assetSetPeriod(p,btn){
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
  if(btn)btn.classList.add("active");
 
- /* Map UI period to Binance kline interval */
- var binanceIntervalMap={"1h":"1m","4h":"5m","1d":"15m","1w":"1h","1m":"4h"};
+ /* Map UI period to Binance kline interval + limit */
+ var binanceIntervalMap={"1h":"1m","4h":"5m","1d":"15m","1w":"1h","1m":"4h","3m":"12h","6m":"1d","1y":"1d"};
+ var binanceLimitMap={"1h":60,"4h":48,"1d":96,"1w":168,"1m":180,"3m":180,"6m":180,"1y":365};
  _liveInterval=binanceIntervalMap[p]||"1m";
+ var _fetchLimit=binanceLimitMap[p]||500;
 
  /* Show loading */
  var container=document.getElementById("assetMainChart");
@@ -1505,7 +1510,7 @@ function assetSetPeriod(p,btn){
  /* Load historical candles from Binance REST for this interval */
  if(currentAssetCategory==="CRYPTO"){
   var pair2=_cleanSymbolForBinance(currentAssetSymbol).toUpperCase();
-  _binanceFetch("/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit=500",6000)
+  _binanceFetch("/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit="+_fetchLimit,6000)
    .then(function(r){return r.json()}).then(function(klines){
     if(!klines||!klines.length||klines.msg){
      /* Binance has no data — fallback to local */
@@ -1522,7 +1527,8 @@ function assetSetPeriod(p,btn){
     _createProChart(container,currentAssetSymbol);
     _setBinanceData(klines);
     container.style.opacity="1";
-    _attachKlineWS();
+    /* Only reconnect live WS for short-term periods */
+    if(p!=="3m"&&p!=="6m"&&p!=="1y")_attachKlineWS();
    }).catch(function(err){
     /* Binance unreachable — fallback to local data */
     if(_loadedChartData&&_loadedChartData.length>=2){
@@ -1537,7 +1543,7 @@ function assetSetPeriod(p,btn){
  } else {
   /* Non-crypto: use local data */
   if(_loadedChartData&&_loadedChartData.length>=2){
-   var sliceMap={"1h":4,"4h":16,"1d":96,"1w":672,"1m":2880};
+   var sliceMap={"1h":4,"4h":16,"1d":96,"1w":672,"1m":2880,"3m":8640,"6m":17280,"1y":35000};
    var n=sliceMap[p]||96;
    var sliced=_loadedChartData.slice(-Math.min(n,_loadedChartData.length));
    _addIndicators(sliced);_renderChartData(sliced);
