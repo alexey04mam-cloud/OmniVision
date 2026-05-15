@@ -1064,9 +1064,9 @@ function loadAssetPage(symbol){
   document.getElementById("assetMetrics").innerHTML=mh;
 
   // Charts
-  buildAssetChart(d.chart);
-  buildAssetRSI(d.chart);
-  buildAssetVolume(d.chart);
+  try{buildAssetChart(d.chart)}catch(e){console.error("Chart error:",e)}
+  try{buildAssetRSI(d.chart)}catch(e){console.error("RSI error:",e)}
+  try{buildAssetVolume(d.chart)}catch(e){console.error("Vol error:",e)}
 
   // AI Analysis
   var ah='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px"><h3>🧠 AI Аналіз: '+a.verdict+'</h3><span class="rec-badge rec-'+a.recommendation+'">'+(a.recommendation==="CONSIDER_BUY"?"📈 Розглянути покупку":a.recommendation==="OVERSOLD_OPPORTUNITY"?"💎 Перепроданість":a.recommendation==="OVERBOUGHT_CAUTION"?"⚠️ Перекупленість":a.recommendation==="WAIT"?"⏳ Зачекати":"➖ Нейтрально")+'</span></div>';
@@ -1079,35 +1079,41 @@ function loadAssetPage(symbol){
   document.getElementById("assetAnalysis").innerHTML=ah;
 
   // Liquidations
-  var lq=d.liquidations;
-  if(lq&&lq.length){
+  try{
+  var lq=d.liquidations||[];
+  if(lq.length){
    var lh='<h3>📊 Рівні ліквідацій</h3><p style="font-size:13px;color:var(--text-tertiary);margin:0 0 16px">Поточна: <span style="color:var(--accent-orange);font-weight:700">'+fmtPrice(m.current_price)+'</span></p>';
    for(var i=0;i<lq.length;i++){
     var lv=lq[i],isL=lv.side==="LONG",bc=isL?"var(--accent-red)":"var(--accent-green)";
     lh+='<div class="liq-bar-row"><span style="width:90px;text-align:right;font-family:monospace;color:'+bc+'">$'+lv.price.toLocaleString()+'</span><span style="width:40px;text-align:center;font-weight:600;font-size:12px;color:'+bc+'">'+(lv.pct>0?"+":"")+lv.pct+'%</span><div class="liq-bar-bg"><div class="liq-bar-fill" style="background:'+bc+';width:'+Math.min(lv.intensity,100)+'%"></div></div><span style="width:40px;font-size:11px;color:var(--text-tertiary)">'+lv.side+'</span></div>';
    }
    document.getElementById("assetLiquidations").innerHTML=lh;
-  }
+  } else {document.getElementById("assetLiquidations").innerHTML='<h3>📊 Рівні ліквідацій</h3><p style="text-align:center;padding:20px;color:var(--text-tertiary)">Немає даних</p>'}
+  }catch(e){console.error("Liq error:",e)}
 
-  // Order Book (simulated from price data)
-  buildOrderBook(m.current_price,b.volume_1h||0);
+  // Order Book
+  try{buildOrderBook(m.current_price,b.volume_1h||b.volume_24h||0)}catch(e){console.error("OrderBook error:",e)}
 
   // Position
+  try{
   if(d.position){
    document.getElementById("assetPosition").style.display="block";
    var pp=d.position,pnlC=pp.pnl_pct>=0?"var(--accent-green)":"var(--accent-red)";
    document.getElementById("assetPosContent").innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><span style="font-size:11px;color:var(--text-tertiary)">Вхід</span><p style="font-weight:700;color:var(--text-primary);margin:4px 0 0">'+fmtPrice(pp.buy_price)+'</p></div><div><span style="font-size:11px;color:var(--text-tertiary)">К-сть</span><p style="font-weight:700;color:var(--text-primary);margin:4px 0 0">'+pp.quantity+'</p></div><div><span style="font-size:11px;color:var(--text-tertiary)">Поточна</span><p style="font-weight:700;color:var(--text-primary);margin:4px 0 0">'+fmtPrice(pp.current_price)+'</p></div><div><span style="font-size:11px;color:var(--text-tertiary)">P&L</span><p style="font-weight:700;margin:4px 0 0;color:'+pnlC+'">'+chIcon(pp.pnl_pct)+' '+chS(pp.pnl_pct)+'</p></div></div>';
-  } else {
-   document.getElementById("assetPosition").style.display="none";
-  }
+  } else {document.getElementById("assetPosition").style.display="none"}
+  }catch(e){}
 
   // Risk
+  try{
   var riskColors={HIGH:"var(--accent-red)",MEDIUM:"var(--accent-orange)",LOW:"var(--accent-green)"};
   var riskLabels={HIGH:"Високий",MEDIUM:"Середній",LOW:"Низький"};
   var riskIcons={HIGH:"🔴",MEDIUM:"🟡",LOW:"🟢"};
-  document.getElementById("assetRiskContent").innerHTML='<div style="font-size:48px;margin-bottom:8px">'+riskIcons[a.risk_level]+'</div><div style="font-size:24px;font-weight:800;color:'+riskColors[a.risk_level]+'">'+riskLabels[a.risk_level]+'</div><p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0">На основі RSI, волатильності та тренду</p>';
+  var rl=a.risk_level||"LOW";
+  document.getElementById("assetRiskContent").innerHTML='<div style="font-size:48px;margin-bottom:8px">'+(riskIcons[rl]||"🟢")+'</div><div style="font-size:24px;font-weight:800;color:'+(riskColors[rl]||"var(--accent-green)")+'">'+(riskLabels[rl]||"Низький")+'</div><p style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0">На основі RSI, волатильності та тренду</p>';
+  }catch(e){console.error("Risk error:",e)}
 
   // Correlations
+  try{
   var corrs=d.correlations||[];
   var ch2="";
   if(corrs.length){
@@ -1117,18 +1123,23 @@ function loadAssetPage(symbol){
    }
   } else {ch2='<p style="text-align:center;padding:16px;color:var(--text-tertiary)">Недостатньо даних</p>'}
   document.getElementById("assetCorrelations").innerHTML=ch2;
+  }catch(e){console.error("Corr error:",e)}
 
   // Quick stats
+  try{
   var qs='<div style="display:flex;flex-direction:column;gap:12px">';
   qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Макс за весь час</span><span style="color:var(--text-primary);font-weight:600;font-size:13px">'+fmtPrice(m.high_all)+'</span></div>';
   qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Мін за весь час</span><span style="color:var(--text-primary);font-weight:600;font-size:13px">'+fmtPrice(m.low_all)+'</span></div>';
-  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Від мінімуму</span><span style="color:var(--accent-green);font-weight:600;font-size:13px">+'+m.from_atl_pct+'%</span></div>';
-  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Точок даних</span><span style="color:var(--text-primary);font-weight:600;font-size:13px">'+m.data_points+'</span></div>';
+  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Від ATH</span><span style="color:var(--accent-orange);font-weight:600;font-size:13px">'+(m.from_ath_pct||0)+'%</span></div>';
+  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Від мінімуму</span><span style="color:var(--accent-green);font-weight:600;font-size:13px">+'+(m.from_atl_pct||0)+'%</span></div>';
+  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Волатильність</span><span style="color:var(--text-primary);font-weight:600;font-size:13px">'+(m.volatility||0)+'%</span></div>';
+  qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Точок даних</span><span style="color:var(--text-primary);font-weight:600;font-size:13px">'+(m.data_points||0)+'</span></div>';
   if(b.chain)qs+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--text-tertiary);font-size:13px">Мережа</span><span style="color:var(--accent-purple);font-weight:600;font-size:13px">'+b.chain+'</span></div>';
-  if(b.capture_reason)qs+='<div style="display:flex;justify-content:space-between;padding:8px 0"><span style="color:var(--text-tertiary);font-size:13px">Причина захоплення</span><span style="color:var(--accent-green);font-weight:600;font-size:12px;text-align:right;max-width:180px">'+b.capture_reason+'</span></div>';
+  if(b.capture_reason)qs+='<div style="display:flex;justify-content:space-between;padding:8px 0"><span style="color:var(--text-tertiary);font-size:13px">Причина</span><span style="color:var(--accent-green);font-weight:600;font-size:12px;text-align:right;max-width:180px">'+b.capture_reason+'</span></div>';
   if(b.last_updated)qs+='<div style="display:flex;justify-content:space-between;padding:8px 0"><span style="color:var(--text-tertiary);font-size:13px">Оновлено</span><span style="color:var(--text-secondary);font-size:12px">'+new Date(b.last_updated).toLocaleString("uk")+'</span></div>';
   qs+='</div>';
   document.getElementById("assetQuickContent").innerHTML=qs;
+  }catch(e){console.error("QuickStats error:",e)}
 
   // Watchlist button state
   if(d.in_watchlist){document.getElementById("assetAddWatchlist").textContent="✓ У watchlist";document.getElementById("assetAddWatchlist").style.color="var(--accent-green)"}else{document.getElementById("assetAddWatchlist").textContent="👁 В watchlist";document.getElementById("assetAddWatchlist").style.color=""}
@@ -1201,47 +1212,54 @@ function toggleChartMode(){
 }
 
 function buildAssetRSI(data){
- if(assetRsiChartI)assetRsiChartI.destroy();
+ try{
+ if(assetRsiChartI){assetRsiChartI.destroy();assetRsiChartI=null}
  var rsiCanvas=document.getElementById("assetRsiChart");
- if(!data||!data.length){return}
+ if(!rsiCanvas||!data||!data.length)return;
  var labels=[],rsi=[],hasRsi=false;
  for(var i=0;i<data.length;i++){
   var t=new Date(data[i].time);labels.push(t.getHours()+":"+String(t.getMinutes()).padStart(2,"0"));
   rsi.push(data[i].rsi||null);
   if(data[i].rsi)hasRsi=true;
  }
- if(!hasRsi){var p=rsiCanvas.parentElement;if(p)p.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:13px">RSI потребує мінімум 14 точок даних</div>';return}
- assetRsiChartI=new Chart(document.getElementById("assetRsiChart").getContext("2d"),{type:"line",data:{labels:labels,datasets:[
+ if(!hasRsi){rsiCanvas.style.display="none";rsiCanvas.parentElement.style.position="relative";
+  var msg=rsiCanvas.parentElement.querySelector(".rsi-msg");if(!msg){msg=document.createElement("div");msg.className="rsi-msg";msg.style.cssText="text-align:center;padding:20px;color:var(--text-tertiary);font-size:13px";msg.textContent="RSI потребує мінімум 14 точок даних";rsiCanvas.parentElement.appendChild(msg)}return}
+ rsiCanvas.style.display="";var oldMsg=rsiCanvas.parentElement.querySelector(".rsi-msg");if(oldMsg)oldMsg.remove();
+ assetRsiChartI=new Chart(rsiCanvas.getContext("2d"),{type:"line",data:{labels:labels,datasets:[
   {label:"RSI",data:rsi,borderColor:"#ff9f0a",backgroundColor:"rgba(255,159,10,.08)",fill:true,tension:.3,pointRadius:data.length<10?4:0,pointHoverRadius:5,borderWidth:1.5}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},annotation:{}},scales:{x:{display:false},y:{min:0,max:100,ticks:{color:"#6e6e73",stepSize:30,font:{size:10}},grid:{color:"rgba(255,255,255,.06)"}}}}})
+ ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,ticks:{color:"#6e6e73",stepSize:30,font:{size:10}},grid:{color:"rgba(255,255,255,.06)"}}}}})}catch(e){console.error("RSI chart error:",e)}
 }
 
 function buildAssetVolume(data){
- if(assetVolChartI)assetVolChartI.destroy();
- if(!data||!data.length)return;
+ try{
+ if(assetVolChartI){assetVolChartI.destroy();assetVolChartI=null}
+ var vc=document.getElementById("assetVolChart");
+ if(!vc||!data||!data.length)return;
  var labels=[],vol=[],colors=[];
  for(var i=0;i<data.length;i++){
   var t=new Date(data[i].time);labels.push(t.getHours()+":"+String(t.getMinutes()).padStart(2,"0"));
   vol.push(data[i].volume_est||0);
   colors.push(i>0&&data[i].price>=data[i-1].price?"rgba(48,209,88,.5)":"rgba(255,69,58,.5)");
  }
- assetVolChartI=new Chart(document.getElementById("assetVolChart").getContext("2d"),{type:"bar",data:{labels:labels,datasets:[{label:"Об'єм",data:vol,backgroundColor:colors,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:"#6e6e73",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}}})
+ assetVolChartI=new Chart(vc.getContext("2d"),{type:"bar",data:{labels:labels,datasets:[{label:"Об'єм",data:vol,backgroundColor:colors,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:"#6e6e73",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}}})}catch(e){console.error("Vol chart error:",e)}
 }
 
 function assetSetPeriod(p){
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
- event.target.classList.add("active");
+ if(event&&event.target)event.target.classList.add("active");
+ showToast("Завантаження "+p+"...",true);
  fetch("/api/chart/"+encodeURIComponent(currentAssetSymbol)+"?period="+p).then(function(r){return r.json()}).then(function(d){
-  if(d.data&&d.data.length){
-   // Add indicators
+  if(d.data&&d.data.length>=2){
    var data=d.data;
    if(data.length>=14){for(var i=13;i<data.length;i++){var avg=0;for(var j=i-13;j<=i;j++)avg+=data[j].price;data[i].ma14=Math.round(avg/14*1e6)/1e6}
     for(var i=14;i<data.length;i++){var g=0,l=0;for(var j=i-13;j<=i;j++){var df=data[j].price-data[j-1].price;if(df>0)g+=df;else l-=df}var ag=g/14,al=l/14;data[i].rsi=al===0?100:Math.round((100-100/(1+ag/al))*10)/10}}
    if(data.length>=20){for(var i=19;i<data.length;i++){var w=[];for(var j=i-19;j<=i;j++)w.push(data[j].price);var ma=0;for(var j=0;j<w.length;j++)ma+=w[j];ma/=20;var sv=0;for(var j=0;j<w.length;j++)sv+=(w[j]-ma)*(w[j]-ma);sv=Math.sqrt(sv/20);data[i].bb_upper=Math.round((ma+2*sv)*1e6)/1e6;data[i].bb_lower=Math.round((ma-2*sv)*1e6)/1e6}}
    for(var i=0;i<data.length;i++){data[i].volume_est=i>0?Math.round(Math.abs(data[i].price-data[i-1].price)*1000*100)/100:0}
-   buildAssetChart(data);buildAssetRSI(data);buildAssetVolume(data);
-  }
- }).catch(function(){})
+   try{buildAssetChart(data)}catch(e){}
+   try{buildAssetRSI(data)}catch(e){}
+   try{buildAssetVolume(data)}catch(e){}
+  } else {showToast("Недостатньо даних для періоду "+p,false)}
+ }).catch(function(e){showToast("Помилка завантаження",false)})
 }
 
 function assetAddToPortfolio(){
