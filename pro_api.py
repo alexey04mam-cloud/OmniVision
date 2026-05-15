@@ -8,6 +8,7 @@ import math
 import logging
 import time
 import random
+import asyncio
 from datetime import datetime, timezone
 
 log = logging.getLogger("omni-pro")
@@ -345,9 +346,9 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
         user = get_current_user(request)
 
         # ── Basic info from DB ──
-        asset = db.query(MarketAsset).filter(
-            MarketAsset.symbol.contains(sym)
-        ).first()
+        asset = db.query(MarketAsset).filter(MarketAsset.symbol == sym).first()
+        if not asset:
+            asset = db.query(MarketAsset).filter(MarketAsset.symbol.contains(sym)).first()
 
         basic = {}
         if asset:
@@ -366,9 +367,14 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                      "last_updated": None}
 
         # ── Price history (chart data) ──
+        _ph_sym = asset.symbol if asset else sym
         prices_raw = db.query(PriceHistory).filter(
-            PriceHistory.symbol.contains(sym)
+            PriceHistory.symbol == _ph_sym
         ).order_by(PriceHistory.recorded_at.desc()).limit(200).all()
+        if not prices_raw:
+            prices_raw = db.query(PriceHistory).filter(
+                PriceHistory.symbol.contains(sym)
+            ).order_by(PriceHistory.recorded_at.desc()).limit(200).all()
         prices_raw.reverse()
         chart_data = []
         for p in prices_raw:
@@ -390,79 +396,78 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                 chart_data = _cached["chart"]
                 if _cached.get("basic_update"):
                     basic.update(_cached["basic_update"])
-                log.info(f"Cache hit for {sym}")
             else:
                 _basic_update = {}
-                # 1) Try CoinGecko (async)
-                try:
-                    cg_id_map = {
-                        "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-                        "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
-                        "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
-                        "MATIC": "matic-network", "LINK": "chainlink", "UNI": "uniswap",
-                        "ATOM": "cosmos", "LTC": "litecoin", "NEAR": "near",
-                        "APT": "aptos", "ARB": "arbitrum", "OP": "optimism",
-                        "SUI": "sui", "FIL": "filecoin", "PEPE": "pepe",
-                        "SHIB": "shiba-inu", "TRX": "tron", "TON": "the-open-network",
-                        "HBAR": "hedera-hashgraph", "INJ": "injective-protocol",
-                        "WIF": "dogwifcoin", "BONK": "bonk", "JUP": "jupiter-exchange-solana",
-                        "RENDER": "render-token", "FET": "artificial-superintelligence-alliance",
-                        "WLD": "worldcoin-wld", "SEI": "sei-network", "TIA": "celestia",
-                        "AAVE": "aave", "MKR": "maker", "CRV": "curve-dao-token",
-                        "RUNE": "thorchain", "STX": "blockstack", "IMX": "immutable-x",
-                    }
-                    cg_id = cg_id_map.get(clean, clean.lower())
-                    async with httpx.AsyncClient(timeout=6) as _hx:
-                        _r = await _hx.get(f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=7")
-                    if _r.status_code == 200:
-                        _prices = _r.json().get("prices", [])
-                        if _prices:
-                            chart_data = [{"time": datetime.fromtimestamp(p[0]/1000, tz=timezone.utc).isoformat(), "price": p[1]} for p in _prices]
-                            log.info(f"CoinGecko: {len(chart_data)} pts for {sym}")
-                except Exception as _e:
-                    log.warning(f"CoinGecko fail {sym}: {_e}")
+                cg_id_map = {
+                    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+                    "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
+                    "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
+                    "MATIC": "matic-network", "LINK": "chainlink", "UNI": "uniswap",
+                    "ATOM": "cosmos", "LTC": "litecoin", "NEAR": "near",
+                    "APT": "aptos", "ARB": "arbitrum", "OP": "optimism",
+                    "SUI": "sui", "FIL": "filecoin", "PEPE": "pepe",
+                    "SHIB": "shiba-inu", "TRX": "tron", "TON": "the-open-network",
+                    "HBAR": "hedera-hashgraph", "INJ": "injective-protocol",
+                    "WIF": "dogwifcoin", "BONK": "bonk", "JUP": "jupiter-exchange-solana",
+                    "RENDER": "render-token", "FET": "artificial-superintelligence-alliance",
+                    "AAVE": "aave", "MKR": "maker", "RUNE": "thorchain", "IMX": "immutable-x",
+                }
+                cg_id = cg_id_map.get(clean)  # None if not in map — skip CoinGecko
 
-                # 2) DexScreener fallback (async)
-                if len(chart_data) < 5:
+                # Fire CoinGecko + DexScreener in PARALLEL (3s timeout)
+                async def _fetch_cg():
+                    if not cg_id: return None
                     try:
-                        async with httpx.AsyncClient(timeout=6) as _hx:
-                            _r2 = await _hx.get(f"https://api.dexscreener.com/latest/dex/search?q={clean}")
-                        if _r2.status_code == 200:
-                            _pairs = _r2.json().get("pairs") or []
-                            if _pairs:
-                                _pairs.sort(key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0), reverse=True)
-                                _best = _pairs[0]
-                                _price_now = float(_best.get("priceUsd") or 0)
-                                if basic["price_usd"] == 0 and _price_now > 0:
-                                    _basic_update = {
-                                        "price_usd": _price_now,
-                                        "change_pct": float((_best.get("priceChange") or {}).get("h24", 0) or 0),
-                                        "volume_24h": float((_best.get("volume") or {}).get("h24", 0) or 0),
-                                        "chain": _best.get("chainId", basic.get("chain")),
-                                        "name": (_best.get("baseToken") or {}).get("name", basic["name"]),
-                                    }
-                                    basic.update(_basic_update)
-                                if _price_now > 0:
-                                    import random
-                                    _ch_24h = float((_best.get("priceChange") or {}).get("h24", 0) or 0)
-                                    _ch_6h = float((_best.get("priceChange") or {}).get("h6", 0) or 0)
-                                    _ch_1h = float((_best.get("priceChange") or {}).get("h1", 0) or 0)
-                                    _p24 = _price_now / (1 + _ch_24h / 100) if _ch_24h else _price_now * 0.99
-                                    _p6 = _price_now / (1 + _ch_6h / 100) if _ch_6h else _price_now
-                                    _p1 = _price_now / (1 + _ch_1h / 100) if _ch_1h else _price_now
-                                    _now_ts = datetime.now(timezone.utc)
-                                    chart_data = []
-                                    for _i in range(96):
-                                        _t = _now_ts.timestamp() - (96 - _i) * 900
-                                        if _i <= 72: _frac = _i / 72; _p = _p24 + (_p6 - _p24) * _frac
-                                        elif _i <= 92: _frac = (_i - 72) / 20; _p = _p6 + (_p1 - _p6) * _frac
-                                        else: _frac = (_i - 92) / 4; _p = _p1 + (_price_now - _p1) * _frac
-                                        chart_data.append({"time": datetime.fromtimestamp(_t, tz=timezone.utc).isoformat(), "price": round(_p + _p * random.uniform(-0.003, 0.003), 8)})
-                                    log.info(f"DexScreener: {len(chart_data)} pts for {sym}")
-                    except Exception as _e2:
-                        log.warning(f"DexScreener fail {sym}: {_e2}")
+                        async with httpx.AsyncClient(timeout=3) as c:
+                            r = await c.get(f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=7")
+                        if r.status_code == 200:
+                            pts = r.json().get("prices", [])
+                            if pts: return [{"time": datetime.fromtimestamp(p[0]/1000, tz=timezone.utc).isoformat(), "price": p[1]} for p in pts]
+                    except: pass
+                    return None
 
-                # Save to cache
+                async def _fetch_dex():
+                    try:
+                        async with httpx.AsyncClient(timeout=3) as c:
+                            r = await c.get(f"https://api.dexscreener.com/latest/dex/search?q={clean}")
+                        if r.status_code == 200:
+                            return r.json().get("pairs") or []
+                    except: pass
+                    return []
+
+                cg_result, dex_pairs = await asyncio.gather(_fetch_cg(), _fetch_dex())
+
+                if cg_result and len(cg_result) >= 5:
+                    chart_data = cg_result
+                elif dex_pairs:
+                    dex_pairs.sort(key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0), reverse=True)
+                    _best = dex_pairs[0]
+                    _price_now = float(_best.get("priceUsd") or 0)
+                    if basic["price_usd"] == 0 and _price_now > 0:
+                        _basic_update = {
+                            "price_usd": _price_now,
+                            "change_pct": float((_best.get("priceChange") or {}).get("h24", 0) or 0),
+                            "volume_24h": float((_best.get("volume") or {}).get("h24", 0) or 0),
+                            "chain": _best.get("chainId", basic.get("chain")),
+                            "name": (_best.get("baseToken") or {}).get("name", basic["name"]),
+                        }
+                        basic.update(_basic_update)
+                    if _price_now > 0:
+                        _ch_24h = float((_best.get("priceChange") or {}).get("h24", 0) or 0)
+                        _ch_6h = float((_best.get("priceChange") or {}).get("h6", 0) or 0)
+                        _ch_1h = float((_best.get("priceChange") or {}).get("h1", 0) or 0)
+                        _p24 = _price_now / (1 + _ch_24h / 100) if _ch_24h else _price_now * 0.99
+                        _p6 = _price_now / (1 + _ch_6h / 100) if _ch_6h else _price_now
+                        _p1 = _price_now / (1 + _ch_1h / 100) if _ch_1h else _price_now
+                        _now_ts = datetime.now(timezone.utc)
+                        chart_data = []
+                        for _i in range(96):
+                            _t = _now_ts.timestamp() - (96 - _i) * 900
+                            if _i <= 72: _frac = _i / 72; _p = _p24 + (_p6 - _p24) * _frac
+                            elif _i <= 92: _frac = (_i - 72) / 20; _p = _p6 + (_p1 - _p6) * _frac
+                            else: _frac = (_i - 92) / 4; _p = _p1 + (_price_now - _p1) * _frac
+                            chart_data.append({"time": datetime.fromtimestamp(_t, tz=timezone.utc).isoformat(), "price": round(_p + _p * random.uniform(-0.003, 0.003), 8)})
+
                 _asset_cache[cache_key] = {"chart": chart_data, "basic_update": _basic_update, "ts": _now}
 
         # Indicators: MA-14, MA-50, RSI-14, Bollinger Bands
@@ -567,45 +572,35 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
                     "est_usd_m": round(intensity * 0.8, 1)
                 })
 
-        # ── Correlations with top assets (cached) ──
+        # ── Correlations (cached 5 min, max 4 assets) ──
         corr_cache_key = f"corr_{sym}"
         correlations = []
         if corr_cache_key in _asset_cache and (time.time() - _asset_cache[corr_cache_key]["ts"]) < 300:
             correlations = _asset_cache[corr_cache_key]["data"]
         else:
             try:
-                top_syms_q = db.query(
-                    PriceHistory.symbol, sqlfunc.count(PriceHistory.id).label("cnt")
-                ).group_by(PriceHistory.symbol).order_by(
-                    sqlfunc.count(PriceHistory.id).desc()
-                ).limit(6).all()
-                corr_symbols = [s[0] for s in top_syms_q if s[0]]
-
-                def get_returns(s, lim=30):
-                    pp = [p.price_usd for p in db.query(PriceHistory).filter(
-                        PriceHistory.symbol.contains(s)
-                    ).order_by(PriceHistory.recorded_at.desc()).limit(lim).all() if p.price_usd]
-                    if len(pp) < 5: return []
-                    return [(pp[i] - pp[i+1]) / pp[i+1] for i in range(len(pp)-1)]
-
-                def pearson(x, y):
-                    n = min(len(x), len(y))
-                    if n < 3: return None
-                    x, y = x[:n], y[:n]
-                    mx, my = sum(x)/n, sum(y)/n
-                    sx = math.sqrt(sum((xi-mx)**2 for xi in x)/n)
-                    sy = math.sqrt(sum((yi-my)**2 for yi in y)/n)
-                    if sx == 0 or sy == 0: return None
-                    return round(sum((x[i]-mx)*(y[i]-my) for i in range(n))/n/(sx*sy), 3)
-
-                my_returns = get_returns(sym)
-                for cs in corr_symbols:
-                    if sym in cs: continue
-                    cr = get_returns(cs)
-                    p = pearson(my_returns, cr)
-                    if p is not None:
-                        correlations.append({"symbol": cs, "correlation": p})
-                correlations.sort(key=lambda x: abs(x["correlation"]), reverse=True)
+                # Use well-known symbols instead of querying DB for top symbols
+                _corr_targets = ["BTC", "ETH", "SOL", "BNB"]
+                my_prices = [p.price_usd for p in db.query(PriceHistory.price_usd).filter(
+                    PriceHistory.symbol.contains(sym)
+                ).order_by(PriceHistory.recorded_at.desc()).limit(20).all() if p.price_usd]
+                if len(my_prices) >= 5:
+                    my_ret = [(my_prices[i] - my_prices[i+1]) / my_prices[i+1] for i in range(len(my_prices)-1)]
+                    for cs in _corr_targets:
+                        if cs in sym: continue
+                        cp = [p.price_usd for p in db.query(PriceHistory.price_usd).filter(
+                            PriceHistory.symbol.contains(cs)
+                        ).order_by(PriceHistory.recorded_at.desc()).limit(20).all() if p.price_usd]
+                        if len(cp) < 5: continue
+                        cr = [(cp[i] - cp[i+1]) / cp[i+1] for i in range(len(cp)-1)]
+                        n = min(len(my_ret), len(cr))
+                        if n < 3: continue
+                        x, y = my_ret[:n], cr[:n]
+                        mx, my2 = sum(x)/n, sum(y)/n
+                        sx = math.sqrt(sum((xi-mx)**2 for xi in x)/n)
+                        sy = math.sqrt(sum((yi-my2)**2 for yi in y)/n)
+                        if sx > 0 and sy > 0:
+                            correlations.append({"symbol": cs, "correlation": round(sum((x[i]-mx)*(y[i]-my2) for i in range(n))/n/(sx*sy), 3)})
                 _asset_cache[corr_cache_key] = {"data": correlations, "ts": time.time()}
             except Exception:
                 pass
