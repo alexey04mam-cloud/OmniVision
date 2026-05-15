@@ -691,9 +691,6 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
          <button class="period-btn" onclick="assetSetPeriod('1d',this)">1D</button>
          <button class="period-btn" onclick="assetSetPeriod('1w',this)">1W</button>
          <button class="period-btn" onclick="assetSetPeriod('1m',this)">1M</button>
-         <button class="period-btn" onclick="assetSetPeriod('3m',this)">3M</button>
-         <button class="period-btn" onclick="assetSetPeriod('6m',this)">6M</button>
-         <button class="period-btn" onclick="assetSetPeriod('1y',this)">1Y</button>
         </div>
         <button id="chartModeBtn" onclick="toggleChartMode()" class="btn-secondary btn-sm" style="margin-left:8px">📊 Свічки</button>
        </div>
@@ -756,6 +753,14 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
        <h3>🔗 Кореляції</h3>
        <div class="sidebar-corr" id="assetCorrelations">
         <div class="skeleton" style="height:160px;border-radius:12px"></div>
+       </div>
+      </div>
+
+      <!-- Historical performance -->
+      <div class="analysis-card" id="assetHistoryCard">
+       <h3>📅 Історична динаміка</h3>
+       <div id="assetHistoryContent">
+        <div class="skeleton" style="height:200px;border-radius:12px"></div>
        </div>
       </div>
 
@@ -1282,6 +1287,9 @@ function loadAssetPage(symbol){
   document.getElementById("assetQuickContent").innerHTML=qs;
   }catch(e){console.error("QuickStats error:",e)}
 
+  // Historical performance — fetch 1 year of daily candles
+  try{_loadHistoricalPerf(b.symbol,b.category,m.current_price)}catch(e){}
+
   // Watchlist button state
   if(d.in_watchlist){document.getElementById("assetAddWatchlist").textContent="✓ У watchlist";document.getElementById("assetAddWatchlist").style.color="var(--accent-green)"}else{document.getElementById("assetAddWatchlist").textContent="👁 В watchlist";document.getElementById("assetAddWatchlist").style.color=""}
 
@@ -1475,6 +1483,111 @@ function _renderChartData(data){
  try{buildAssetRSI(data)}catch(e){}
  try{buildAssetVolume(data)}catch(e){}
 }
+
+/* ── Historical Performance ── */
+function _loadHistoricalPerf(symbol,category,currentPrice){
+ var el=document.getElementById("assetHistoryContent");
+ if(!el)return;
+ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">Завантажую історію...</div>';
+
+ if(category!=="CRYPTO"){
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">Історичні дані доступні лише для крипто</div>';
+  return;
+ }
+
+ var pair=_cleanSymbolForBinance(symbol).toUpperCase();
+ _binanceFetch("/api/v3/klines?symbol="+pair+"&interval=1d&limit=365",8000)
+  .then(function(r){return r.json()}).then(function(klines){
+   if(!klines||!klines.length||klines.msg){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">Немає історичних даних</div>';
+    return;
+   }
+
+   var now=currentPrice;
+   var total=klines.length;
+
+   /* Find prices at specific intervals ago */
+   function _getCandle(daysAgo){
+    var idx=total-daysAgo;
+    if(idx<0||idx>=total)return null;
+    return {
+     open:parseFloat(klines[idx][1]),
+     high:parseFloat(klines[idx][2]),
+     low:parseFloat(klines[idx][3]),
+     close:parseFloat(klines[idx][4]),
+     vol:parseFloat(klines[idx][5]),
+     date:new Date(klines[idx][0])
+    };
+   }
+
+   /* Period stats: min, max, avg over a range */
+   function _periodStats(fromIdx,toIdx){
+    if(fromIdx<0)fromIdx=0;
+    var mn=Infinity,mx=0,sum=0,cnt=0,totalVol=0;
+    for(var i=fromIdx;i<=toIdx&&i<total;i++){
+     var h=parseFloat(klines[i][2]),l=parseFloat(klines[i][3]),c=parseFloat(klines[i][4]),v=parseFloat(klines[i][5]);
+     if(h>mx)mx=h;if(l<mn)mn=l;sum+=c;cnt++;totalVol+=v;
+    }
+    return {min:mn,max:mx,avg:cnt?sum/cnt:0,vol:totalVol};
+   }
+
+   var periods=[
+    {label:"24 години",days:1},
+    {label:"7 днів",days:7},
+    {label:"30 днів",days:30},
+    {label:"90 днів",days:90},
+    {label:"6 місяців",days:180},
+    {label:"1 рік",days:365}
+   ];
+
+   var h='<div style="display:flex;flex-direction:column;gap:0">';
+
+   /* Header */
+   h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px">';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600">Період</span>';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Ціна тоді</span>';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Зміна</span>';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Мін</span>';
+   h+='<span style="font-size:11px;color:var(--text-tertiary);font-weight:600;text-align:right">Макс</span>';
+   h+='</div>';
+
+   for(var i=0;i<periods.length;i++){
+    var p=periods[i];
+    if(p.days>total)continue;
+    var candle=_getCandle(p.days);
+    var stats=_periodStats(total-p.days,total-1);
+    if(!candle)continue;
+
+    var oldPrice=candle.open;
+    var chg=oldPrice?((now-oldPrice)/oldPrice*100):0;
+    var chgColor=chg>=0?"#2ebd85":"#f6465d";
+    var chgSign=chg>=0?"+":"";
+
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:4px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.03);align-items:center">';
+    h+='<span style="font-size:13px;color:var(--text-primary);font-weight:600">'+p.label+'</span>';
+    h+='<span style="font-size:12px;color:var(--text-secondary);text-align:right;font-family:monospace">'+fmtPrice(oldPrice)+'</span>';
+    h+='<span style="font-size:13px;font-weight:700;text-align:right;color:'+chgColor+';font-family:monospace">'+chgSign+chg.toFixed(2)+'%</span>';
+    h+='<span style="font-size:11px;color:var(--accent-red);text-align:right;font-family:monospace">'+fmtPrice(stats.min)+'</span>';
+    h+='<span style="font-size:11px;color:#2ebd85;text-align:right;font-family:monospace">'+fmtPrice(stats.max)+'</span>';
+    h+='</div>';
+   }
+
+   /* Summary: ATH/ATL for the loaded period */
+   var allStats=_periodStats(0,total-1);
+   h+='<div style="margin-top:12px;padding:12px;background:rgba(255,255,255,.03);border-radius:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">';
+   h+='<div><div style="font-size:11px;color:var(--text-tertiary)">Макс за рік</div><div style="font-size:15px;font-weight:700;color:#2ebd85;margin-top:4px">'+fmtPrice(allStats.max)+'</div></div>';
+   h+='<div><div style="font-size:11px;color:var(--text-tertiary)">Мін за рік</div><div style="font-size:15px;font-weight:700;color:#f6465d;margin-top:4px">'+fmtPrice(allStats.min)+'</div></div>';
+   h+='<div><div style="font-size:11px;color:var(--text-tertiary)">Середня</div><div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-top:4px">'+fmtPrice(allStats.avg)+'</div></div>';
+   h+='</div>';
+
+   h+='</div>';
+   el.innerHTML=h;
+
+  }).catch(function(err){
+   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-tertiary)">Історія недоступна</div>';
+  });
+}
+
 function assetSetPeriod(p,btn){
  /* Highlight active button */
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
