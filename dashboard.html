@@ -715,11 +715,19 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
        <div class="skeleton" style="height:200px;border-radius:12px"></div>
       </div>
 
-      <!-- Order Book -->
-      <div class="analysis-card" id="assetOrderBook">
-       <h3>📋 Книга ордерів</h3>
-       <div id="orderBookContent" style="font-family:monospace;font-size:12px">
-        <div class="skeleton" style="height:240px;border-radius:12px"></div>
+      <!-- Order Book + Trades side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+       <div class="analysis-card" id="assetOrderBook" style="margin-bottom:0">
+        <h3>📋 Книга ордерів <span id="liveBookDot" style="display:none;color:var(--accent-green);font-size:10px">● LIVE</span></h3>
+        <div id="orderBookContent" style="font-family:monospace;font-size:12px">
+         <div class="skeleton" style="height:240px;border-radius:12px"></div>
+        </div>
+       </div>
+       <div class="analysis-card" style="margin-bottom:0">
+        <h3>🔄 Останні угоди <span id="liveTradesDot" style="display:none;color:var(--accent-green);font-size:10px">● LIVE</span></h3>
+        <div id="recentTradesContent" style="font-family:monospace;font-size:12px">
+         <div class="skeleton" style="height:240px;border-radius:12px"></div>
+        </div>
        </div>
       </div>
      </div>
@@ -1001,6 +1009,120 @@ function loadAdvisor(){var el=document.getElementById("advisorContent");el.inner
 
 /* ══════ ASSET DETAIL PAGE ══════ */
 var currentAssetSymbol="",currentAssetCategory="",assetMainChartI=null,assetRsiChartI=null,assetVolChartI=null,assetPrevTab="hunted",_loadedChartData=null;
+var _liveWS=null,_liveKlineWS=null,_liveBookWS=null,_liveTradesWS=null,_liveInterval="1m";
+
+/* ══════ BINANCE LIVE WEBSOCKET ENGINE ══════ */
+function _cleanSymbolForBinance(sym){
+ var s=sym.toUpperCase().replace(/[^A-Z0-9]/g,"");
+ if(!s.endsWith("USDT")&&!s.endsWith("BTC")&&!s.endsWith("BUSD"))s+="USDT";
+ return s.toLowerCase();
+}
+
+function _startLiveFeeds(symbol){
+ _stopLiveFeeds();
+ var pair=_cleanSymbolForBinance(symbol);
+
+ /* 1) Live Kline (candle) stream */
+ try{
+  _liveKlineWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@kline_"+_liveInterval);
+  _liveKlineWS.onmessage=function(e){
+   try{
+    var msg=JSON.parse(e.data);
+    if(!msg.k)return;
+    var k=msg.k;
+    var candle={time:Math.floor(k.t/1000),open:parseFloat(k.o),high:parseFloat(k.h),low:parseFloat(k.l),close:parseFloat(k.c)};
+    var vol={time:candle.time,value:parseFloat(k.v),color:candle.close>=candle.open?"rgba(48,209,88,.4)":"rgba(255,69,58,.4)"};
+    if(tvCandleSeries){tvCandleSeries.update(candle)}
+    if(tvVolSeries){tvVolSeries.update(vol)}
+    /* Update price in header */
+    var priceEl=document.getElementById("assetPrice");
+    if(priceEl){
+     var oldP=parseFloat(priceEl.textContent.replace(/[^0-9.-]/g,""))||0;
+     priceEl.textContent=fmtPrice(candle.close);
+     priceEl.style.transition="color .15s";
+     priceEl.style.color=candle.close>oldP?"var(--accent-green)":candle.close<oldP?"var(--accent-red)":"var(--text-primary)";
+     setTimeout(function(){priceEl.style.color="var(--text-primary)"},800);
+    }
+   }catch(err){}
+  };
+  _liveKlineWS.onerror=function(){};
+ }catch(e){}
+
+ /* 2) Live Order Book (depth) stream */
+ try{
+  _liveBookWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@depth10@100ms");
+  _liveBookWS.onmessage=function(e){
+   try{
+    var msg=JSON.parse(e.data);
+    var bids=msg.bids||[],asks=msg.asks||[];
+    var el=document.getElementById("orderBookContent");
+    if(!el||!asks.length)return;
+    var maxQty=0;
+    for(var i=0;i<asks.length;i++){var q=parseFloat(asks[i][1]);if(q>maxQty)maxQty=q}
+    for(var i=0;i<bids.length;i++){var q=parseFloat(bids[i][1]);if(q>maxQty)maxQty=q}
+    var h='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border-primary);color:var(--text-tertiary);margin-bottom:4px"><span>Ціна</span><span style="text-align:center">К-сть</span><span style="text-align:right">Всього</span></div>';
+    var total=0;
+    var showAsks=asks.slice(0,8).reverse();
+    for(var i=0;i<showAsks.length;i++){var p=parseFloat(showAsks[i][0]),q=parseFloat(showAsks[i][1]);total+=p*q;var pct=maxQty?(q/maxQty)*100:0;
+     h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;padding:2px 0;position:relative;font-size:12px;font-family:monospace"><div style="position:absolute;right:0;top:0;bottom:0;width:'+pct+'%;background:rgba(255,69,58,.08)"></div><span style="color:var(--accent-red);z-index:1">'+fmtPrice(p)+'</span><span style="text-align:center;z-index:1;color:var(--text-secondary)">'+q.toFixed(4)+'</span><span style="text-align:right;color:var(--text-tertiary);z-index:1">'+fmtVol(total)+'</span></div>'}
+    var midPrice=parseFloat(asks[0][0]);
+    h+='<div style="text-align:center;padding:6px;font-size:15px;font-weight:700;color:var(--accent-green);border-top:1px solid var(--border-primary);border-bottom:1px solid var(--border-primary);margin:2px 0">'+fmtPrice(midPrice)+'</div>';
+    total=0;
+    for(var i=0;i<Math.min(bids.length,8);i++){var p=parseFloat(bids[i][0]),q=parseFloat(bids[i][1]);total+=p*q;var pct2=maxQty?(q/maxQty)*100:0;
+     h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;padding:2px 0;position:relative;font-size:12px;font-family:monospace"><div style="position:absolute;right:0;top:0;bottom:0;width:'+pct2+'%;background:rgba(48,209,88,.08)"></div><span style="color:var(--accent-green);z-index:1">'+fmtPrice(p)+'</span><span style="text-align:center;z-index:1;color:var(--text-secondary)">'+q.toFixed(4)+'</span><span style="text-align:right;color:var(--text-tertiary);z-index:1">'+fmtVol(total)+'</span></div>'}
+    el.innerHTML=h;
+   }catch(err){}
+  };
+ }catch(e){}
+
+ /* 3) Live Trades stream */
+ try{
+  _liveTradesWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@trade");
+  var _tradeBuffer=[];
+  _liveTradesWS.onmessage=function(e){
+   try{
+    var msg=JSON.parse(e.data);
+    _tradeBuffer.unshift({price:parseFloat(msg.p),qty:parseFloat(msg.q),time:msg.T,buy:msg.m===false});
+    if(_tradeBuffer.length>20)_tradeBuffer.length=20;
+    var el=document.getElementById("recentTradesContent");
+    if(!el)return;
+    var h='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border-primary);color:var(--text-tertiary);margin-bottom:4px"><span>Ціна</span><span style="text-align:center">К-сть</span><span style="text-align:right">Час</span></div>';
+    for(var i=0;i<_tradeBuffer.length;i++){var t=_tradeBuffer[i],d=new Date(t.time),tc=t.buy?"var(--accent-green)":"var(--accent-red)";
+     h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;padding:2px 0;font-size:11px;font-family:monospace"><span style="color:'+tc+'">'+fmtPrice(t.price)+'</span><span style="text-align:center;color:var(--text-secondary)">'+t.qty.toFixed(4)+'</span><span style="text-align:right;color:var(--text-tertiary)">'+d.getHours()+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0")+'</span></div>'}
+    el.innerHTML=h;
+   }catch(err){}
+  };
+ }catch(e){}
+
+ /* 4) Mini ticker for live price + change */
+ try{
+  _liveWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@miniTicker");
+  _liveWS.onmessage=function(e){
+   try{
+    var msg=JSON.parse(e.data);
+    var chEl=document.getElementById("assetChange");
+    if(chEl&&msg.o&&msg.c){
+     var ch=((parseFloat(msg.c)-parseFloat(msg.o))/parseFloat(msg.o)*100);
+     chEl.textContent=chIcon(ch)+" "+chS(ch);chEl.style.cssText=chC(ch);
+    }
+    /* Update 24h high/low */
+    var mCards=document.getElementById("assetMetrics");
+    if(mCards&&msg.h&&msg.l){
+     var cards=mCards.querySelectorAll(".metric-card .mc-value");
+     if(cards[0])cards[0].textContent=fmtPrice(parseFloat(msg.h));
+     if(cards[1])cards[1].textContent=fmtPrice(parseFloat(msg.l));
+    }
+   }catch(err){}
+  };
+ }catch(e){}
+}
+
+function _stopLiveFeeds(){
+ if(_liveWS){try{_liveWS.close()}catch(e){}}_liveWS=null;
+ if(_liveKlineWS){try{_liveKlineWS.close()}catch(e){}}_liveKlineWS=null;
+ if(_liveBookWS){try{_liveBookWS.close()}catch(e){}}_liveBookWS=null;
+ if(_liveTradesWS){try{_liveTradesWS.close()}catch(e){}}_liveTradesWS=null;
+}
 
 function openChart(symbol,category){
  currentAssetSymbol=symbol;currentAssetCategory=category||"CRYPTO";
@@ -1015,6 +1137,7 @@ function openChart(symbol,category){
 }
 
 function closeAssetPage(){
+ _stopLiveFeeds();
  destroyTvChart();
  if(assetRsiChartI){assetRsiChartI.destroy();assetRsiChartI=null}
  if(assetVolChartI){assetVolChartI.destroy();assetVolChartI=null}
@@ -1063,9 +1186,43 @@ function loadAssetPage(symbol){
   var mh="";for(var i=0;i<mCards.length;i++){mh+='<div class="metric-card"><div class="mc-label">'+mCards[i].l+'</div><div class="mc-value" style="color:'+mCards[i].c+'">'+mCards[i].v+'</div></div>'}
   document.getElementById("assetMetrics").innerHTML=mh;
 
-  // Charts — save for period switching
+  // Charts — try Binance REST for real candles (crypto only)
   _loadedChartData=d.chart||[];
-  try{buildAssetChart(_loadedChartData)}catch(e){console.error("Chart error:",e)}
+  if(b.category==="CRYPTO"){
+   var _bp=_cleanSymbolForBinance(b.symbol).toUpperCase();
+   fetch("https://api.binance.com/api/v3/klines?symbol="+_bp+"&interval=1m&limit=200")
+    .then(function(r){return r.json()}).then(function(klines){
+     if(!klines||!klines.length||klines.error){
+      try{buildAssetChart(_loadedChartData)}catch(e){}
+      return;
+     }
+     destroyTvChart();
+     var container=document.getElementById("assetMainChart");
+     container.innerHTML="";container.style.height="420px";
+     tvChart=LightweightCharts.createChart(container,{
+      width:container.clientWidth,height:420,
+      layout:{background:{type:"solid",color:"transparent"},textColor:"#a1a1a6",fontSize:11},
+      grid:{vertLines:{color:"rgba(255,255,255,.04)"},horzLines:{color:"rgba(255,255,255,.06)"}},
+      crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+      rightPriceScale:{borderColor:"rgba(255,255,255,.08)"},
+      timeScale:{borderColor:"rgba(255,255,255,.08)",timeVisible:true,secondsVisible:false}
+     });
+     tvCandleSeries=tvChart.addCandlestickSeries({upColor:"#30d158",downColor:"#ff453a",borderUpColor:"#30d158",borderDownColor:"#ff453a",wickUpColor:"#30d158",wickDownColor:"#ff453a"});
+     tvVolSeries=tvChart.addHistogramSeries({priceFormat:{type:"volume"},priceScaleId:"vol"});
+     tvChart.priceScale("vol").applyOptions({scaleMargins:{top:0.85,bottom:0}});
+     var cData=[],vData=[];
+     for(var i=0;i<klines.length;i++){
+      var k=klines[i],ts=Math.floor(k[0]/1000);
+      cData.push({time:ts,open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});
+      vData.push({time:ts,value:parseFloat(k[5]),color:parseFloat(k[4])>=parseFloat(k[1])?"rgba(48,209,88,.4)":"rgba(255,69,58,.4)"});
+     }
+     tvCandleSeries.setData(cData);tvVolSeries.setData(vData);
+     tvChart.timeScale().fitContent();
+     tvResizeObs=new ResizeObserver(function(){if(tvChart)tvChart.applyOptions({width:container.clientWidth})});tvResizeObs.observe(container);
+    }).catch(function(){try{buildAssetChart(_loadedChartData)}catch(e){}});
+  } else {
+   try{buildAssetChart(_loadedChartData)}catch(e){console.error("Chart error:",e)}
+  }
   try{buildAssetRSI(_loadedChartData)}catch(e){console.error("RSI error:",e)}
   try{buildAssetVolume(_loadedChartData)}catch(e){console.error("Vol error:",e)}
 
@@ -1147,6 +1304,13 @@ function loadAssetPage(symbol){
 
   showToast(b.symbol+" завантажено",true);
   window.scrollTo({top:0,behavior:"smooth"});
+
+  /* Start live Binance feeds for crypto */
+  if(b.category==="CRYPTO"){
+   _startLiveFeeds(b.symbol);
+   var ld=document.getElementById("liveBookDot");if(ld)ld.style.display="inline";
+   var lt=document.getElementById("liveTradesDot");if(lt)lt.style.display="inline";
+  }
  }).catch(function(e){_assetLoading=false;showToast("Помилка: "+e.message,false)})
 }
 
@@ -1260,19 +1424,66 @@ function _renderChartData(data){
 function assetSetPeriod(p){
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
  if(event&&event.target)event.target.classList.add("active");
- /* Slice loaded data by period instead of API call */
- if(_loadedChartData&&_loadedChartData.length>=2){
-  var sliceMap={"1h":4,"4h":16,"1d":96,"1w":672,"1m":2880};
-  var n=sliceMap[p]||96;
-  var sliced=_loadedChartData.slice(-Math.min(n,_loadedChartData.length));
-  if(sliced.length>=2){_addIndicators(sliced);_renderChartData(sliced);return}
+
+ /* Map UI period to Binance kline interval */
+ var binanceIntervalMap={"1h":"1m","4h":"5m","1d":"15m","1w":"1h","1m":"4h"};
+ _liveInterval=binanceIntervalMap[p]||"1m";
+
+ /* Reconnect kline WS with new interval */
+ if(_liveKlineWS&&currentAssetCategory==="CRYPTO"){
+  try{_liveKlineWS.close()}catch(e){}
+  var pair=_cleanSymbolForBinance(currentAssetSymbol);
+  _liveKlineWS=new WebSocket("wss://stream.binance.com:9443/ws/"+pair+"@kline_"+_liveInterval);
+  _liveKlineWS.onmessage=function(e){
+   try{
+    var msg=JSON.parse(e.data);if(!msg.k)return;var k=msg.k;
+    var candle={time:Math.floor(k.t/1000),open:parseFloat(k.o),high:parseFloat(k.h),low:parseFloat(k.l),close:parseFloat(k.c)};
+    var vol={time:candle.time,value:parseFloat(k.v),color:candle.close>=candle.open?"rgba(48,209,88,.4)":"rgba(255,69,58,.4)"};
+    if(tvCandleSeries)tvCandleSeries.update(candle);
+    if(tvVolSeries)tvVolSeries.update(vol);
+   }catch(err){}
+  };
  }
- /* Fallback: try API */
- fetch("/api/chart/"+encodeURIComponent(currentAssetSymbol)+"?period="+p).then(function(r){return r.json()}).then(function(d){
-  if(d.data&&d.data.length>=2){_addIndicators(d.data);_renderChartData(d.data)}
-  else if(_loadedChartData&&_loadedChartData.length>=2){_renderChartData(_loadedChartData);showToast("Показано всі доступні дані",true)}
-  else {showToast("Недостатньо даних",false)}
- }).catch(function(){if(_loadedChartData&&_loadedChartData.length>=2){_renderChartData(_loadedChartData)}})
+
+ /* Load historical candles from Binance REST for this interval */
+ if(currentAssetCategory==="CRYPTO"){
+  var pair2=_cleanSymbolForBinance(currentAssetSymbol).toUpperCase();
+  fetch("https://api.binance.com/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit=200")
+   .then(function(r){return r.json()}).then(function(klines){
+    if(!klines||!klines.length||klines.error)return;
+    destroyTvChart();
+    var container=document.getElementById("assetMainChart");
+    container.innerHTML="";container.style.height="420px";
+    tvChart=LightweightCharts.createChart(container,{
+     width:container.clientWidth,height:420,
+     layout:{background:{type:"solid",color:"transparent"},textColor:"#a1a1a6",fontSize:11},
+     grid:{vertLines:{color:"rgba(255,255,255,.04)"},horzLines:{color:"rgba(255,255,255,.06)"}},
+     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+     rightPriceScale:{borderColor:"rgba(255,255,255,.08)"},
+     timeScale:{borderColor:"rgba(255,255,255,.08)",timeVisible:true,secondsVisible:false}
+    });
+    tvCandleSeries=tvChart.addCandlestickSeries({upColor:"#30d158",downColor:"#ff453a",borderUpColor:"#30d158",borderDownColor:"#ff453a",wickUpColor:"#30d158",wickDownColor:"#ff453a"});
+    tvVolSeries=tvChart.addHistogramSeries({priceFormat:{type:"volume"},priceScaleId:"vol"});
+    tvChart.priceScale("vol").applyOptions({scaleMargins:{top:0.85,bottom:0}});
+    var cData=[],vData=[];
+    for(var i=0;i<klines.length;i++){
+     var k=klines[i],ts=Math.floor(k[0]/1000);
+     cData.push({time:ts,open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])});
+     vData.push({time:ts,value:parseFloat(k[5]),color:parseFloat(k[4])>=parseFloat(k[1])?"rgba(48,209,88,.4)":"rgba(255,69,58,.4)"});
+    }
+    tvCandleSeries.setData(cData);tvVolSeries.setData(vData);
+    tvChart.timeScale().fitContent();
+    tvResizeObs=new ResizeObserver(function(){if(tvChart)tvChart.applyOptions({width:container.clientWidth})});tvResizeObs.observe(container);
+   }).catch(function(){});
+ } else {
+  /* Non-crypto: use local data */
+  if(_loadedChartData&&_loadedChartData.length>=2){
+   var sliceMap={"1h":4,"4h":16,"1d":96,"1w":672,"1m":2880};
+   var n=sliceMap[p]||96;
+   var sliced=_loadedChartData.slice(-Math.min(n,_loadedChartData.length));
+   _addIndicators(sliced);_renderChartData(sliced);
+  }
+ }
 }
 
 function assetAddToPortfolio(){
