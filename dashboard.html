@@ -686,9 +686,9 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
         <div><h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">Графік ціни</h3>
         <p style="font-size:12px;color:var(--text-tertiary);margin:2px 0 0">MA14 · MA50 · Bollinger Bands</p></div>
         <div class="period-btns">
-         <button class="period-btn" onclick="assetSetPeriod('1h',this)">1H</button>
+         <button class="period-btn active" onclick="assetSetPeriod('1h',this)">1H</button>
          <button class="period-btn" onclick="assetSetPeriod('4h',this)">4H</button>
-         <button class="period-btn active" onclick="assetSetPeriod('1d',this)" id="assetPeriod1d">1D</button>
+         <button class="period-btn" onclick="assetSetPeriod('1d',this)">1D</button>
          <button class="period-btn" onclick="assetSetPeriod('1w',this)">1W</button>
          <button class="period-btn" onclick="assetSetPeriod('1m',this)">1M</button>
         </div>
@@ -1190,9 +1190,9 @@ function loadAssetPage(symbol){
   _loadedChartData=d.chart||[];
   if(b.category==="CRYPTO"){
    var _bp=_cleanSymbolForBinance(b.symbol).toUpperCase();
-   fetch("https://api.binance.com/api/v3/klines?symbol="+_bp+"&interval=1m&limit=500")
+   _binanceFetch("/api/v3/klines?symbol="+_bp+"&interval=1m&limit=500",6000)
     .then(function(r){return r.json()}).then(function(klines){
-     if(!klines||!klines.length||klines.error){
+     if(!klines||!klines.length||klines.msg){
       try{buildAssetChart(_loadedChartData)}catch(e){}
       return;
      }
@@ -1297,6 +1297,40 @@ function loadAssetPage(symbol){
 var tvChart=null,tvCandleSeries=null,tvMa14Series=null,tvMa50Series=null,tvBbUpSeries=null,tvBbLowSeries=null,tvVolSeries=null,tvResizeObs=null;
 var assetChartMode="candle";
 function destroyTvChart(){if(tvResizeObs){tvResizeObs.disconnect();tvResizeObs=null}if(tvChart){try{tvChart.remove()}catch(e){}tvChart=null}tvCandleSeries=null;tvMa14Series=null;tvMa50Series=null;tvBbUpSeries=null;tvBbLowSeries=null;tvVolSeries=null}
+
+/* ── Fetch with timeout + Binance mirrors ── */
+var _binanceBase="https://api.binance.com";
+var _binanceMirrors=["https://api.binance.com","https://api1.binance.com","https://api2.binance.com","https://api3.binance.com","https://api4.binance.com"];
+var _mirrorIdx=0;
+
+function _fetchTimeout(url,ms){
+ ms=ms||5000;
+ return new Promise(function(resolve,reject){
+  var done=false;
+  var timer=setTimeout(function(){done=true;reject(new Error("timeout"))},ms);
+  fetch(url).then(function(r){
+   if(done)return;clearTimeout(timer);resolve(r);
+  }).catch(function(e){
+   if(done)return;clearTimeout(timer);reject(e);
+  });
+ });
+}
+function _binanceFetch(path,ms){
+ ms=ms||6000;
+ /* Try current mirror, fallback to next on failure */
+ function tryMirror(idx){
+  if(idx>=_binanceMirrors.length)return Promise.reject(new Error("All Binance mirrors failed"));
+  var url=_binanceMirrors[idx]+path;
+  return _fetchTimeout(url,ms).then(function(r){
+   if(!r.ok)throw new Error("HTTP "+r.status);
+   _mirrorIdx=idx; /* Remember working mirror */
+   return r;
+  }).catch(function(){
+   return tryMirror(idx+1);
+  });
+ }
+ return tryMirror(_mirrorIdx);
+}
 
 /* ── Binance-style chart factory ── */
 function _createProChart(container,symbol){
@@ -1471,21 +1505,34 @@ function assetSetPeriod(p,btn){
  /* Load historical candles from Binance REST for this interval */
  if(currentAssetCategory==="CRYPTO"){
   var pair2=_cleanSymbolForBinance(currentAssetSymbol).toUpperCase();
-  fetch("https://api.binance.com/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit=500")
+  _binanceFetch("/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit=500",6000)
    .then(function(r){return r.json()}).then(function(klines){
-    if(!klines||!klines.length||klines.error){
+    if(!klines||!klines.length||klines.msg){
+     /* Binance has no data — fallback to local */
+     if(_loadedChartData&&_loadedChartData.length>=2){
+      var sliceMap2={"1m":4,"5m":16,"15m":96,"1h":672,"4h":2880};
+      var n2=sliceMap2[_liveInterval]||96;
+      var sliced2=_loadedChartData.slice(-Math.min(n2,_loadedChartData.length));
+      _addIndicators(sliced2);_renderChartData(sliced2);
+     }
      if(container)container.style.opacity="1";
-     showToast("Немає даних для цього таймфрейму",false);
+     showToast("Binance: немає даних, локальні дані",false);
      return;
     }
     _createProChart(container,currentAssetSymbol);
     _setBinanceData(klines);
     container.style.opacity="1";
     _attachKlineWS();
-    showToast(_liveInterval.toUpperCase()+" завантажено",true);
    }).catch(function(err){
+    /* Binance unreachable — fallback to local data */
+    if(_loadedChartData&&_loadedChartData.length>=2){
+     var sliceMap3={"1m":4,"5m":16,"15m":96,"1h":672,"4h":2880};
+     var n3=sliceMap3[_liveInterval]||96;
+     var sliced3=_loadedChartData.slice(-Math.min(n3,_loadedChartData.length));
+     _addIndicators(sliced3);_renderChartData(sliced3);
+    }
     if(container)container.style.opacity="1";
-    showToast("Помилка: "+err.message,false);
+    showToast("Binance недоступний, локальні дані",false);
    });
  } else {
   /* Non-crypto: use local data */
