@@ -1015,15 +1015,24 @@ function openChart(symbol,category){
 }
 
 function closeAssetPage(){
+ destroyTvChart();
+ if(assetRsiChartI){assetRsiChartI.destroy();assetRsiChartI=null}
+ if(assetVolChartI){assetVolChartI.destroy();assetVolChartI=null}
  showTab(assetPrevTab);
  setRoute(assetPrevTab);
 }
 
 function assetRefresh(){if(currentAssetSymbol)loadAssetPage(currentAssetSymbol)}
 
+var _assetLoading=false;
 function loadAssetPage(symbol){
+ if(_assetLoading)return;
+ _assetLoading=true;
  var sym=symbol.replace(/[^A-Za-z0-9_.-]/g,"");
+ /* Show loading state */
+ var mc=document.getElementById("assetMainChart");if(mc)mc.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text-tertiary)"><div class="skeleton" style="width:100%;height:100%;border-radius:12px"></div></div>';
  fetch("/api/asset/"+encodeURIComponent(sym)).then(function(r){return r.json()}).then(function(d){
+  _assetLoading=false;
   if(d.status!=="ok"){showToast("Помилка завантаження",false);return}
   var b=d.basic,m=d.metrics,a=d.analysis;
 
@@ -1126,17 +1135,17 @@ function loadAssetPage(symbol){
 
   showToast(b.symbol+" завантажено",true);
   window.scrollTo({top:0,behavior:"smooth"});
- }).catch(function(e){showToast("Помилка: "+e.message,false)})
+ }).catch(function(e){_assetLoading=false;showToast("Помилка: "+e.message,false)})
 }
 
-var tvChart=null,tvCandleSeries=null,tvMa14Series=null,tvMa50Series=null,tvBbUpSeries=null,tvBbLowSeries=null,tvVolSeries=null;
-var assetChartMode="candle"; /* candle or line */
+var tvChart=null,tvCandleSeries=null,tvMa14Series=null,tvMa50Series=null,tvBbUpSeries=null,tvBbLowSeries=null,tvVolSeries=null,tvResizeObs=null;
+var assetChartMode="candle";
+function destroyTvChart(){if(tvResizeObs){tvResizeObs.disconnect();tvResizeObs=null}if(tvChart){try{tvChart.remove()}catch(e){}tvChart=null}tvCandleSeries=null;tvMa14Series=null;tvMa50Series=null;tvBbUpSeries=null;tvBbLowSeries=null;tvVolSeries=null}
 function buildAssetChart(data){
  var container=document.getElementById("assetMainChart");
- if(!data||!data.length){container.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text-tertiary);font-size:15px">📊 Недостатньо даних для графіка. Дані оновляться кожні 15 хвилин.</div>';return}
- var container=document.getElementById("assetMainChart");
+ if(!data||!data.length){container.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--text-tertiary);font-size:15px">📊 Недостатньо даних для графіка</div>';return}
+ destroyTvChart();
  container.innerHTML="";container.style.height="420px";
- if(tvChart){try{tvChart.remove()}catch(e){}}
  tvChart=LightweightCharts.createChart(container,{
   width:container.clientWidth,height:420,
   layout:{background:{type:"solid",color:"transparent"},textColor:"#a1a1a6",fontSize:11},
@@ -1182,7 +1191,7 @@ function buildAssetChart(data){
  tvVolSeries.setData(volData);
  tvChart.timeScale().fitContent();
  /* Resize handler */
- var ro=new ResizeObserver(function(){tvChart.applyOptions({width:container.clientWidth})});ro.observe(container);
+ tvResizeObs=new ResizeObserver(function(){if(tvChart)tvChart.applyOptions({width:container.clientWidth})});tvResizeObs.observe(container);
 }
 function toggleChartMode(){
  assetChartMode=assetChartMode==="candle"?"line":"candle";
