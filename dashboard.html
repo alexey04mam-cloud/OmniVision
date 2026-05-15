@@ -1000,7 +1000,7 @@ function addPosition(){var sym=document.getElementById("posSymbol").value.trim()
 function loadAdvisor(){var el=document.getElementById("advisorContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><span style="font-size:32px">🧠</span><p style="color:var(--text-secondary);margin:12px 0 0">Аналізую...</p></div>';fetch("/api/advisor").then(function(r){return r.json()}).then(function(d){if(d.error){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+d.error+'</div>';return}var html='';var sc=d.health_score>=70?'var(--accent-green)':d.health_score>=40?'var(--accent-orange)':'var(--accent-red)';html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px"><div class="card" style="padding:28px;text-align:center"><div style="font-size:52px;font-weight:800;color:'+sc+'">'+d.health_score+'</div><div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">Здоров\'я портфелю</div></div>';var pp=d.portfolio||{};html+='<div class="card" style="padding:28px;text-align:center"><div style="font-size:28px;font-weight:700;color:var(--text-primary)">'+fmtPrice(pp.total_current||0)+'</div><div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">Вартість</div></div></div>';if(d.alerts&&d.alerts.length){html+='<div style="margin-bottom:20px">';for(var i=0;i<d.alerts.length;i++){var a=d.alerts[i];var ai=a.type==='danger'?'🚨':a.type==='warning'?'⚠️':'ℹ️';html+='<div class="card" style="padding:16px;margin-bottom:8px"><span>'+ai+' '+a.msg+'</span></div>'}html+='</div>'}if(d.buy_opportunities&&d.buy_opportunities.length){html+='<h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 12px">Можливості</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px">';for(var i=0;i<d.buy_opportunities.length;i++){var b=d.buy_opportunities[i];html+='<div class="card" style="padding:20px;background:rgba(48,209,88,.04)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--text-primary);font-weight:700">'+b.symbol+'</span><span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--accent-green);color:#fff">BUY</span></div><p style="font-size:13px;color:var(--text-secondary);margin:0">'+b.reason+'</p></div>'}html+='</div>'}html+='<div class="card" style="padding:16px;text-align:center"><p style="font-size:12px;color:var(--text-tertiary);margin:0">⚠️ '+(d.disclaimer||'Не є фінансовою порадою.')+'</p></div>';el.innerHTML=html}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
 
 /* ══════ ASSET DETAIL PAGE ══════ */
-var currentAssetSymbol="",currentAssetCategory="",assetMainChartI=null,assetRsiChartI=null,assetVolChartI=null,assetPrevTab="hunted";
+var currentAssetSymbol="",currentAssetCategory="",assetMainChartI=null,assetRsiChartI=null,assetVolChartI=null,assetPrevTab="hunted",_loadedChartData=null;
 
 function openChart(symbol,category){
  currentAssetSymbol=symbol;currentAssetCategory=category||"CRYPTO";
@@ -1063,10 +1063,11 @@ function loadAssetPage(symbol){
   var mh="";for(var i=0;i<mCards.length;i++){mh+='<div class="metric-card"><div class="mc-label">'+mCards[i].l+'</div><div class="mc-value" style="color:'+mCards[i].c+'">'+mCards[i].v+'</div></div>'}
   document.getElementById("assetMetrics").innerHTML=mh;
 
-  // Charts
-  try{buildAssetChart(d.chart)}catch(e){console.error("Chart error:",e)}
-  try{buildAssetRSI(d.chart)}catch(e){console.error("RSI error:",e)}
-  try{buildAssetVolume(d.chart)}catch(e){console.error("Vol error:",e)}
+  // Charts — save for period switching
+  _loadedChartData=d.chart||[];
+  try{buildAssetChart(_loadedChartData)}catch(e){console.error("Chart error:",e)}
+  try{buildAssetRSI(_loadedChartData)}catch(e){console.error("RSI error:",e)}
+  try{buildAssetVolume(_loadedChartData)}catch(e){console.error("Vol error:",e)}
 
   // AI Analysis
   var ah='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px"><h3>🧠 AI Аналіз: '+a.verdict+'</h3><span class="rec-badge rec-'+a.recommendation+'">'+(a.recommendation==="CONSIDER_BUY"?"📈 Розглянути покупку":a.recommendation==="OVERSOLD_OPPORTUNITY"?"💎 Перепроданість":a.recommendation==="OVERBOUGHT_CAUTION"?"⚠️ Перекупленість":a.recommendation==="WAIT"?"⏳ Зачекати":"➖ Нейтрально")+'</span></div>';
@@ -1244,22 +1245,34 @@ function buildAssetVolume(data){
  assetVolChartI=new Chart(vc.getContext("2d"),{type:"bar",data:{labels:labels,datasets:[{label:"Об'єм",data:vol,backgroundColor:colors,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:"#6e6e73",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}}})}catch(e){console.error("Vol chart error:",e)}
 }
 
+function _addIndicators(data){
+ if(data.length>=14){for(var i=13;i<data.length;i++){var avg=0;for(var j=i-13;j<=i;j++)avg+=data[j].price;data[i].ma14=Math.round(avg/14*1e6)/1e6}
+  for(var i=14;i<data.length;i++){var g=0,l=0;for(var j=i-13;j<=i;j++){var df=data[j].price-data[j-1].price;if(df>0)g+=df;else l-=df}var ag=g/14,al=l/14;data[i].rsi=al===0?100:Math.round((100-100/(1+ag/al))*10)/10}}
+ if(data.length>=20){for(var i=19;i<data.length;i++){var w=[];for(var j=i-19;j<=i;j++)w.push(data[j].price);var ma=0;for(var j=0;j<w.length;j++)ma+=w[j];ma/=20;var sv=0;for(var j=0;j<w.length;j++)sv+=(w[j]-ma)*(w[j]-ma);sv=Math.sqrt(sv/20);data[i].bb_upper=Math.round((ma+2*sv)*1e6)/1e6;data[i].bb_lower=Math.round((ma-2*sv)*1e6)/1e6}}
+ for(var i=0;i<data.length;i++){data[i].volume_est=i>0?Math.round(Math.abs(data[i].price-data[i-1].price)*1000*100)/100:0}
+ return data;
+}
+function _renderChartData(data){
+ try{buildAssetChart(data)}catch(e){}
+ try{buildAssetRSI(data)}catch(e){}
+ try{buildAssetVolume(data)}catch(e){}
+}
 function assetSetPeriod(p){
  document.querySelectorAll("#panel-asset .period-btn").forEach(function(b){b.classList.remove("active")});
  if(event&&event.target)event.target.classList.add("active");
- showToast("Завантаження "+p+"...",true);
+ /* Slice loaded data by period instead of API call */
+ if(_loadedChartData&&_loadedChartData.length>=2){
+  var sliceMap={"1h":4,"4h":16,"1d":96,"1w":672,"1m":2880};
+  var n=sliceMap[p]||96;
+  var sliced=_loadedChartData.slice(-Math.min(n,_loadedChartData.length));
+  if(sliced.length>=2){_addIndicators(sliced);_renderChartData(sliced);return}
+ }
+ /* Fallback: try API */
  fetch("/api/chart/"+encodeURIComponent(currentAssetSymbol)+"?period="+p).then(function(r){return r.json()}).then(function(d){
-  if(d.data&&d.data.length>=2){
-   var data=d.data;
-   if(data.length>=14){for(var i=13;i<data.length;i++){var avg=0;for(var j=i-13;j<=i;j++)avg+=data[j].price;data[i].ma14=Math.round(avg/14*1e6)/1e6}
-    for(var i=14;i<data.length;i++){var g=0,l=0;for(var j=i-13;j<=i;j++){var df=data[j].price-data[j-1].price;if(df>0)g+=df;else l-=df}var ag=g/14,al=l/14;data[i].rsi=al===0?100:Math.round((100-100/(1+ag/al))*10)/10}}
-   if(data.length>=20){for(var i=19;i<data.length;i++){var w=[];for(var j=i-19;j<=i;j++)w.push(data[j].price);var ma=0;for(var j=0;j<w.length;j++)ma+=w[j];ma/=20;var sv=0;for(var j=0;j<w.length;j++)sv+=(w[j]-ma)*(w[j]-ma);sv=Math.sqrt(sv/20);data[i].bb_upper=Math.round((ma+2*sv)*1e6)/1e6;data[i].bb_lower=Math.round((ma-2*sv)*1e6)/1e6}}
-   for(var i=0;i<data.length;i++){data[i].volume_est=i>0?Math.round(Math.abs(data[i].price-data[i-1].price)*1000*100)/100:0}
-   try{buildAssetChart(data)}catch(e){}
-   try{buildAssetRSI(data)}catch(e){}
-   try{buildAssetVolume(data)}catch(e){}
-  } else {showToast("Недостатньо даних для періоду "+p,false)}
- }).catch(function(e){showToast("Помилка завантаження",false)})
+  if(d.data&&d.data.length>=2){_addIndicators(d.data);_renderChartData(d.data)}
+  else if(_loadedChartData&&_loadedChartData.length>=2){_renderChartData(_loadedChartData);showToast("Показано всі доступні дані",true)}
+  else {showToast("Недостатньо даних",false)}
+ }).catch(function(){if(_loadedChartData&&_loadedChartData.length>=2){_renderChartData(_loadedChartData)}})
 }
 
 function assetAddToPortfolio(){
