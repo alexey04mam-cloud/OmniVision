@@ -277,7 +277,73 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
         except Exception as e:
             log.error(f"News trending error: {e}")
 
-        result = {"news": news, "count": len(news)}
+        # ── CryptoCompare news ──
+        try:
+            r = await client.get("https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=popular")
+            if r.status_code == 200:
+                cc_articles = r.json().get("Data", [])[:12]
+                for art in cc_articles:
+                    title = art.get("title", "")
+                    body = art.get("body", "")[:200]
+                    sentiment = "neutral"
+                    text_lower = (title + " " + body).lower()
+                    bull_words = ["surge", "rally", "bull", "soar", "gain", "breakout", "moon", "pump", "ath", "record"]
+                    bear_words = ["crash", "dump", "bear", "drop", "plunge", "sell", "fear", "hack", "ban", "fraud"]
+                    bull_score = sum(1 for w in bull_words if w in text_lower)
+                    bear_score = sum(1 for w in bear_words if w in text_lower)
+                    if bull_score > bear_score:
+                        sentiment = "bullish"
+                    elif bear_score > bull_score:
+                        sentiment = "bearish"
+                    news.append({
+                        "type": "news", "source": art.get("source_info", {}).get("name", "CryptoCompare"),
+                        "title": title,
+                        "detail": body,
+                        "url": art.get("url", ""),
+                        "imageurl": art.get("imageurl", ""),
+                        "sentiment": sentiment,
+                        "time": datetime.fromtimestamp(art.get("published_on", 0), tz=timezone.utc).isoformat()
+                    })
+        except Exception as e:
+            log.error(f"CryptoCompare news error: {e}")
+
+        # ── CoinPaprika global stats ──
+        try:
+            r = await client.get("https://api.coinpaprika.com/v1/global")
+            if r.status_code == 200:
+                gp = r.json()
+                mc_change = gp.get("market_cap_change_24h", 0)
+                btc_dom = gp.get("bitcoin_dominance_percentage", 0)
+                news.append({
+                    "type": "market", "source": "CoinPaprika",
+                    "title": f"Global Market: {'UP' if mc_change > 0 else 'DOWN'} {mc_change:+.2f}%",
+                    "detail": f"Cryptos: {gp.get('cryptocurrencies_number', 0):,} | BTC dom: {btc_dom:.1f}% | Vol 24h: ${gp.get('volume_24h_usd', 0)/1e9:.1f}B",
+                    "sentiment": "bullish" if mc_change > 1 else "bearish" if mc_change < -1 else "neutral",
+                    "time": datetime.now(timezone.utc).isoformat()
+                })
+        except Exception as e:
+            log.error(f"CoinPaprika error: {e}")
+
+        # ── Auto-analysis: aggregate sentiment ──
+        bull_count = sum(1 for n in news if n.get("sentiment") == "bullish")
+        bear_count = sum(1 for n in news if n.get("sentiment") == "bearish")
+        total_sent = bull_count + bear_count
+        if total_sent > 0:
+            bull_pct = round(bull_count / total_sent * 100)
+            bear_pct = 100 - bull_pct
+        else:
+            bull_pct = 50
+            bear_pct = 50
+        overall = "bullish" if bull_pct > 60 else "bearish" if bear_pct > 60 else "neutral"
+        analysis = {
+            "overall": overall,
+            "bullish_pct": bull_pct,
+            "bearish_pct": bear_pct,
+            "total_signals": len(news),
+            "sources": list(set(n.get("source", "") for n in news))
+        }
+
+        result = {"news": news, "count": len(news), "analysis": analysis}
         set_cache("news", result)
         return result
 

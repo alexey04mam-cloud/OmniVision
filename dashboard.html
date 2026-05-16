@@ -1312,16 +1312,16 @@ function loadAssetPage(symbol){
   // Charts — try Binance REST for real candles (crypto only)
   _loadedChartData=d.chart||[];
   if(b.category==="CRYPTO"){
-   var _bp=_cleanSymbolForBinance(b.symbol).toUpperCase();
-   _binanceFetch("/api/v3/klines?symbol="+_bp+"&interval=1m&limit=500",6000)
-    .then(function(r){return r.json()}).then(function(klines){
-     if(!klines||!klines.length||klines.msg){
-      try{buildAssetChart(_loadedChartData)}catch(e){}
-      return;
-     }
+   _fetchChartMulti(b.symbol,"1m",500)
+    .then(function(result){
+     var parsed=_parseMultiChart(result);
+     if(!parsed.candles.length){try{buildAssetChart(_loadedChartData)}catch(e){}return;}
      var container=document.getElementById("assetMainChart");
      _createProChart(container,b.symbol);
-     _setBinanceData(klines);
+     if(tvCandleSeries)tvCandleSeries.setData(parsed.candles);
+     if(tvVolSeries)tvVolSeries.setData(parsed.vols);
+     if(tvChart)tvChart.timeScale().fitContent();
+     if(result.source!=="binance"){_startLivePoll(b.symbol);showToast("Графік: "+result.source,true)}
     }).catch(function(){try{buildAssetChart(_loadedChartData)}catch(e){}});
   } else {
    try{buildAssetChart(_loadedChartData)}catch(e){console.error("Chart error:",e)}
@@ -1457,6 +1457,110 @@ function _binanceFetch(path,ms){
  }
  return tryMirror(_mirrorIdx);
 }
+
+/* ── CoinGecko ID map for fallback ── */
+var cgMap={"BTC":"bitcoin","ETH":"ethereum","BNB":"binancecoin","SOL":"solana","XRP":"ripple","ADA":"cardano","DOGE":"dogecoin","DOT":"polkadot","AVAX":"avalanche-2","MATIC":"matic-network","LINK":"chainlink","UNI":"uniswap","LTC":"litecoin","ATOM":"cosmos","NEAR":"near","APT":"aptos","ARB":"arbitrum","OP":"optimism","SUI":"sui","XAUT":"tether-gold","PAXG":"pax-gold","FIL":"filecoin","INJ":"injective-protocol","TIA":"celestia","SEI":"sei-network","PEPE":"pepe","WIF":"dogwifcoin","BONK":"bonk","FLOKI":"floki","SHIB":"shiba-inu"};
+
+function _fetchChartMulti(symbol,interval,limit){
+ var clean=symbol.toUpperCase().replace(/USDT|USD|BUSD/g,"");
+ var pair=clean+"USDT";
+ /* Map interval to CoinGecko days param */
+ var cgDaysMap={"1m":1,"5m":1,"15m":1,"1h":7,"4h":14,"12h":30,"1d":90};
+ var ccIntervalMap={"1m":"histominute","5m":"histominute","15m":"histominute","1h":"histohour","4h":"histohour","12h":"histohour","1d":"histoday"};
+ var cgDays=cgDaysMap[interval]||7;
+ var ccFunc=ccIntervalMap[interval]||"histohour";
+
+ /* Try Binance first */
+ return _binanceFetch("/api/v3/klines?symbol="+pair.toUpperCase()+"&interval="+interval+"&limit="+limit,4000)
+  .then(function(r){return r.json()})
+  .then(function(klines){
+   if(!klines||!klines.length||klines.msg)throw new Error("no data");
+   return {source:"binance",data:klines,type:"klines"};
+  })
+  .catch(function(){
+   /* CoinGecko OHLC fallback */
+   var cgId=cgMap[clean];
+   if(!cgId)return Promise.reject(new Error("no cgId"));
+   return _fetchTimeout("https://api.coingecko.com/api/v3/coins/"+cgId+"/ohlc?vs_currency=usd&days="+cgDays,6000)
+    .then(function(r){return r.json()})
+    .then(function(ohlc){
+     if(!ohlc||!ohlc.length)throw new Error("no cg data");
+     return {source:"coingecko",data:ohlc,type:"ohlc"};
+    });
+  })
+  .catch(function(){
+   /* CryptoCompare fallback */
+   return _fetchTimeout("https://min-api.cryptocompare.com/data/v2/"+ccFunc+"?fsym="+clean+"&tsym=USD&limit="+limit,6000)
+    .then(function(r){return r.json()})
+    .then(function(d){
+     if(!d||!d.Data||!d.Data.Data||!d.Data.Data.length)throw new Error("no cc data");
+     return {source:"cryptocompare",data:d.Data.Data,type:"cc"};
+    });
+  });
+}
+
+/* Parse multi-source chart data into TradingView format */
+function _parseMultiChart(result){
+ var candles=[],vols=[];
+ if(result.type==="klines"){
+  /* Binance klines */
+  for(var i=0;i<result.data.length;i++){
+   var k=result.data[i];
+   var t=Math.floor(k[0]/1000);
+   var o=parseFloat(k[1]),h=parseFloat(k[2]),l=parseFloat(k[3]),c=parseFloat(k[4]),v=parseFloat(k[5]);
+   candles.push({time:t,open:o,high:h,low:l,close:c});
+   vols.push({time:t,value:v,color:c>=o?"rgba(46,189,133,.35)":"rgba(246,70,93,.35)"});
+  }
+ } else if(result.type==="ohlc"){
+  /* CoinGecko OHLC: [[timestamp,open,high,low,close],...] */
+  for(var i=0;i<result.data.length;i++){
+   var d=result.data[i];
+   var t=Math.floor(d[0]/1000);
+   candles.push({time:t,open:d[1],high:d[2],low:d[3],close:d[4]});
+   vols.push({time:t,value:0,color:d[4]>=d[1]?"rgba(46,189,133,.35)":"rgba(246,70,93,.35)"});
+  }
+ } else if(result.type==="cc"){
+  /* CryptoCompare: {time,open,high,low,close,volumefrom,...} */
+  for(var i=0;i<result.data.length;i++){
+   var d=result.data[i];
+   candles.push({time:d.time,open:d.open,high:d.high,low:d.low,close:d.close});
+   vols.push({time:d.time,value:d.volumefrom||0,color:d.close>=d.open?"rgba(46,189,133,.35)":"rgba(246,70,93,.35)"});
+  }
+ }
+ return {candles:candles,vols:vols,source:result.source};
+}
+
+/* Live price polling via CoinGecko (fallback when WS fails) */
+var _livePollTimer=null;
+function _startLivePoll(symbol){
+ _stopLivePoll();
+ var clean=symbol.toUpperCase().replace(/USDT|USD|BUSD/g,"");
+ var cgId=cgMap[clean];
+ if(!cgId)return;
+ function poll(){
+  _fetchTimeout("https://api.coingecko.com/api/v3/simple/price?ids="+cgId+"&vs_currencies=usd&include_24hr_change=true",5000)
+   .then(function(r){return r.json()})
+   .then(function(d){
+    if(!d[cgId])return;
+    var price=d[cgId].usd;
+    var ch24=d[cgId].usd_24h_change||0;
+    var priceEl=document.querySelector("#panel-asset .asset-price-main");
+    if(priceEl){
+     var old=parseFloat(priceEl.textContent.replace(/[^0-9.\-]/g,""));
+     priceEl.textContent="$"+_fmtPrice(price);
+     if(price>old)priceEl.classList.add("price-flash-up");
+     else if(price<old)priceEl.classList.add("price-flash-down");
+     setTimeout(function(){priceEl.classList.remove("price-flash-up","price-flash-down")},600);
+    }
+    var chEl=document.querySelector("#panel-asset .asset-change-main");
+    if(chEl){chEl.textContent=(ch24>=0?"+":"")+ch24.toFixed(2)+"%";chEl.style.color=ch24>=0?"var(--green)":"var(--red)"}
+   }).catch(function(){});
+ }
+ poll();
+ _livePollTimer=setInterval(poll,15000);
+}
+function _stopLivePoll(){if(_livePollTimer){clearInterval(_livePollTimer);_livePollTimer=null}}
+
 
 /* ── Binance-style chart factory ── */
 function _createProChart(container,symbol){
@@ -1751,27 +1855,24 @@ function assetSetPeriod(p,btn){
  /* Load historical candles from Binance REST for this interval */
  if(currentAssetCategory==="CRYPTO"){
   var pair2=_cleanSymbolForBinance(currentAssetSymbol).toUpperCase();
-  _binanceFetch("/api/v3/klines?symbol="+pair2+"&interval="+_liveInterval+"&limit="+_fetchLimit,6000)
-   .then(function(r){return r.json()}).then(function(klines){
-    if(!klines||!klines.length||klines.msg){
-     /* Binance has no data — fallback to local */
-     if(_loadedChartData&&_loadedChartData.length>=2){
-      var sliceMap2={"1m":4,"5m":16,"15m":96,"1h":672,"4h":2880};
-      var n2=sliceMap2[_liveInterval]||96;
-      var sliced2=_loadedChartData.slice(-Math.min(n2,_loadedChartData.length));
-      _addIndicators(sliced2);_renderChartData(sliced2);
-     }
-     if(container)container.style.opacity="1";
-     showToast("Binance: немає даних, локальні дані",false);
-     return;
-    }
+  _fetchChartMulti(currentAssetSymbol,_liveInterval,_fetchLimit)
+   .then(function(result){
+    var parsed=_parseMultiChart(result);
+    if(!parsed.candles.length)throw new Error("empty");
     _createProChart(container,currentAssetSymbol);
-    _setBinanceData(klines);
+    if(tvCandleSeries)tvCandleSeries.setData(parsed.candles);
+    if(tvVolSeries)tvVolSeries.setData(parsed.vols);
+    if(tvChart)tvChart.timeScale().fitContent();
     container.style.opacity="1";
-    /* Only reconnect live WS for short-term periods */
-    if(p!=="3m"&&p!=="6m"&&p!=="1y")_attachKlineWS();
+    if(result.source!=="binance"){
+     _startLivePoll(currentAssetSymbol);
+     showToast("Дані: "+result.source,true);
+    } else {
+     _stopLivePoll();
+     if(p!=="3m"&&p!=="6m"&&p!=="1y")_attachKlineWS();
+    }
    }).catch(function(err){
-    /* Binance unreachable — fallback to local data */
+    /* All sources failed — fallback to local data */
     if(_loadedChartData&&_loadedChartData.length>=2){
      var sliceMap3={"1m":4,"5m":16,"15m":96,"1h":672,"4h":2880};
      var n3=sliceMap3[_liveInterval]||96;
@@ -2129,5 +2230,3 @@ function _startRefreshTimer(){
 </script>
 </body>
 </html>
-
-<
