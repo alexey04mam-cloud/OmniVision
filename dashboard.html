@@ -7,8 +7,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
 <title>Omni-Vision v1.2</title>
+<link rel="preconnect" href="https://api.binance.com">
+<link rel="preconnect" href="https://stream.binance.com">
+<link rel="dns-prefetch" href="https://api.binance.com">
+<link rel="dns-prefetch" href="https://stream.binance.com">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 *{box-sizing:border-box;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -370,7 +374,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
   <div style="display:flex;align-items:center;gap:12px">
    <button class="mobile-search-btn" onclick="openMobileSearch()" style="display:none;background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;padding:8px">🔍</button>
    <div style="position:relative" id="searchWrap">
-    <input id="globalSearch" type="text" placeholder="Пошук активів..." class="input-field" style="width:260px;padding:8px 40px 8px 36px;font-size:13px;border-radius:20px;background:rgba(255,255,255,.06)" oninput="onGlobalSearch(this.value)" onfocus="onGlobalSearch(this.value)" onblur="setTimeout(function(){document.getElementById('searchResults').style.display='none'},200)">
+    <input id="globalSearch" type="text" placeholder="Пошук активів..." class="input-field" style="width:260px;padding:8px 40px 8px 36px;font-size:13px;border-radius:20px;background:rgba(255,255,255,.06)" oninput="_debounceSearch(this.value)" onfocus="onGlobalSearch(this.value)" onblur="setTimeout(function(){document.getElementById('searchResults').style.display='none'},200)">
     <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-tertiary)">🔍</span>
     <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%)" class="kbd">⌘K</span>
     <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-primary);border-radius:12px;max-height:320px;overflow-y:auto;z-index:99;box-shadow:0 16px 48px rgba(0,0,0,.5)"></div>
@@ -1871,8 +1875,10 @@ function buildOrderBook(price,vol){
 }
 
 /* ══════ GLOBAL SEARCH ══════ */
-var allAssetsCache=[];
-function refreshAssetsCache(){fetch("/api/assets").then(function(r){return r.json()}).then(function(d){allAssetsCache=d.assets||d||[]}).catch(function(){})}
+var allAssetsCache=[],_allAssetsCache=[];
+var _searchTimer=null;
+function _debounceSearch(q){clearTimeout(_searchTimer);_searchTimer=setTimeout(function(){onGlobalSearch(q)},150)}
+function refreshAssetsCache(){fetch("/api/assets").then(function(r){return r.json()}).then(function(d){allAssetsCache=d.assets||d||[];_allAssetsCache=allAssetsCache}).catch(function(){})}
 function onGlobalSearch(q){
  var box=document.getElementById("searchResults");
  if(!q||q.length<1){box.style.display="none";return}
@@ -1892,7 +1898,7 @@ var ws=null,wsRetry=0;
 function connectWS(){
  var proto=location.protocol==="https:"?"wss:":"ws:";
  try{ws=new WebSocket(proto+"//"+location.host+"/ws/prices")}catch(e){return}
- ws.onopen=function(){wsRetry=0;document.getElementById("headerStatus").textContent="Live";document.getElementById("headerStatus").style.color="var(--accent-green)"};
+ ws.onopen=function(){wsRetry=0;var hs=document.getElementById("headerStatus");hs.textContent="Live";hs.style.color="var(--accent-green)";var pd=document.querySelector(".pulse-dot");if(pd)pd.style.background="var(--accent-green)"};
  ws.onmessage=function(evt){
   try{var data=JSON.parse(evt.data);
    if(data.prices){
@@ -1917,7 +1923,7 @@ function connectWS(){
   }catch(e){}
  };
  ws.onclose=function(){
-  document.getElementById("headerStatus").textContent="Reconnecting...";document.getElementById("headerStatus").style.color="var(--accent-orange)";
+  var hs=document.getElementById("headerStatus");hs.textContent="Reconnecting...";hs.style.color="var(--accent-orange)";var pd=document.querySelector(".pulse-dot");if(pd)pd.style.background="var(--accent-orange)";
   wsRetry++;var delay=Math.min(1000*Math.pow(2,wsRetry),30000);
   setTimeout(connectWS,delay);
  };
@@ -2124,6 +2130,4 @@ function _startRefreshTimer(){
 </body>
 </html>
 
-</script>
-</body>
-</html>
+<

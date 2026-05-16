@@ -20,14 +20,41 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
     from sqlalchemy.orm import Session
     from sqlalchemy import func as sqlfunc
 
+    # ──── API Response Cache ────
+    _api_cache = {}
+
+    def cached_api(key, ttl=60):
+        """Check cache and return (data, is_cached). If cached, data is the cached response."""
+        entry = _api_cache.get(key)
+        if entry and (time.time() - entry["t"]) < ttl:
+            return entry["data"], True
+        return None, False
+
+    def set_cache(key, data):
+        _api_cache[key] = {"data": data, "t": time.time()}
+
+    # ──── Shared HTTP Client ────
+    _http_client = None
+
+    async def get_http():
+        nonlocal _http_client
+        if _http_client is None or _http_client.is_closed:
+            _http_client = httpx.AsyncClient(timeout=12)
+        return _http_client
+
     # ──── 1. Fear & Greed Index ────
     @app.get("/api/fear-greed")
     async def api_fear_greed():
+        cached, hit = cached_api("fear_greed", 120)
+        if hit:
+            return cached
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get("https://api.alternative.me/fng/?limit=30&format=json")
-                if r.status_code == 200:
-                    return r.json()
+            client = await get_http()
+            r = await client.get("https://api.alternative.me/fng/?limit=30&format=json")
+            if r.status_code == 200:
+                data = r.json()
+                set_cache("fear_greed", data)
+                return data
         except Exception as e:
             log.error(f"Fear&Greed error: {e}")
         return {"data": [], "metadata": {"error": "unavailable"}}
@@ -56,25 +83,35 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
     # ──── 3. DEX Screener / Signals ────
     @app.get("/api/dex/trending")
     async def api_dex_trending():
+        cached, hit = cached_api("dex_trending", 60)
+        if hit:
+            return cached
         try:
-            async with httpx.AsyncClient(timeout=12) as client:
-                r = await client.get("https://api.dexscreener.com/token-boosts/latest/v1")
-                if r.status_code == 200:
-                    data = r.json()
-                    tokens = data[:30] if isinstance(data, list) else []
-                    return {"tokens": tokens, "status": "ok"}
+            client = await get_http()
+            r = await client.get("https://api.dexscreener.com/token-boosts/latest/v1")
+            if r.status_code == 200:
+                data = r.json()
+                tokens = data[:30] if isinstance(data, list) else []
+                result = {"tokens": tokens, "status": "ok"}
+                set_cache("dex_trending", result)
+                return result
         except Exception as e:
             log.error(f"DEX trending error: {e}")
         return {"tokens": [], "status": "error"}
 
     @app.get("/api/dex/new-pairs")
     async def api_dex_new_pairs():
+        cached, hit = cached_api("dex_new_pairs", 60)
+        if hit:
+            return cached
         try:
-            async with httpx.AsyncClient(timeout=12) as client:
-                r = await client.get("https://api.dexscreener.com/token-profiles/latest/v1")
-                if r.status_code == 200:
-                    data = r.json()
-                    return {"pairs": data[:30] if isinstance(data, list) else [], "status": "ok"}
+            client = await get_http()
+            r = await client.get("https://api.dexscreener.com/token-profiles/latest/v1")
+            if r.status_code == 200:
+                data = r.json()
+                result = {"pairs": data[:30] if isinstance(data, list) else [], "status": "ok"}
+                set_cache("dex_new_pairs", result)
+                return result
         except Exception as e:
             log.error(f"DEX new pairs error: {e}")
         return {"pairs": [], "status": "error"}
@@ -152,28 +189,33 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
     # ──── 6. On-Chain Analytics ────
     @app.get("/api/onchain/btc")
     async def api_onchain_btc():
+        cached, hit = cached_api("onchain_btc", 120)
+        if hit:
+            return cached
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get("https://api.blockchain.info/stats?format=json")
-                if r.status_code == 200:
-                    d = r.json()
-                    return {
-                        "market_price_usd": d.get("market_price_usd"),
-                        "hash_rate": d.get("hash_rate"),
-                        "n_tx": d.get("n_tx"),
-                        "n_blocks_mined": d.get("n_blocks_mined"),
-                        "minutes_between_blocks": d.get("minutes_between_blocks"),
-                        "totalbc": d.get("totalbc"),
-                        "n_blocks_total": d.get("n_blocks_total"),
-                        "estimated_transaction_volume_usd": d.get("estimated_transaction_volume_usd"),
-                        "miners_revenue_usd": d.get("miners_revenue_usd"),
-                        "difficulty": d.get("difficulty"),
-                        "trade_volume_btc": d.get("trade_volume_btc"),
-                        "trade_volume_usd": d.get("trade_volume_usd"),
-                        "total_fees_btc": d.get("total_fees_btc"),
-                        "mempool_size": d.get("mempool_size"),
-                        "status": "ok"
-                    }
+            client = await get_http()
+            r = await client.get("https://api.blockchain.info/stats?format=json")
+            if r.status_code == 200:
+                d = r.json()
+                result = {
+                    "market_price_usd": d.get("market_price_usd"),
+                    "hash_rate": d.get("hash_rate"),
+                    "n_tx": d.get("n_tx"),
+                    "n_blocks_mined": d.get("n_blocks_mined"),
+                    "minutes_between_blocks": d.get("minutes_between_blocks"),
+                    "totalbc": d.get("totalbc"),
+                    "n_blocks_total": d.get("n_blocks_total"),
+                    "estimated_transaction_volume_usd": d.get("estimated_transaction_volume_usd"),
+                    "miners_revenue_usd": d.get("miners_revenue_usd"),
+                    "difficulty": d.get("difficulty"),
+                    "trade_volume_btc": d.get("trade_volume_btc"),
+                    "trade_volume_usd": d.get("trade_volume_usd"),
+                    "total_fees_btc": d.get("total_fees_btc"),
+                    "mempool_size": d.get("mempool_size"),
+                    "status": "ok"
+                }
+                set_cache("onchain_btc", result)
+                return result
         except Exception as e:
             log.error(f"On-chain error: {e}")
         return {"status": "error"}
@@ -181,59 +223,63 @@ def setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, S
     # ──── 7. News Aggregator ────
     @app.get("/api/news")
     async def api_news():
+        cached, hit = cached_api("news", 120)
+        if hit:
+            return cached
         news = []
+        client = await get_http()
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get("https://api.coingecko.com/api/v3/global")
-                if r.status_code == 200:
-                    gd = r.json().get("data", {})
-                    btc_dom = gd.get("market_cap_percentage", {}).get("btc", 0)
-                    total_mc = gd.get("total_market_cap", {}).get("usd", 0)
-                    total_vol = gd.get("total_volume", {}).get("usd", 0)
-                    mc_change = gd.get("market_cap_change_percentage_24h_usd", 0)
-                    active = gd.get("active_cryptocurrencies", 0)
-                    news.append({
-                        "type": "market", "source": "CoinGecko",
-                        "title": "Crypto Market " + ("UP" if mc_change > 0 else "DOWN") + f" {mc_change:+.2f}%",
-                        "detail": f"Cap: ${total_mc/1e12:.2f}T | Vol: ${total_vol/1e9:.1f}B | BTC dom: {btc_dom:.1f}% | Active: {active:,}",
-                        "sentiment": "bullish" if mc_change > 1 else "bearish" if mc_change < -1 else "neutral",
-                        "time": datetime.now(timezone.utc).isoformat()
-                    })
+            r = await client.get("https://api.coingecko.com/api/v3/global")
+            if r.status_code == 200:
+                gd = r.json().get("data", {})
+                btc_dom = gd.get("market_cap_percentage", {}).get("btc", 0)
+                total_mc = gd.get("total_market_cap", {}).get("usd", 0)
+                total_vol = gd.get("total_volume", {}).get("usd", 0)
+                mc_change = gd.get("market_cap_change_percentage_24h_usd", 0)
+                active = gd.get("active_cryptocurrencies", 0)
+                news.append({
+                    "type": "market", "source": "CoinGecko",
+                    "title": "Crypto Market " + ("UP" if mc_change > 0 else "DOWN") + f" {mc_change:+.2f}%",
+                    "detail": f"Cap: ${total_mc/1e12:.2f}T | Vol: ${total_vol/1e9:.1f}B | BTC dom: {btc_dom:.1f}% | Active: {active:,}",
+                    "sentiment": "bullish" if mc_change > 1 else "bearish" if mc_change < -1 else "neutral",
+                    "time": datetime.now(timezone.utc).isoformat()
+                })
         except Exception as e:
             log.error(f"News global error: {e}")
 
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get("https://api.coingecko.com/api/v3/search/trending")
-                if r.status_code == 200:
-                    data = r.json()
-                    for coin in data.get("coins", [])[:10]:
-                        item = coin.get("item", {})
-                        pc = 0
-                        try:
-                            pc = item.get("data", {}).get("price_change_percentage_24h", {}).get("usd", 0) or 0
-                        except:
-                            pass
-                        news.append({
-                            "type": "trending", "source": "CoinGecko",
-                            "title": f"{item.get('name','')} ({item.get('symbol','')})",
-                            "detail": f"Rank #{item.get('market_cap_rank','?')} | Change: {pc:+.1f}%",
-                            "thumb": item.get("small", ""),
-                            "sentiment": "bullish" if pc > 0 else "bearish" if pc < 0 else "neutral",
-                            "time": datetime.now(timezone.utc).isoformat()
-                        })
-                    for nft in data.get("nfts", [])[:3]:
-                        news.append({
-                            "type": "nft", "source": "CoinGecko",
-                            "title": f"NFT: {nft.get('name','')}",
-                            "detail": f"Floor: {nft.get('data',{}).get('floor_price','?')}",
-                            "sentiment": "neutral",
-                            "time": datetime.now(timezone.utc).isoformat()
-                        })
+            r = await client.get("https://api.coingecko.com/api/v3/search/trending")
+            if r.status_code == 200:
+                data = r.json()
+                for coin in data.get("coins", [])[:10]:
+                    item = coin.get("item", {})
+                    pc = 0
+                    try:
+                        pc = item.get("data", {}).get("price_change_percentage_24h", {}).get("usd", 0) or 0
+                    except:
+                        pass
+                    news.append({
+                        "type": "trending", "source": "CoinGecko",
+                        "title": f"{item.get('name','')} ({item.get('symbol','')})",
+                        "detail": f"Rank #{item.get('market_cap_rank','?')} | Change: {pc:+.1f}%",
+                        "thumb": item.get("small", ""),
+                        "sentiment": "bullish" if pc > 0 else "bearish" if pc < 0 else "neutral",
+                        "time": datetime.now(timezone.utc).isoformat()
+                    })
+                for nft in data.get("nfts", [])[:3]:
+                    news.append({
+                        "type": "nft", "source": "CoinGecko",
+                        "title": f"NFT: {nft.get('name','')}",
+                        "detail": f"Floor: {nft.get('data',{}).get('floor_price','?')}",
+                        "sentiment": "neutral",
+                        "time": datetime.now(timezone.utc).isoformat()
+                    })
         except Exception as e:
             log.error(f"News trending error: {e}")
 
-        return {"news": news, "count": len(news)}
+        result = {"news": news, "count": len(news)}
+        set_cache("news", result)
+        return result
 
     # ──── 8. Portfolio Allocation ────
     @app.get("/api/portfolio/allocation")

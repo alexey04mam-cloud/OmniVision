@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request, HTTPException, Depends, Query, Form, Respo
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Float, func, ForeignKey
@@ -41,6 +43,20 @@ HUNT_INTERVAL = int(os.getenv("HUNT_INTERVAL", "60"))
 PORT = int(os.getenv("PORT", "8000"))
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_LANG = "ukr"
+
+# ──── Template Cache ────
+_template_cache = {}
+_template_mtime = {}
+
+def read_template(name: str) -> str:
+    path = BASE_DIR / name
+    if not path.exists():
+        return None
+    mtime = path.stat().st_mtime
+    if name not in _template_cache or _template_mtime.get(name) != mtime:
+        _template_cache[name] = path.read_text(encoding="utf-8")
+        _template_mtime[name] = mtime
+    return _template_cache[name]
 
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
@@ -338,6 +354,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+class APICacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.method == "GET" and request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "public, max-age=10, stale-while-revalidate=30"
+        return response
+
+app.add_middleware(APICacheMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET","POST","PUT","DELETE"], allow_headers=["*"])
+
 # ──── Pro Features ────
 pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal, WatchlistItem)
 
@@ -424,10 +451,9 @@ def login_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/", status_code=302)
-    tpl = BASE_DIR / "login.html"
-    if not tpl.exists():
+    html = read_template("login.html")
+    if not html:
         return HTMLResponse("<h1>login.html not found</h1>", status_code=500)
-    html = tpl.read_text(encoding="utf-8")
     return HTMLResponse(content=html)
 
 @app.post("/login")
@@ -457,10 +483,9 @@ def register_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/", status_code=302)
-    tpl = BASE_DIR / "register.html"
-    if not tpl.exists():
+    html = read_template("register.html")
+    if not html:
         return HTMLResponse("<h1>register.html not found</h1>", status_code=500)
-    html = tpl.read_text(encoding="utf-8")
     return HTMLResponse(content=html)
 
 @app.post("/register")
@@ -513,11 +538,10 @@ def profile_page(request: Request):
         return RedirectResponse(url="/login", status_code=302)
     db = SessionLocal()
     u = db.query(User).filter(User.id == user["uid"]).first()
-    tpl = BASE_DIR / "profile.html"
-    if not tpl.exists():
+    html = read_template("profile.html")
+    if not html:
         db.close()
         return HTMLResponse("<h1>profile.html not found</h1>", status_code=500)
-    html = tpl.read_text(encoding="utf-8")
     html = html.replace("{{USERNAME}}", u.username if u else "")
     html = html.replace("{{EMAIL}}", u.email if u else "")
     html = html.replace("{{CREATED}}", u.created_at.strftime("%d.%m.%Y") if u and u.created_at else "")
@@ -739,10 +763,9 @@ def dashboard(request: Request, lang: str = Query(DEFAULT_LANG, pattern="^(ukr|e
     hc = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1).count()
     pc = db.query(Portfolio).filter(Portfolio.user_id == uid, Portfolio.status == "open").count()
     db.close()
-    tpl = BASE_DIR / "dashboard.html"
-    if not tpl.exists():
+    html = read_template("dashboard.html")
+    if not html:
         return HTMLResponse(content="<h1>dashboard.html not found</h1>", status_code=500)
-    html = tpl.read_text(encoding="utf-8")
     replacements = {
         "{{GREETING}}": t("greeting", lang), "{{STATUS}}": t("status_ok", lang),
         "{{STATUS_LABEL}}": t("status_label", lang), "{{WALLETS_LABEL}}": t("wallets", lang),
@@ -957,12 +980,20 @@ class WatchlistCreate(BaseModel):
 
 @app.get("/api/watchlist")
 def get_watchlist(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import or_, and_
     user = get_current_user(request)
     if not user: return []
     items = db.query(WatchlistItem).filter(WatchlistItem.user_id == user["uid"]).order_by(WatchlistItem.added_at.desc()).all()
+    if not items:
+        return []
+    # Batch fetch all assets at once instead of N+1
+    symbols_cats = [(w.symbol, w.category) for w in items]
+    conditions = [and_(MarketAsset.symbol == s, MarketAsset.category == c) for s, c in symbols_cats]
+    assets_list = db.query(MarketAsset).filter(or_(*conditions)).all() if conditions else []
+    asset_map = {(a.symbol, a.category): a for a in assets_list}
     result = []
     for w in items:
-        asset = db.query(MarketAsset).filter(MarketAsset.symbol == w.symbol, MarketAsset.category == w.category).first()
+        asset = asset_map.get((w.symbol, w.category))
         result.append({"id": w.id, "symbol": w.symbol, "category": w.category,
             "target_price": w.target_price, "direction": w.direction, "note": w.note,
             "triggered": w.triggered, "current_price": asset.price_usd if asset else None,
