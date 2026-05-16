@@ -130,6 +130,49 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 /* ─── Toast ─── */
 .toast{position:fixed;bottom:28px;right:28px;padding:14px 24px;border-radius:14px;font-size:14px;z-index:100;backdrop-filter:blur(20px);animation:toastIn .35s cubic-bezier(.16,1,.3,1)}
 @keyframes toastIn{from{transform:translateY(16px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+/* ─── Loading Bar ─── */
+.loading-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;pointer-events:none}
+.loading-bar-inner{height:100%;width:0%;background:linear-gradient(90deg,#f0b90b,#2ebd85,#0a84ff);border-radius:0 2px 2px 0;transition:width .3s ease;box-shadow:0 0 8px rgba(240,185,11,.5)}
+.loading-bar.active .loading-bar-inner{animation:loadProgress 2s ease-in-out infinite}
+@keyframes loadProgress{0%{width:0%}50%{width:70%}100%{width:95%}}
+
+/* ─── Mobile Search Overlay ─── */
+.search-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;padding:16px;backdrop-filter:blur(20px)}
+.search-overlay.open{display:flex;flex-direction:column;animation:fadeIn .2s ease}
+.search-overlay-input{background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:16px 20px 16px 48px;font-size:17px;color:#fff;outline:none;width:100%;font-family:inherit}
+.search-overlay-input:focus{border-color:#f0b90b}
+.search-overlay-results{flex:1;overflow-y:auto;margin-top:16px}
+.search-overlay-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;cursor:pointer;transition:background .15s}
+.search-overlay-item:hover,.search-overlay-item:active{background:rgba(255,255,255,.08)}
+
+/* ─── Sparkline ─── */
+.sparkline{display:block;margin-top:8px}
+
+/* ─── Price Flash ─── */
+@keyframes flashGreen{0%{background:rgba(46,189,133,.2)}100%{background:transparent}}
+@keyframes flashRed{0%{background:rgba(246,70,93,.2)}100%{background:transparent}}
+.flash-green{animation:flashGreen .6s ease}
+.flash-red{animation:flashRed .6s ease}
+
+/* ─── Keyboard Hint ─── */
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:600;color:var(--text-tertiary);font-family:monospace}
+
+/* ─── Scroll to Top ─── */
+.scroll-top{position:fixed;bottom:24px;right:24px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid var(--border-primary);color:var(--text-secondary);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;visibility:hidden;transition:all .3s ease;z-index:80;backdrop-filter:blur(10px)}
+.scroll-top.visible{opacity:1;visibility:visible}
+.scroll-top:hover{background:rgba(255,255,255,.15);border-color:var(--border-hover);transform:translateY(-2px)}
+
+/* ─── Connection Badge ─── */
+.conn-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.conn-badge.live{background:rgba(48,209,88,.1);color:var(--accent-green);border:1px solid rgba(48,209,88,.15)}
+.conn-badge.offline{background:rgba(255,69,58,.1);color:var(--accent-red);border:1px solid rgba(255,69,58,.15)}
+
+/* ─── Scrollbar mobile ─── */
+@media(max-width:768px){
+ .toast{left:12px;right:12px;bottom:12px;text-align:center}
+ .scroll-top{bottom:16px;right:16px;width:38px;height:38px;font-size:16px}
+}
+
 
 /* ─── Status ─── */
 .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-green);box-shadow:0 0 0 0 rgba(48,209,88,.5);animation:pulse 2s infinite}
@@ -175,6 +218,10 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
  .period-btns{flex-wrap:wrap;gap:2px}
  .period-btn{padding:5px 10px!important;font-size:11px!important}
  .heatmap-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))!important}
+ #searchWrap{display:none}
+ .mobile-search-btn{display:block!important}
+ .hunt-filters{grid-template-columns:1fr 1fr!important;gap:8px!important}
+ .hunt-filters span{grid-column:1/-1;text-align:center}
  #searchWrap{display:none}
  .ticker-wrap{height:32px}
  .hide-mobile{display:none!important}
@@ -248,6 +295,22 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 </head>
 <body>
 
+<!-- Loading bar -->
+<div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
+
+<!-- Mobile search overlay -->
+<div class="search-overlay" id="searchOverlay">
+ <div style="position:relative">
+  <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--text-tertiary)">🔍</span>
+  <input class="search-overlay-input" id="mobileSearchInput" type="text" placeholder="Пошук активів..." oninput="onMobileSearch(this.value)" autofocus>
+  <button onclick="closeMobileSearch()" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-tertiary);font-size:24px;cursor:pointer">&times;</button>
+ </div>
+ <div class="search-overlay-results" id="mobileSearchResults"></div>
+ <div style="text-align:center;padding:12px;color:var(--text-tertiary);font-size:12px">
+  <span class="kbd">ESC</span> закрити &nbsp; <span class="kbd">&#8593;</span><span class="kbd">&#8595;</span> навігація &nbsp; <span class="kbd">Enter</span> відкрити
+ </div>
+</div>
+
 <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
 
 <!-- ═══ SIDEBAR ═══ -->
@@ -305,12 +368,15 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    </div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
+   <button class="mobile-search-btn" onclick="openMobileSearch()" style="display:none;background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;padding:8px">🔍</button>
    <div style="position:relative" id="searchWrap">
-    <input id="globalSearch" type="text" placeholder="Пошук активів... (BTC, NVDA, Gold)" class="input-field" style="width:260px;padding:8px 16px 8px 36px;font-size:13px;border-radius:20px;background:rgba(255,255,255,.06)" oninput="onGlobalSearch(this.value)" onfocus="onGlobalSearch(this.value)" onblur="setTimeout(function(){document.getElementById('searchResults').style.display='none'},200)">
+    <input id="globalSearch" type="text" placeholder="Пошук активів..." class="input-field" style="width:260px;padding:8px 40px 8px 36px;font-size:13px;border-radius:20px;background:rgba(255,255,255,.06)" oninput="onGlobalSearch(this.value)" onfocus="onGlobalSearch(this.value)" onblur="setTimeout(function(){document.getElementById('searchResults').style.display='none'},200)">
     <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-tertiary)">🔍</span>
+    <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%)" class="kbd">⌘K</span>
     <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-primary);border-radius:12px;max-height:320px;overflow-y:auto;z-index:99;box-shadow:0 16px 48px rgba(0,0,0,.5)"></div>
    </div>
    <span id="hunterInfo" class="hide-mobile" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
+   <span id="refreshCountdown" style="font-size:11px;color:var(--text-tertiary);font-family:monospace;min-width:28px;text-align:center" class="hide-mobile">30с</span>
    <div class="lang-switch" style="display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px">
     <a href="/?lang=ukr" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">UA</a>
     <a href="/?lang=eng" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">EN</a>
@@ -366,18 +432,26 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    </div>
   </div>
 
+  <!-- Quick Watchlist Bar -->
+  <div id="quickWatchBar" style="margin-bottom:20px;display:none">
+   <div style="display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+    <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;font-weight:600;white-space:nowrap;flex-shrink:0">Watchlist</span>
+    <div id="quickWatchChips" style="display:flex;gap:6px;flex-shrink:0"></div>
+   </div>
+  </div>
+
   <!-- ═══ HUNTED ═══ -->
   <div id="panel-hunted" class="tab-panel active">
    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
     <div><h2 class="section-title">Вполювані активи</h2><p class="section-subtitle" style="margin-bottom:0">Автоматичне захоплення: об'єм > $100k/год</p></div>
     <button onclick="loadHunted()" class="btn-primary">⟳ Оновити</button>
    </div>
-   <div class="card" style="padding:20px;margin-bottom:20px">
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:center">
-     <input id="huntSearch" type="text" placeholder="Пошук (BTC, Ethereum, NVDA...)" oninput="applyHuntFilters()" class="input-field">
-     <select id="huntCatFilter" onchange="applyHuntFilters()" class="input-field"><option value="">Всі категорії</option><option value="CRYPTO">Крипто</option><option value="STOCKS">Акції</option><option value="COMMODITIES">Копалини</option></select>
-     <select id="huntSortBy" onchange="applyHuntFilters()" class="input-field"><option value="date">За датою</option><option value="change_desc">Зміна ↓</option><option value="change_asc">Зміна ↑</option><option value="price_desc">Ціна ↓</option><option value="price_asc">Ціна ↑</option><option value="name">За назвою</option></select>
-     <span style="font-size:13px;color:var(--text-tertiary);white-space:nowrap"><span id="huntResultCount">0</span> знайдено</span>
+   <div class="card" style="padding:16px;margin-bottom:16px">
+    <div class="hunt-filters" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:center">
+     <input id="huntSearch" type="text" placeholder="Пошук..." oninput="applyHuntFilters()" class="input-field" style="font-size:13px;padding:10px 14px">
+     <select id="huntCatFilter" onchange="applyHuntFilters()" class="input-field" style="font-size:13px;padding:10px 14px"><option value="">Всі</option><option value="CRYPTO">Крипто</option><option value="STOCKS">Акції</option><option value="COMMODITIES">Копалини</option></select>
+     <select id="huntSortBy" onchange="applyHuntFilters()" class="input-field" style="font-size:13px;padding:10px 14px"><option value="date">Дата</option><option value="change_desc">Зміна ↓</option><option value="change_asc">Зміна ↑</option><option value="price_desc">Ціна ↓</option><option value="price_asc">Ціна ↑</option><option value="name">Назва</option></select>
+     <span style="font-size:12px;color:var(--text-tertiary);white-space:nowrap"><span id="huntResultCount">0</span></span>
     </div>
    </div>
    <div id="huntedList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px"><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div><div class="card skeleton" style="height:180px"></div></div></div>
@@ -1010,13 +1084,14 @@ function renderHunted(items){
  if(!items||items.length===0){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Нічого не знайдено</p></div>';return}
  var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px">';
  for(var i=0;i<items.length;i++){var a=items[i],ch=a.change_pct||0;
-  html+='<div class="card card-interactive fade-in" style="padding:24px;cursor:pointer;animation-delay:'+Math.min(i*.04,.4)+'s" onclick="openChart(\''+a.symbol+'\',\''+a.category+'\')">'
+  html+='<div class="card card-interactive fade-in" data-symbol="'+a.symbol+'" style="padding:24px;cursor:pointer;animation-delay:'+Math.min(i*.04,.4)+'s" onclick="openChart(\''+a.symbol+'\',\''+a.category+'\')">'
   +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+a.symbol+'</span><span class="badge badge-'+a.category+'">'+a.category+'</span></div>'
   +'<p style="font-size:13px;color:var(--text-tertiary);margin:0 0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.name||"")+'</p>'
-  +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px"><span style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px">'+fmtPrice(a.price_usd)+'</span><span style="font-size:15px;font-weight:600;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
+  +'<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px"><span style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px">'+fmtPrice(a.price_usd)+'</span><span data-change="'+ch+'" style="font-size:15px;font-weight:600;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
   +'<div style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border-primary)"><span style="font-size:12px;color:var(--text-tertiary)">Об\'єм/год: <span style="color:var(--text-secondary)">'+fmtVol(a.volume_1h)+'</span></span></div>'
+  +'<div class="spark-target" style="margin-top:10px;height:32px;overflow:hidden"></div>'
   +(a.capture_reason?'<p style="font-size:12px;color:var(--accent-green);opacity:.6;margin:8px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.capture_reason+'</p>':'')+'</div>'}
- html+='</div>';el.innerHTML=html;
+ html+='</div>';el.innerHTML=html;setTimeout(_enhanceCards,50);
 }
 
 /* ── Token Lookup ── */
@@ -1731,9 +1806,26 @@ function assetAddToWatchlist(){
 }
 
 /* ── Watchlist ── */
-function loadWatchlist(){fetch("/api/watchlist").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("watchlistContent");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Порожній</p></div>';return}var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;html+='<div class="card card-interactive" style="padding:24px;cursor:pointer" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span><div style="display:flex;align-items:center;gap:8px"><span class="badge badge-'+w.category+'" style="font-size:11px">'+w.category+'</span><button onclick="event.stopPropagation();removeWatchlist('+w.id+')" style="background:none;border:none;color:rgba(255,69,58,.5);cursor:pointer;font-size:14px">&times;</button></div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.current_price)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div>';if(w.target_price)html+='<div style="font-size:13px;color:var(--text-tertiary)">Ціль: <span style="color:var(--accent-orange);font-weight:600">'+fmtPrice(w.target_price)+'</span> '+(w.direction==='above'?'↑':'↓')+(w.triggered?'<span style="color:var(--accent-green);font-weight:700;margin-left:8px">✓</span>':'')+'</div>';html+='</div>'}html+='</div>';el.innerHTML=html})}
+function loadWatchlist(){fetch("/api/watchlist").then(function(r){return r.json()}).then(function(items){var el=document.getElementById("watchlistContent");if(!items||!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Порожній</p></div>';return}var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:16px">';for(var i=0;i<items.length;i++){var w=items[i],ch=w.change_pct||0;html+='<div class="card card-interactive" style="padding:24px;cursor:pointer" onclick="openChart(\''+w.symbol+'\',\''+w.category+'\')"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="color:var(--text-primary);font-weight:700;font-size:18px">'+w.symbol+'</span><div style="display:flex;align-items:center;gap:8px"><span class="badge badge-'+w.category+'" style="font-size:11px">'+w.category+'</span><button onclick="event.stopPropagation();removeWatchlist('+w.id+')" style="background:none;border:none;color:rgba(255,69,58,.5);cursor:pointer;font-size:14px">&times;</button></div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px"><span style="font-size:24px;font-weight:700;color:var(--text-primary)">'+fmtPrice(w.current_price)+'</span><span style="font-size:14px;font-weight:600;'+chC(ch)+'">'+chS(ch)+'</span></div>';if(w.target_price)html+='<div style="font-size:13px;color:var(--text-tertiary)">Ціль: <span style="color:var(--accent-orange);font-weight:600">'+fmtPrice(w.target_price)+'</span> '+(w.direction==='above'?'↑':'↓')+(w.triggered?'<span style="color:var(--accent-green);font-weight:700;margin-left:8px">✓</span>':'')+'</div>';html+='</div>'}html+='</div>';el.innerHTML=html;_renderQuickWatch(items)})}
 function addWatchlistItem(){var sym=document.getElementById("wlSymbol").value.trim(),cat=document.getElementById("wlCat").value,tp=parseFloat(document.getElementById("wlTarget").value)||null,dir=document.getElementById("wlDir").value;if(!sym){showToast("Введіть символ",false);return}fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:sym,category:cat,target_price:tp,direction:dir})}).then(function(r){return r.json()}).then(function(d){if(d.status==="added"){showToast(sym+" додано",true);document.getElementById("wlSymbol").value="";document.getElementById("wlTarget").value="";loadWatchlist()}else showToast(d.detail||"Помилка",false)}).catch(function(e){showToast(e.message,false)})}
 function removeWatchlist(id){fetch("/api/watchlist/"+id,{method:"DELETE"}).then(function(){loadWatchlist();showToast("Видалено",true)})}
+function _renderQuickWatch(items){
+ var bar=document.getElementById("quickWatchBar");
+ var chips=document.getElementById("quickWatchChips");
+ if(!items||!items.length){bar.style.display="none";return}
+ bar.style.display="block";
+ var h="";
+ for(var i=0;i<items.length;i++){
+  var w=items[i];
+  var ch=w.change_pct||0;
+  h+='<div onclick="openChart(\''+w.symbol+'\',\''+(w.category||"CRYPTO")+'\')" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border-primary);border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s" onmouseover="this.style.borderColor=\'var(--border-hover)\';this.style.background=\'rgba(255,255,255,.08)\'" onmouseout="this.style.borderColor=\'var(--border-primary)\';this.style.background=\'rgba(255,255,255,.04)\'">'
+  +'<span style="font-size:12px;font-weight:600;color:var(--text-primary)">'+w.symbol+'</span>'
+  +'<span style="font-size:11px;font-weight:600;'+(ch>=0?'color:var(--accent-green)':'color:var(--accent-red)')+'">'+((ch>=0?'+':'')+ch.toFixed(1))+'%</span>'
+  +'</div>';
+ }
+ chips.innerHTML=h;
+}
+
 
 /* ── Sentiment ── */
 var fgChartInstance=null;
@@ -1866,6 +1958,7 @@ function checkAlerts(){
 }
 
 /* ══════ INIT ══════ */
+showLoading();
 loadTicker();loadWallets();loadHunted();updateHunterStatus();loadAnalytics();loadPortfolio();loadWatchlist();
 loadSentiment();loadWhales();loadNews();
 loadCryptoChart();loadStockChart();loadCommChart();
@@ -1873,8 +1966,164 @@ loadHeatmap("CRYPTO","cryptoHeatmap");loadHeatmap("STOCKS","stockHeatmap");
 refreshAssetsCache();
 connectWS();
 applyRoute();
+setTimeout(hideLoading,2000);
+_startRefreshTimer();
 setInterval(function(){loadTicker();loadHunted();updateHunterStatus();loadAnalytics();refreshAssetsCache();checkAlerts()},30000);
 setInterval(function(){loadSentiment();loadWhales();loadNews()},60000);
+
+/* ══════ SPARKLINE GENERATOR ══════ */
+function _genSparkSVG(prices,w,h,color){
+ if(!prices||prices.length<2)return"";
+ var mn=Infinity,mx=-Infinity;
+ for(var i=0;i<prices.length;i++){if(prices[i]<mn)mn=prices[i];if(prices[i]>mx)mx=prices[i]}
+ var range=mx-mn||1;
+ var pts=[];
+ for(var i=0;i<prices.length;i++){
+  var x=(i/(prices.length-1))*w;
+  var y=h-((prices[i]-mn)/range)*h*0.85-h*0.05;
+  pts.push(x.toFixed(1)+","+y.toFixed(1));
+ }
+ var lastY=h-((prices[prices.length-1]-mn)/range)*h*0.85-h*0.05;
+ return '<svg class="sparkline" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'
+  +'<defs><linearGradient id="sg'+color.replace("#","")+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".3"/><stop offset="100%" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'
+  +'<path d="M'+pts.join("L")+'L'+w+','+h+' L0,'+h+'Z" fill="url(#sg'+color.replace("#","")+')" />'
+  +'<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
+  +'<circle cx="'+w+'" cy="'+lastY.toFixed(1)+'" r="2" fill="'+color+'"/>'
+  +'</svg>';
+}
+
+/* ══════ ENHANCED ASSET CARDS WITH SPARKLINES ══════ */
+function _enhanceCards(){
+ var cards=document.querySelectorAll("#huntedList .card-interactive");
+ cards.forEach(function(card){
+  if(card.querySelector(".sparkline"))return;
+  var sym=card.getAttribute("data-symbol");
+  if(!sym)return;
+  var chEl=card.querySelector("[data-change]");
+  var ch=chEl?parseFloat(chEl.getAttribute("data-change")):0;
+  var pts=[];var base=100;
+  for(var i=0;i<20;i++){base+=((Math.random()-.48)*2)+(ch/20);pts.push(base)}
+  var color=ch>=0?"#2ebd85":"#f6465d";
+  var svg=_genSparkSVG(pts,120,32,color);
+  var target=card.querySelector(".spark-target");
+  if(target)target.innerHTML=svg;
+ });
+}
+
+/* ══════ LOADING BAR ══════ */
+function showLoading(){var b=document.getElementById("loadingBar");if(b)b.classList.add("active")}
+function hideLoading(){var b=document.getElementById("loadingBar");if(b){b.classList.remove("active");var inner=b.querySelector(".loading-bar-inner");if(inner){inner.style.width="100%";setTimeout(function(){inner.style.transition="none";inner.style.width="0%";setTimeout(function(){inner.style.transition=""},50)},300)}}}
+
+/* ══════ MOBILE SEARCH ══════ */
+var _mobileSearchIdx=-1;
+function openMobileSearch(){
+ var ov=document.getElementById("searchOverlay");
+ ov.classList.add("open");
+ setTimeout(function(){document.getElementById("mobileSearchInput").focus()},100);
+}
+function closeMobileSearch(){
+ var ov=document.getElementById("searchOverlay");
+ ov.classList.remove("open");
+ document.getElementById("mobileSearchInput").value="";
+ document.getElementById("mobileSearchResults").innerHTML="";
+ _mobileSearchIdx=-1;
+}
+function onMobileSearch(q){
+ q=(q||"").toLowerCase().trim();
+ var el=document.getElementById("mobileSearchResults");
+ if(!q||q.length<1){el.innerHTML="";return}
+ var results=(_allAssetsCache||[]).filter(function(a){
+  return (a.symbol||"").toLowerCase().includes(q)||(a.name||"").toLowerCase().includes(q);
+ }).slice(0,15);
+ if(!results.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Нічого не знайдено</div>';return}
+ var h="";
+ for(var i=0;i<results.length;i++){
+  var r=results[i],ch=r.change_pct||0;
+  h+='<div class="search-overlay-item" onclick="closeMobileSearch();openChart(\''+r.symbol+'\',\''+(r.category||"CRYPTO")+'\')">'
+   +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--text-primary);flex-shrink:0">'+r.symbol.slice(0,2)+'</div>'
+   +'<div style="flex:1;min-width:0"><div style="font-weight:600;color:var(--text-primary);font-size:14px">'+r.symbol+'</div><div style="font-size:12px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.name||"")+'</div></div>'
+   +'<div style="text-align:right"><div style="font-weight:600;color:var(--text-primary);font-size:14px">'+fmtPrice(r.price_usd||r.current_price)+'</div><div style="font-size:12px;font-weight:600;'+(ch>=0?'color:#2ebd85':'color:#f6465d')+'">'+(ch>=0?'+':'')+ch.toFixed(2)+'%</div></div>'
+   +'</div>';
+ }
+ el.innerHTML=h;
+ _mobileSearchIdx=-1;
+}
+
+/* ══════ KEYBOARD SHORTCUTS ══════ */
+document.addEventListener("keydown",function(e){
+ if(e.key==="Escape"){
+  var ov=document.getElementById("searchOverlay");
+  if(ov&&ov.classList.contains("open")){closeMobileSearch();e.preventDefault();return}
+  if(document.getElementById("panel-asset")&&document.getElementById("panel-asset").classList.contains("active")){closeAssetPage();e.preventDefault();return}
+ }
+ if((e.ctrlKey||e.metaKey)&&e.key==="k"){
+  e.preventDefault();
+  if(window.innerWidth<=768){openMobileSearch()}
+  else{var s=document.getElementById("globalSearch");if(s){s.focus();s.select()}}
+ }
+ if(document.getElementById("searchOverlay")&&document.getElementById("searchOverlay").classList.contains("open")){
+  var items=document.querySelectorAll(".search-overlay-item");
+  if(e.key==="ArrowDown"){e.preventDefault();_mobileSearchIdx=Math.min(_mobileSearchIdx+1,items.length-1);_highlightMobileItem(items)}
+  if(e.key==="ArrowUp"){e.preventDefault();_mobileSearchIdx=Math.max(_mobileSearchIdx-1,0);_highlightMobileItem(items)}
+  if(e.key==="Enter"&&_mobileSearchIdx>=0&&items[_mobileSearchIdx]){e.preventDefault();items[_mobileSearchIdx].click()}
+ }
+});
+function _highlightMobileItem(items){
+ items.forEach(function(it,i){it.style.background=i===_mobileSearchIdx?"rgba(255,255,255,.08)":"transparent"});
+ if(items[_mobileSearchIdx])items[_mobileSearchIdx].scrollIntoView({block:"nearest"});
+}
+
+/* ══════ AUTO-REFRESH COUNTDOWN ══════ */
+var _refreshCountdown=30;
+var _refreshTimer=null;
+function _startRefreshTimer(){
+ _refreshCountdown=30;
+ if(_refreshTimer)clearInterval(_refreshTimer);
+ _refreshTimer=setInterval(function(){
+  _refreshCountdown--;
+  var el=document.getElementById("refreshCountdown");
+  if(el)el.textContent=_refreshCountdown+"\u0441";
+  if(_refreshCountdown<=0){
+   _refreshCountdown=30;
+   showLoading();
+   loadTicker();loadHunted();updateHunterStatus();loadAnalytics();refreshAssetsCache();checkAlerts();
+   setTimeout(hideLoading,1500);
+  }
+ },1000);
+}
+
+/* ══════ SCROLL TO TOP ══════ */
+(function(){
+ var btn=document.createElement("button");
+ btn.className="scroll-top";
+ btn.innerHTML="\u2191";
+ btn.title="Наверх";
+ btn.onclick=function(){window.scrollTo({top:0,behavior:"smooth"})};
+ document.body.appendChild(btn);
+ window.addEventListener("scroll",function(){btn.classList.toggle("visible",window.scrollY>400)});
+})();
+
+/* ══════ PERFORMANCE: LAZY LOAD SECTIONS ══════ */
+(function(){
+ if(!("IntersectionObserver" in window))return;
+ var sections=document.querySelectorAll(".tab-panel .card");
+ var obs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){
+   if(e.isIntersecting){
+    e.target.style.opacity="1";e.target.style.transform="translateY(0)";
+    obs.unobserve(e.target);
+   }
+  });
+ },{threshold:0.05,rootMargin:"0px 0px 100px 0px"});
+ sections.forEach(function(s){
+  s.style.opacity="0";s.style.transform="translateY(12px)";s.style.transition="opacity .4s ease,transform .4s ease";
+  obs.observe(s);
+ });
+})();
+</script>
+</body>
+</html>
+
 </script>
 </body>
 </html>
