@@ -1999,7 +1999,7 @@ fetch("/api/liquidations").then(function(r){return r.json()}).then(function(d){v
 function loadNews(){fetch("/api/news").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("newsContent");var items=d.news||[];var an=d.analysis||{};if(!items.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає новин</div>';return}
  var bp=an.bullish_pct||50,brp=an.bearish_pct||50,ov=an.overall||"neutral";
  var ovC=ov==="bullish"?"#30d158":ov==="bearish"?"#ff453a":"#ff9f0a";
- var ovT=ov==="bullish"?"БИЧАЧИЙ":"bearish"?"ВЕДМЕЖИЙ":"НЕЙТРАЛЬНИЙ";
+ var ovT=ov==="bullish"?"БИЧАЧИЙ":ov==="bearish"?"ВЕДМЕЖИЙ":"НЕЙТРАЛЬНИЙ";
  var h='<div class="news-summary-bar"><div class="news-summary-stat"><div class="val" style="color:'+ovC+'">'+ovT+'</div><div class="lbl">Настрій ринку</div></div><div class="news-summary-stat"><div class="val" style="color:#30d158">'+bp+'%</div><div class="lbl">Бичачих</div></div><div class="news-summary-stat"><div class="val" style="color:#ff453a">'+brp+'%</div><div class="lbl">Ведмежих</div></div><div class="news-summary-stat"><div class="val" style="color:var(--text-primary)">'+items.length+'</div><div class="lbl">Сигналів</div></div><div style="flex:1;min-width:120px"><div class="sentiment-meter"><div class="sentiment-fill" style="width:'+bp+'%;background:linear-gradient(90deg,#30d158,#ff9f0a,#ff453a)"></div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--text-tertiary)"><span>Бики '+bp+'%</span><span>Ведмеді '+brp+'%</span></div></div></div>';
  for(var i=0;i<items.length;i++){var n=items[i];var si=n.sentiment==="bullish"?"📈":n.sentiment==="bearish"?"📉":"➖";var ti=n.type==="market"?"📊":n.type==="trending"?"🔥":n.type==="nft"?"🎨":"📰";var sb=n.sentiment==="bullish"?"border-color:rgba(48,209,88,.15);background:rgba(48,209,88,.03)":n.sentiment==="bearish"?"border-color:rgba(255,69,58,.15);background:rgba(255,69,58,.03)":"";
   h+='<div class="card fade-in" style="padding:20px;margin-bottom:12px;'+sb+';animation-delay:'+Math.min(i*.05,.5)+'s"><div style="display:flex;align-items:flex-start;gap:14px">'+(n.imageurl?'<img src="'+n.imageurl+'" style="width:56px;height:56px;border-radius:12px;object-fit:cover;flex-shrink:0" onerror="this.outerHTML=\'<span style=\\'font-size:32px\\'>'+ti+'</span>\'">':n.thumb?'<img src="'+n.thumb+'" style="width:44px;height:44px;border-radius:50%;flex-shrink:0" onerror="this.style.display=\'none\'">':'<span style="font-size:32px;flex-shrink:0">'+ti+'</span>')+'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"><span style="color:var(--text-primary);font-weight:600;font-size:14px;line-height:1.4">'+n.title+'</span><span style="font-size:13px">'+si+'</span></div><p style="font-size:13px;color:var(--text-secondary);margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+n.detail+'</p><div style="display:flex;gap:12px;margin-top:8px;align-items:center"><span style="font-size:11px;color:var(--text-tertiary);padding:2px 8px;background:rgba(255,255,255,.05);border-radius:6px">'+n.source+'</span>'+(n.url?'<a href="'+n.url+'" target="_blank" style="font-size:11px;color:var(--accent-blue);text-decoration:none">Читати →</a>':'')+'</div></div></div></div>'}
@@ -2115,6 +2115,302 @@ function checkAlerts(){
   if(hit){al.triggered=true;changed=true;showToast("🔔 "+al.symbol+" досяг $"+al.price+"!",true)}
  });
  if(changed)localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
+}
+
+/* ══════ MISSING FUNCTIONS (restored) ══════ */
+
+/* ── Hunted ── */
+var _huntedData=[];
+function loadHunted(){
+ fetch("/api/hunted").then(function(r){return r.json()}).then(function(d){
+  _huntedData=d.assets||d||[];
+  document.getElementById("statHunted").textContent=_huntedData.length;
+  applyHuntFilters();
+ }).catch(function(e){showToast("Hunted: "+e.message,false)})
+}
+function applyHuntFilters(){
+ var q=(document.getElementById("huntSearch").value||"").toLowerCase().trim();
+ var cat=document.getElementById("huntCatFilter").value;
+ var sort=document.getElementById("huntSortBy").value;
+ var filtered=_huntedData.filter(function(a){
+  if(cat&&a.category!==cat)return false;
+  if(q&&!matchesSearch(a.symbol,a.name,q))return false;
+  return true;
+ });
+ if(sort==="change_desc")filtered.sort(function(a,b){return(b.change_pct||0)-(a.change_pct||0)});
+ else if(sort==="change_asc")filtered.sort(function(a,b){return(a.change_pct||0)-(b.change_pct||0)});
+ else if(sort==="price_desc")filtered.sort(function(a,b){return(b.price_usd||0)-(a.price_usd||0)});
+ else if(sort==="price_asc")filtered.sort(function(a,b){return(a.price_usd||0)-(b.price_usd||0)});
+ else if(sort==="name")filtered.sort(function(a,b){return(a.symbol||"").localeCompare(b.symbol||"")});
+ document.getElementById("huntResultCount").textContent=filtered.length;
+ renderHunted(filtered);
+}
+
+/* ── Hunter Status ── */
+function updateHunterStatus(){
+ fetch("/api/hunter/status").then(function(r){return r.json()}).then(function(d){
+  var el=document.getElementById("hunterInfo");
+  if(el)el.textContent="Мисливець: "+(d.status||"active")+" · "+(d.count||0)+" знайдено";
+ }).catch(function(){})
+}
+
+/* ── Analytics ── */
+function loadAnalytics(){
+ fetch("/api/analytics").then(function(r){return r.json()}).then(function(d){
+  if(d.total_invested!==undefined)document.getElementById("totalInvested").textContent="$"+fmtBig(d.total_invested);
+  if(d.total_current!==undefined)document.getElementById("totalCurrent").textContent="$"+fmtBig(d.total_current);
+  if(d.total_pnl!==undefined){
+   var pnlEl=document.getElementById("totalPnl");
+   pnlEl.textContent=(d.total_pnl>=0?"+$":"-$")+fmtBig(Math.abs(d.total_pnl));
+   pnlEl.style.color=d.total_pnl>=0?"var(--accent-green)":"var(--accent-red)";
+  }
+  /* Hunt history chart */
+  if(d.hunt_history&&d.hunt_history.labels&&d.hunt_history.labels.length){
+   if(chartInstances["huntChart"])chartInstances["huntChart"].destroy();
+   chartInstances["huntChart"]=new Chart(document.getElementById("huntChart").getContext("2d"),{type:"bar",data:{labels:d.hunt_history.labels,datasets:[{label:"Вполювань",data:d.hunt_history.values,backgroundColor:"rgba(48,209,88,.3)",borderColor:"#30d158",borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#6e6e73",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#6e6e73",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}}}}});
+  }
+  /* Category chart */
+  if(d.categories&&d.categories.labels&&d.categories.labels.length){
+   if(chartInstances["categoryChart"])chartInstances["categoryChart"].destroy();
+   var catColors=["#30d158","#0a84ff","#ff9f0a","#bf5af2","#ff453a"];
+   chartInstances["categoryChart"]=new Chart(document.getElementById("categoryChart").getContext("2d"),{type:"doughnut",data:{labels:d.categories.labels,datasets:[{data:d.categories.values,backgroundColor:catColors.slice(0,d.categories.labels.length),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#a1a1a6",font:{size:12}}}}}});
+  }
+  /* Top movers */
+  if(d.top_movers&&d.top_movers.length){
+   var mh="";
+   for(var i=0;i<d.top_movers.length;i++){
+    var m=d.top_movers[i],ch=m.change_pct||0;
+    mh+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-primary);cursor:pointer" onclick="openChart(\''+m.symbol+'\',\''+(m.category||"CRYPTO")+'\')">'
+     +'<div style="display:flex;align-items:center;gap:10px">'+coinIconHtml(m.symbol,32)+'<span style="font-weight:600;color:var(--text-primary)">'+m.symbol+'</span></div>'
+     +'<span style="font-weight:700;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>';
+   }
+   document.getElementById("topMovers").innerHTML=mh;
+  }
+ }).catch(function(){})
+}
+
+/* ── Portfolio ── */
+function loadPortfolio(tab){
+ tab=tab||"open";
+ fetch("/api/portfolio?status="+tab).then(function(r){return r.json()}).then(function(items){
+  var el=document.getElementById("portfolioTable");
+  if(!items||!items.length){el.innerHTML='<p style="text-align:center;padding:32px 0;color:var(--text-tertiary)">Порожньо</p>';return}
+  var h='<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border-primary)">'
+   +'<th style="padding:12px;text-align:left;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600">Символ</th>'
+   +'<th style="padding:12px;text-align:right;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600">Вхід</th>'
+   +'<th style="padding:12px;text-align:right;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600">Поточна</th>'
+   +'<th style="padding:12px;text-align:right;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600">К-сть</th>'
+   +'<th style="padding:12px;text-align:right;font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600">P&L</th>'
+   +'</tr></thead><tbody>';
+  for(var i=0;i<items.length;i++){
+   var p=items[i],pnl=p.pnl_pct||0;
+   h+='<tr style="border-bottom:1px solid var(--border-primary);cursor:pointer" onclick="openChart(\''+p.symbol+'\',\''+(p.category||"CRYPTO")+'\')">'
+    +'<td style="padding:12px"><div style="display:flex;align-items:center;gap:8px">'+coinIconHtml(p.symbol,28)+'<span style="font-weight:600;color:var(--text-primary)">'+p.symbol+'</span></div></td>'
+    +'<td style="padding:12px;text-align:right;color:var(--text-secondary)">'+fmtPrice(p.buy_price)+'</td>'
+    +'<td style="padding:12px;text-align:right;color:var(--text-primary);font-weight:600">'+fmtPrice(p.current_price)+'</td>'
+    +'<td style="padding:12px;text-align:right;color:var(--text-secondary)">'+p.quantity+'</td>'
+    +'<td style="padding:12px;text-align:right;font-weight:700;'+chC(pnl)+'">'+chIcon(pnl)+' '+chS(pnl)+'</td>'
+    +'</tr>';
+  }
+  h+='</tbody></table>';
+  el.innerHTML=h;
+  document.getElementById("statPortfolio").textContent=items.length;
+ }).catch(function(e){showToast("Portfolio: "+e.message,false)})
+}
+
+function addPosition(){
+ var sym=document.getElementById("posSymbol").value.trim().toUpperCase();
+ var bp=parseFloat(document.getElementById("posBuyPrice").value);
+ var qty=parseFloat(document.getElementById("posQty").value)||1;
+ var cat=document.getElementById("posCat").value;
+ if(!sym||isNaN(bp)){showToast("Введіть символ та ціну",false);return}
+ fetch("/api/portfolio",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:sym,category:cat,buy_price:bp,quantity:qty})})
+  .then(function(r){return r.json()}).then(function(d){
+   if(d.position||d.status==="ok"){showToast(sym+" додано",true);document.getElementById("posSymbol").value="";document.getElementById("posBuyPrice").value="";loadPortfolio()}
+   else showToast(d.detail||"Помилка",false)
+  }).catch(function(e){showToast(e.message,false)})
+}
+
+/* ── Wallets ── */
+function loadWallets(){
+ fetch("/api/wallets").then(function(r){return r.json()}).then(function(items){
+  var el=document.getElementById("walletTable");
+  if(!items||!items.length){el.innerHTML='<tr><td colspan="5" style="padding:40px 20px;text-align:center;color:var(--text-tertiary)">Порожньо</td></tr>';return}
+  var h="";
+  for(var i=0;i<items.length;i++){
+   var w=items[i];
+   h+='<tr style="border-bottom:1px solid var(--border-primary)">'
+    +'<td style="padding:14px 20px;font-family:monospace;font-size:12px;color:var(--accent-blue)">'+(w.address||"").slice(0,8)+'...'+(w.address||"").slice(-6)+'</td>'
+    +'<td style="padding:14px 20px;color:var(--text-primary)">'+((w.label)||"—")+'</td>'
+    +'<td style="padding:14px 20px;color:var(--text-secondary)">'+((w.chain)||"—")+'</td>'
+    +'<td style="padding:14px 20px;color:var(--text-primary);font-weight:600">'+(w.asset||"—")+'</td>'
+    +'<td style="padding:14px 20px;text-align:right;color:var(--text-primary);font-weight:600">'+fmtPrice(w.balance_usd)+'</td>'
+    +'</tr>';
+  }
+  el.innerHTML=h;
+ }).catch(function(){})
+}
+
+function addWallet(){
+ var addr=document.getElementById("walletAddr").value.trim();
+ var label=document.getElementById("walletLabel").value.trim();
+ var chain=document.getElementById("walletChain").value;
+ if(!addr){showToast("Введіть адресу",false);return}
+ fetch("/api/wallets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({address:addr,label:label,chain:chain})})
+  .then(function(r){return r.json()}).then(function(d){
+   if(d.status==="ok"||d.wallet){showToast("Гаманець додано",true);document.getElementById("walletAddr").value="";document.getElementById("walletLabel").value="";loadWallets()}
+   else showToast(d.detail||"Помилка",false)
+  }).catch(function(e){showToast(e.message,false)})
+}
+
+/* ── AI Advisor ── */
+function loadAdvisor(){
+ var el=document.getElementById("advisorContent");
+ el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Аналізую ринок...</p></div>';
+ fetch("/api/advisor").then(function(r){return r.json()}).then(function(d){
+  if(!d||(!d.recommendations&&!d.summary)){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає рекомендацій</div>';return}
+  var h="";
+  if(d.summary){
+   h+='<div class="card" style="padding:24px;margin-bottom:16px"><h3 style="color:var(--text-primary);font-size:18px;font-weight:700;margin:0 0 12px">📋 Зведення</h3><p style="color:var(--text-secondary);font-size:14px;line-height:1.6;margin:0">'+d.summary+'</p></div>';
+  }
+  if(d.health_score!==undefined){
+   var hc=d.health_score>=70?"var(--accent-green)":d.health_score>=40?"var(--accent-orange)":"var(--accent-red)";
+   h+='<div class="card" style="padding:24px;margin-bottom:16px;text-align:center"><p style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 0 12px">Health Score</p><p style="font-size:48px;font-weight:800;color:'+hc+';margin:0">'+d.health_score+'</p></div>';
+  }
+  var recs=d.recommendations||[];
+  if(recs.length){
+   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px">';
+   for(var i=0;i<recs.length;i++){
+    var r=recs[i],ch=r.change_pct||0;
+    var sig=getInvestSignal(r);
+    h+='<div class="card card-interactive" style="padding:24px;cursor:pointer" onclick="openChart(\''+r.symbol+'\',\''+(r.category||"CRYPTO")+'\')">'
+     +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+coinIconHtml(r.symbol,36)
+     +'<div style="flex:1"><span style="color:var(--text-primary);font-weight:700;font-size:17px">'+r.symbol+'</span></div>'
+     +'<span class="signal-badge '+sig.cls+'">'+sig.label+'</span></div>'
+     +'<p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin:0">'+(r.reason||r.detail||"")+'</p></div>';
+   }
+   h+='</div>';
+  }
+  if(d.alerts&&d.alerts.length){
+   h+='<div class="card" style="padding:24px;margin-top:16px"><h3 style="color:var(--text-primary);font-size:18px;font-weight:700;margin:0 0 16px">⚠️ Сповіщення</h3>';
+   for(var i=0;i<d.alerts.length;i++){
+    var a=d.alerts[i];
+    h+='<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span>'+(a.severity==="HIGH"?"🔴":a.severity==="MEDIUM"?"🟡":"🟢")+'</span><span style="color:var(--text-secondary);font-size:14px">'+a.message+'</span></div>';
+   }
+   h+='</div>';
+  }
+  el.innerHTML=h;
+  showToast("AI Радник оновлено",true);
+ }).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})
+}
+
+/* ── Stocks Scan ── */
+function scanStocks(){
+ var el=document.getElementById("stocksTable");
+ var btn=document.getElementById("scanStocksBtn");
+ btn.disabled=true;btn.textContent="Сканую...";
+ el.innerHTML='<p style="text-align:center;padding:40px 0;color:var(--text-secondary)">Сканую S&P 500...</p>';
+ fetch("/api/stocks/scan").then(function(r){return r.json()}).then(function(d){
+  btn.disabled=false;btn.textContent="Сканувати";
+  var items=d.stocks||d||[];
+  if(!items.length){el.innerHTML='<p style="text-align:center;padding:40px 0;color:var(--text-tertiary)">Немає результатів</p>';return}
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:16px">';
+  for(var i=0;i<items.length;i++){
+   var s=items[i],ch=s.change_pct||0;
+   h+='<div class="card card-interactive fade-in" style="padding:20px;cursor:pointer;animation-delay:'+Math.min(i*.03,.3)+'s" onclick="openChart(\''+s.symbol+'\',\'STOCKS\')">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="color:var(--text-primary);font-weight:700;font-size:16px">'+s.symbol+'</span><span style="font-weight:600;font-size:14px;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
+    +'<p style="font-size:12px;color:var(--text-tertiary);margin:0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(s.name||"")+'</p>'
+    +'<div style="display:flex;justify-content:space-between"><span style="font-size:18px;font-weight:700;color:var(--text-primary)">'+fmtPrice(s.price_usd||s.price)+'</span>'
+    +(s.rvol?'<span style="font-size:12px;color:var(--accent-cyan)">RVOL: '+s.rvol.toFixed(1)+'x</span>':'')+'</div></div>';
+  }
+  h+='</div>';
+  el.innerHTML=h;
+  showToast("Акції: "+items.length,true);
+ }).catch(function(e){btn.disabled=false;btn.textContent="Сканувати";showToast(e.message,false)})
+}
+
+function lookupStock(){
+ var sym=document.getElementById("stockTicker").value.trim().toUpperCase();
+ if(!sym){showToast("Введіть тікер",false);return}
+ openChart(sym,"STOCKS");
+}
+
+/* ── Token Lookup ── */
+function lookupToken(){
+ var addr=document.getElementById("tokenAddr").value.trim();
+ if(!addr){showToast("Введіть адресу",false);return}
+ var btn=document.getElementById("lookupBtn");
+ btn.disabled=true;btn.textContent="Перевіряю...";
+ fetch("/api/token/"+encodeURIComponent(addr)).then(function(r){return r.json()}).then(function(d){
+  btn.disabled=false;btn.textContent="Перевірити";
+  var el=document.getElementById("tokenResult");
+  var cards=document.getElementById("tokenCards");
+  el.classList.remove("hidden");el.style.display="block";
+  var items=[
+   {l:"Назва",v:d.name||"—"},{l:"Символ",v:d.symbol||"—"},
+   {l:"Ціна",v:fmtPrice(d.price)},{l:"Ринкова кап.",v:fmtVol(d.market_cap)},
+   {l:"Об'єм 24г",v:fmtVol(d.volume_24h)},{l:"Мережа",v:d.chain||"—"}
+  ];
+  var h="";
+  for(var i=0;i<items.length;i++){
+   h+='<div class="card" style="padding:16px"><p style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin:0 0 8px">'+items[i].l+'</p><p style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">'+items[i].v+'</p></div>';
+  }
+  cards.innerHTML=h;
+ }).catch(function(e){btn.disabled=false;btn.textContent="Перевірити";showToast(e.message,false)})
+}
+
+/* ── Commodities Scan ── */
+function scanCommodities(){
+ var el=document.getElementById("commoditiesGrid");
+ var btn=document.getElementById("scanCommBtn");
+ btn.disabled=true;btn.textContent="Сканую...";
+ fetch("/api/commodities/scan").then(function(r){return r.json()}).then(function(d){
+  btn.disabled=false;btn.textContent="Сканувати";
+  var items=d.commodities||d||[];
+  if(!items.length){el.innerHTML='<p style="grid-column:1/-1;text-align:center;padding:40px 0;color:var(--text-tertiary)">Немає результатів</p>';return}
+  var h="";
+  for(var i=0;i<items.length;i++){
+   var c=items[i],ch=c.change_pct||0;
+   var icons={"GOLD":"🥇","OIL":"🛢️","GAS":"🔥","SILVER":"🥈","PLATINUM":"⚪","COPPER":"🟤"};
+   h+='<div class="card card-interactive fade-in" style="padding:20px;cursor:pointer;animation-delay:'+Math.min(i*.03,.3)+'s" onclick="openChart(\''+c.symbol+'\',\'COMMODITIES\')">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:24px">'+(icons[c.symbol.toUpperCase()]||"⛏️")+'</span><span style="font-weight:600;font-size:14px;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div>'
+    +'<p style="color:var(--text-primary);font-weight:700;font-size:16px;margin:0 0 4px">'+c.symbol+'</p>'
+    +'<p style="font-size:12px;color:var(--text-tertiary);margin:0 0 8px">'+(c.name||"")+'</p>'
+    +'<span style="font-size:20px;font-weight:700;color:var(--text-primary)">'+fmtPrice(c.price_usd||c.price)+'</span></div>';
+  }
+  el.innerHTML=h;
+  showToast("Копалини: "+items.length,true);
+ }).catch(function(e){btn.disabled=false;btn.textContent="Сканувати";showToast(e.message,false)})
+}
+
+/* ── Flow Detection ── */
+function detectFlow(){
+ var el=document.getElementById("flowAlerts");
+ var btn=document.getElementById("flowBtn");
+ if(btn){btn.disabled=true;btn.textContent="Аналізую..."}
+ fetch("/api/flow/detect").then(function(r){return r.json()}).then(function(d){
+  if(btn){btn.disabled=false;btn.textContent="Аналізувати"}
+  var items=d.flows||d||[];
+  if(!items.length){el.innerHTML='<p style="text-align:center;padding:40px 0;color:var(--text-tertiary)">Немає переливів</p>';return}
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:16px">';
+  for(var i=0;i<items.length;i++){
+   var f=items[i];
+   var dirIcon=f.direction==="inflow"?"📥":f.direction==="outflow"?"📤":"🔄";
+   var dirColor=f.direction==="inflow"?"var(--accent-green)":f.direction==="outflow"?"var(--accent-red)":"var(--accent-orange)";
+   h+='<div class="card fade-in" style="padding:20px;animation-delay:'+Math.min(i*.04,.4)+'s">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:24px">'+dirIcon+'</span>'
+    +'<div style="flex:1"><span style="color:var(--text-primary);font-weight:700;font-size:15px">'+(f.from_market||"")+'</span>'
+    +'<span style="color:var(--text-tertiary);margin:0 8px">→</span>'
+    +'<span style="color:var(--text-primary);font-weight:700;font-size:15px">'+(f.to_market||"")+'</span></div></div>'
+    +'<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">'+(f.detail||f.description||"")+'</p>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border-primary)">'
+    +'<span style="font-size:14px;font-weight:700;color:'+dirColor+'">'+fmtVol(f.amount)+'</span>'
+    +'<span style="font-size:11px;color:var(--text-tertiary)">'+(f.time||"")+'</span></div></div>';
+  }
+  h+='</div>';
+  el.innerHTML=h;
+  showToast("Переливи: "+items.length,true);
+ }).catch(function(e){if(btn){btn.disabled=false;btn.textContent="Аналізувати"}showToast(e.message,false)})
 }
 
 /* ══════ INIT ══════ */
