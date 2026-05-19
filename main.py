@@ -1200,6 +1200,129 @@ def add_insight(ticker: str, summary: str, source: Optional[str] = None, db: Ses
     db.add(ins); db.commit(); db.refresh(ins)
     return {"added":ins.ticker,"id":ins.id}
 
+
+# ──── Push Notifications ────
+_push_subscribers = {}  # user_id -> {endpoint, keys, subscribed_at}
+_push_file = "push_subs.json"
+
+def _load_push_subs():
+    global _push_subscribers
+    try:
+        if os.path.exists(_push_file):
+            import json as _json
+            with open(_push_file) as f:
+                _push_subscribers = _json.load(f)
+    except: pass
+
+def _save_push_subs():
+    try:
+        import json as _json
+        with open(_push_file, "w") as f:
+            _json.dump(_push_subscribers, f)
+    except: pass
+
+_load_push_subs()
+
+@app.get("/sw.js")
+def serve_sw():
+    sw_path = BASE_DIR / "sw.js"
+    if sw_path.exists():
+        return Response(content=sw_path.read_text(), media_type="application/javascript",
+                       headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+    raise HTTPException(404)
+
+@app.post("/api/push/subscribe")
+def push_subscribe(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    import json as _json
+    body = asyncio.get_event_loop().run_until_complete(request.json()) if hasattr(request, 'json') else {}
+    # Use sync approach
+    return {"status": "ok"}
+
+@app.post("/api/push/subscribe_sync")
+async def push_subscribe_sync(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    body = await request.json()
+    uid = str(user["uid"])
+    _push_subscribers[uid] = {
+        "endpoint": body.get("endpoint"),
+        "keys": body.get("keys"),
+        "subscribed_at": datetime.now(timezone.utc).isoformat()
+    }
+    _save_push_subs()
+    return {"status": "subscribed", "user": user["user"]}
+
+@app.delete("/api/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    uid = str(user["uid"])
+    _push_subscribers.pop(uid, None)
+    _save_push_subs()
+    return {"status": "unsubscribed"}
+
+@app.get("/api/push/status")
+def push_status(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"subscribed": False}
+    uid = str(user["uid"])
+    return {"subscribed": uid in _push_subscribers, "total_subscribers": len(_push_subscribers)}
+
+
+
+# ──── Deep Analytics ────
+
+@app.get("/api/analytics/timeline")
+def analytics_timeline(days: int = Query(7, ge=1, le=90), db: Session = Depends(get_db)):
+    """Price history timeline for charts"""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    records = db.query(HuntHistory).filter(HuntHistory.scanned_at >= cutoff).order_by(HuntHistory.scanned_at.asc()).all()
+    return [{"count": h.hunted_count, "crypto": h.crypto_count, "stocks": h.stocks_count,
+             "duration": h.scan_duration, "time": h.scanned_at.isoformat() if h.scanned_at else None} for h in records]
+
+@app.get("/api/analytics/top_gainers")
+def top_gainers(limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
+    assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1, MarketAsset.change_pct != None).order_by(MarketAsset.change_pct.desc()).limit(limit).all()
+    return [{"symbol": a.symbol, "category": a.category, "price": a.price_usd,
+             "change": a.change_pct, "volume_1h": a.volume_1h} for a in assets]
+
+@app.get("/api/analytics/top_losers")
+def top_losers(limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
+    assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1, MarketAsset.change_pct != None).order_by(MarketAsset.change_pct.asc()).limit(limit).all()
+    return [{"symbol": a.symbol, "category": a.category, "price": a.price_usd,
+             "change": a.change_pct, "volume_1h": a.volume_1h} for a in assets]
+
+@app.get("/api/analytics/volume_leaders")
+def volume_leaders(limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
+    assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1, MarketAsset.volume_1h != None).order_by(MarketAsset.volume_1h.desc()).limit(limit).all()
+    return [{"symbol": a.symbol, "category": a.category, "price": a.price_usd,
+             "change": a.change_pct, "volume_1h": a.volume_1h} for a in assets]
+
+@app.get("/api/analytics/market_summary")
+def market_summary(db: Session = Depends(get_db)):
+    """Overall market summary"""
+    assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1).all()
+    if not assets:
+        return {"total": 0, "bullish": 0, "bearish": 0, "neutral": 0, "avg_change": 0}
+    bullish = len([a for a in assets if (a.change_pct or 0) > 1])
+    bearish = len([a for a in assets if (a.change_pct or 0) < -1])
+    neutral = len(assets) - bullish - bearish
+    changes = [a.change_pct for a in assets if a.change_pct is not None]
+    avg_change = round(sum(changes) / len(changes), 2) if changes else 0
+    total_vol = sum(a.volume_1h or 0 for a in assets)
+    return {"total": len(assets), "bullish": bullish, "bearish": bearish, "neutral": neutral,
+            "avg_change": avg_change, "total_volume_1h": total_vol,
+            "bullish_pct": round(bullish / len(assets) * 100, 1) if assets else 0,
+            "bearish_pct": round(bearish / len(assets) * 100, 1) if assets else 0}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)

@@ -2582,6 +2582,50 @@ function _startRefreshTimer(){
   obs.observe(s);
  });
 })();
+
+/* ── Push Notifications ── */
+function initPush(){
+ if(!("serviceWorker" in navigator) || !("PushManager" in window)){return}
+ navigator.serviceWorker.register("/sw.js").then(function(reg){
+  console.log("[SW] Registered");
+  checkPushSubscription(reg);
+ }).catch(function(e){console.warn("[SW] Error:",e)})
+}
+function checkPushSubscription(reg){
+ reg.pushManager.getSubscription().then(function(sub){
+  var btn=document.getElementById("pushToggle");
+  if(!btn)return;
+  if(sub){btn.textContent="🔔 Сповіщення ON";btn.classList.add("active")}
+  else{btn.textContent="🔕 Увімкнути сповіщення";btn.classList.remove("active")}
+ })
+}
+function togglePush(){
+ if(!("serviceWorker" in navigator))return showToast("Браузер не підтримує push",false);
+ navigator.serviceWorker.ready.then(function(reg){
+  reg.pushManager.getSubscription().then(function(sub){
+   if(sub){
+    sub.unsubscribe().then(function(){
+     fetch("/api/push/unsubscribe",{method:"DELETE"});
+     showToast("Сповіщення вимкнено",true);
+     var btn=document.getElementById("pushToggle");
+     if(btn){btn.textContent="🔕 Увімкнути сповіщення";btn.classList.remove("active")}
+    })
+   }else{
+    reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:null}).then(function(newSub){
+     fetch("/api/push/subscribe_sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newSub.toJSON())});
+     showToast("Сповіщення увімкнено!",true);
+     var btn=document.getElementById("pushToggle");
+     if(btn){btn.textContent="🔔 Сповіщення ON";btn.classList.add("active")}
+    }).catch(function(e){
+     if(Notification.permission==="denied"){showToast("Дозвольте сповіщення в браузері",false)}
+     else{showToast("Помилка: "+e.message,false)}
+    })
+   }
+  })
+ })
+}
+initPush();
+
 </script>
 </body>
 </html>
