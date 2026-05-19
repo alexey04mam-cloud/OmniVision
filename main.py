@@ -26,6 +26,7 @@ from scanners import (
     flow_detector, global_hunter,
 )
 import pro_api
+import telegram_bot
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("omni-vision")
@@ -332,6 +333,11 @@ async def background_hunter():
             hunt_status["last_count"] = result.get("hunted_count", 0)
             hunt_status["errors"] = []
             log.info(f"Мисливець: вполювано {result['hunted_count']}, нових у базі: {count}")
+            # Notify Telegram subscribers
+            try:
+                await telegram_bot.broadcast_hunt_results(result)
+            except Exception as tg_err:
+                log.error(f"TG broadcast error: {tg_err}")
         except Exception as e:
             hunt_status["errors"].append(str(e))
             log.error(f"Мисливець помилка: {e}")
@@ -342,14 +348,19 @@ async def background_hunter():
 @asynccontextmanager
 async def lifespan(app):
     task = None
+    tg_task = None
     if HUNT_INTERVAL > 0:
         task = asyncio.create_task(background_hunter())
         log.info(f"Мисливець запущено (інтервал: {HUNT_INTERVAL}с)")
     else:
         log.info("Мисливець вимкнено (HUNT_INTERVAL=0)")
+    # Start Telegram bot
+    tg_task = asyncio.create_task(telegram_bot.run_bot(SessionLocal))
     yield
     if task:
         task.cancel()
+    if tg_task:
+        tg_task.cancel()
 
 app = FastAPI(title="Omni-Vision", version="1.2.0", lifespan=lifespan)
 
@@ -817,6 +828,13 @@ def dashboard(request: Request, lang: str = Query(DEFAULT_LANG, pattern="^(ukr|e
     return HTMLResponse(content=html)
 
 # ──── API (public data — no auth needed) ────
+
+@app.get("/api/telegram/status")
+def telegram_status():
+    subs = len(telegram_bot._subscribers)
+    return {"bot_active": bool(os.getenv("TELEGRAM_BOT_TOKEN")),
+            "subscribers": subs,
+            "token_set": bool(os.getenv("TELEGRAM_BOT_TOKEN"))}
 
 @app.get("/api/status")
 def api_status(lang: str = Query(DEFAULT_LANG, pattern="^(ukr|eng|rus)$")):
