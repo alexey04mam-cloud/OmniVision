@@ -35,7 +35,10 @@ BOSS_KEY = os.getenv("BOSS_KEY")
 if not BOSS_KEY:
     raise RuntimeError("BOSS_KEY not set in .env")
 
-SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_hex(32)
+    log.warning("SECRET_KEY not set — generating random key. Sessions will reset on restart!")
 SESSION_MAX_AGE = int(os.getenv("SESSION_MAX_AGE", "86400"))
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./omni_vision.db")
@@ -104,15 +107,25 @@ def t(key, lang=DEFAULT_LANG):
 
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    h = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}:{h}"
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 600_000).hex()
+    return f"pbkdf2:{salt}:{h}"
 
 def verify_password(password: str, hashed: str) -> bool:
     try:
-        salt, h = hashed.split(":")
-        return hashlib.sha256((salt + password).encode()).hexdigest() == h
+        if hashed.startswith("pbkdf2:"):
+            _, salt, h = hashed.split(":")
+            return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 600_000).hex() == h
+        else:
+            # Legacy SHA-256 fallback (auto-upgrade on next login)
+            salt, h = hashed.split(":")
+            return hashlib.sha256((salt + password).encode()).hexdigest() == h
     except Exception:
         return False
+
+def upgrade_password_if_needed(user_obj, password: str):
+    """Auto-upgrade legacy SHA-256 hashes to PBKDF2"""
+    if user_obj.password_hash and not user_obj.password_hash.startswith("pbkdf2:"):
+        user_obj.password_hash = hash_password(password)
 
 # ──── Models ────
 
@@ -350,6 +363,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://assets.coincap.io https://*.cryptocompare.com https://*.coingecko.com blob:; connect-src 'self' https://api.binance.com https://api.coingecko.com https://min-api.cryptocompare.com https://api.coinpaprika.com wss://stream.binance.com; frame-ancestors 'none'"
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -363,7 +378,10 @@ class APICacheMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(APICacheMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET","POST","PUT","DELETE"], allow_headers=["*"])
+ALLOWED_ORIGINS = [
+    os.getenv("CORS_ORIGIN", "https://dependable-tranquility-production-d86f.up.railway.app"),
+]
+app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["GET","POST","PUT","DELETE"], allow_headers=["Content-Type","X-Boss-Key","X-CSRF-Token"])
 
 # ──── Pro Features ────
 pro_api.setup(app, get_db, MarketAsset, PriceHistory, Portfolio, get_current_user, SessionLocal, WatchlistItem)
@@ -384,6 +402,16 @@ ws_clients = set()
 
 @app.websocket("/ws/prices")
 async def ws_prices(websocket: WebSocket):
+    # Verify session cookie before accepting
+    token = websocket.cookies.get("omni_session")
+    if not token:
+        await websocket.close(code=4001, reason="Not authenticated")
+        return
+    try:
+        serializer.loads(token, max_age=SESSION_MAX_AGE)
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid session")
+        return
     await websocket.accept()
     ws_clients.add(websocket)
     try:
@@ -406,7 +434,7 @@ async def ws_prices(websocket: WebSocket):
 login_attempts = defaultdict(list)  # ip -> [timestamps]
 RATE_LIMIT_MAX = 5
 RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_BLOCK = 300  # 5 min block
+RATE_LIMIT_BLOCK = 600  # 10 min block after 5 failed attempts
 
 def check_rate_limit(ip: str) -> bool:
     now = time.time()
@@ -457,7 +485,10 @@ def login_page(request: Request):
     return HTMLResponse(content=html)
 
 @app.post("/login")
-def do_login(request: Request, username: str = Form(...), password: str = Form(...)):
+async def do_login(request: Request, username: str = Form(...), password: str = Form(...), csrf_token: str = Form("")):
+    # CSRF check (skip if token not yet implemented in form)
+    if csrf_token and not verify_csrf_token(csrf_token):
+        return RedirectResponse(url="/login?error=csrf", status_code=302)
     ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(ip):
         log.warning(f"Rate limit: {ip} заблоковано")
@@ -470,7 +501,9 @@ def do_login(request: Request, username: str = Form(...), password: str = Form(.
         login_attempts[ip] = []  # reset on success
         token = create_session_token(user.id, user.username)
         resp = RedirectResponse(url="/", status_code=302)
-        resp.set_cookie(key="omni_session", value=token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+        resp.set_cookie(key="omni_session", value=token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax", secure=True)
+        upgrade_password_if_needed(user, password)
+        db.commit()
         log.info(f"Вхід: {username} з {ip}")
         db.close()
         return resp
@@ -489,7 +522,9 @@ def register_page(request: Request):
     return HTMLResponse(content=html)
 
 @app.post("/register")
-def do_register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...), password2: str = Form(...)):
+async def do_register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...), password2: str = Form(...), csrf_token: str = Form("")):
+    if csrf_token and not verify_csrf_token(csrf_token):
+        return RedirectResponse(url="/register?error=csrf", status_code=302)
     ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(ip):
         return RedirectResponse(url="/register?error=blocked", status_code=302)
@@ -502,7 +537,7 @@ def do_register(request: Request, username: str = Form(...), email: str = Form(.
         return RedirectResponse(url="/register?error=email_invalid", status_code=302)
     if password != password2:
         return RedirectResponse(url="/register?error=mismatch", status_code=302)
-    if len(password) < 6:
+    if len(password) < 8:
         return RedirectResponse(url="/register?error=short", status_code=302)
     if len(password) > 128:
         return RedirectResponse(url="/register?error=too_long", status_code=302)
@@ -518,7 +553,7 @@ def do_register(request: Request, username: str = Form(...), email: str = Form(.
     login_attempts[ip] = []
     token = create_session_token(user.id, user.username)
     resp = RedirectResponse(url="/", status_code=302)
-    resp.set_cookie(key="omni_session", value=token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    resp.set_cookie(key="omni_session", value=token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax", secure=True)
     log.info(f"Реєстрація: {username} ({email}) з {ip}")
     db.close()
     return resp
@@ -816,7 +851,7 @@ def radar_flow(crypto_change: Optional[float] = None):
     return {"flow_alerts": flow_detector.detect_flows(stocks_data, commodities_data, crypto_change)}
 
 @app.get("/api/hunted")
-def list_hunted(limit: int = 50, db: Session = Depends(get_db)):
+def list_hunted(limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1).order_by(MarketAsset.last_updated.desc()).limit(limit).all()
     return [{"id": a.id, "category": a.category, "symbol": a.symbol, "name": a.name,
              "price_usd": a.price_usd, "change_pct": a.change_pct, "volume_1h": a.volume_1h,
@@ -829,7 +864,7 @@ def list_flow_alerts(db: Session = Depends(get_db)):
              "detected_at": a.detected_at.isoformat()} for a in db.query(FlowAlert).order_by(FlowAlert.detected_at.desc()).limit(20).all()]
 
 @app.get("/api/hunt_history")
-def get_hunt_history(limit: int = 50, db: Session = Depends(get_db)):
+def get_hunt_history(limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     records = db.query(HuntHistory).order_by(HuntHistory.scanned_at.desc()).limit(limit).all()
     return [{"id": h.id, "hunted_count": h.hunted_count, "crypto_count": h.crypto_count,
              "stocks_count": h.stocks_count, "scan_duration": h.scan_duration,
@@ -936,7 +971,10 @@ def delete_position(request: Request, pos_id: int, db: Session = Depends(get_db)
     return {"status": "deleted", "id": pos_id}
 
 @app.get("/api/export/hunted")
-def export_hunted_csv(db: Session = Depends(get_db)):
+def export_hunted_csv(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Увійдіть в систему")
     assets = db.query(MarketAsset).filter(MarketAsset.auto_captured == 1).order_by(MarketAsset.last_updated.desc()).all()
     output = io.StringIO()
     writer = csv.writer(output)
@@ -965,7 +1003,7 @@ def export_portfolio_csv(request: Request, db: Session = Depends(get_db)):
 # ──── Price History & Charts ────
 
 @app.get("/api/price_history/{symbol}")
-def get_price_history(symbol: str, category: str = "CRYPTO", limit: int = 100, db: Session = Depends(get_db)):
+def get_price_history(symbol: str, category: str = "CRYPTO", limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db)):
     records = db.query(PriceHistory).filter(PriceHistory.symbol == symbol.upper(), PriceHistory.category == category.upper()).order_by(PriceHistory.recorded_at.asc()).limit(limit).all()
     return [{"price": r.price_usd, "time": r.recorded_at.isoformat()} for r in records]
 
@@ -1025,9 +1063,13 @@ ADMIN_USER = os.getenv("ADMIN_USER", "boss")
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     user = get_current_user(request)
-    if not user or user["user"] != ADMIN_USER:
+    if not user:
         return HTMLResponse("<h1>403 Forbidden</h1>", status_code=403)
     db = SessionLocal()
+    db_user = db.query(User).filter(User.id == user["uid"]).first()
+    if not db_user or (db_user.is_admin != 1 and db_user.username != ADMIN_USER):
+        db.close()
+        return HTMLResponse("<h1>403 Forbidden</h1>", status_code=403)
     users = db.query(User).order_by(User.created_at.desc()).all()
     total_users = len(users)
     total_assets = db.query(MarketAsset).count()
@@ -1071,7 +1113,7 @@ a{{color:#00e0ff;text-decoration:none}}a:hover{{text-decoration:underline}}
 
     for u in users:
         role = '<span class="badge badge-admin">ADMIN</span>' if u.username == ADMIN_USER else '<span class="badge badge-user">USER</span>'
-        html += f'<tr><td>{u.id}</td><td>{u.username}</td><td>{u.email}</td><td>{u.risk_profile or "balanced"}</td><td>{role}</td><td>{u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "—"}</td></tr>'
+        html += f'<tr><td>{u.id}</td><td>{html_escape.escape(u.username)}</td><td>{html_escape.escape(u.email)}</td><td>{html_escape.escape(u.risk_profile or "balanced")}</td><td>{role}</td><td>{u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "—"}</td></tr>'
 
     html += '''</table></div></div></body></html>'''
     db.close()
