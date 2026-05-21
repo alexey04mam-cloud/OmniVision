@@ -754,13 +754,45 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    </div>
   </div>
 
-  <!-- ═══ ADVISOR ═══ -->
+  <!-- ═══ AI ADVISOR CHAT ═══ -->
   <div id="panel-advisor" class="tab-panel">
-   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-    <div><h2 class="section-title">AI Радник</h2><p class="section-subtitle" style="margin-bottom:0">Рекомендації на основі портфелю та ринку</p></div>
-    <button onclick="loadAdvisor()" class="btn-primary" style="background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue))">🧠 Аналізувати</button>
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+    <div><h2 class="section-title">AI Радник</h2><p class="section-subtitle" style="margin-bottom:0">Запитуй будь-що про крипту, ринок, монети</p></div>
+    <button onclick="loadAdvisor()" class="btn-secondary btn-sm" style="font-size:12px">📊 Портфель-аналіз</button>
    </div>
-   <div id="advisorContent"><div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-tertiary)">Натисніть "Аналізувати"</p></div></div>
+   <!-- Quick action buttons -->
+   <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px" id="aiQuickBtns">
+    <button onclick="aiAsk('Який загальний стан крипторинку зараз?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">📈 Стан ринку</button>
+    <button onclick="aiAsk('Що зараз в тренді? Які монети найбільше ростуть?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">🔥 Тренди</button>
+    <button onclick="aiAsk('Аналіз Bitcoin - варто зараз купувати?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">₿ Bitcoin</button>
+    <button onclick="aiAsk('Аналіз Ethereum - прогноз та рекомендації')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">⟠ Ethereum</button>
+    <button onclick="aiAsk('Які альткоіни варто розглянути для інвестицій?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">💎 Альткоіни</button>
+    <button onclick="aiAsk('Проаналізуй мій портфель та дай рекомендації')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">💼 Мій портфель</button>
+    <button onclick="aiAsk('Які останні важливі новини в крипто?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">📰 Новини</button>
+    <button onclick="aiAsk('Що таке DeFi та які проєкти цікаві зараз?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">🏦 DeFi</button>
+   </div>
+   <!-- Chat messages -->
+   <div id="aiChatMessages" class="card" style="padding:20px;min-height:300px;max-height:60vh;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:16px">
+    <div style="text-align:center;padding:40px 0">
+     <div style="font-size:48px;margin-bottom:12px">🧠</div>
+     <p style="font-size:16px;color:var(--text-primary);font-weight:600;margin:0 0 8px">Omni-Vision AI</p>
+     <p style="font-size:13px;color:var(--text-tertiary);margin:0;max-width:400px;margin:0 auto">Запитуй будь-що про крипто, ринок, монети, DeFi, NFT. Аналіз на основі реальних даних з бірж, новин та on-chain.</p>
+    </div>
+   </div>
+   <!-- Chat input -->
+   <div class="card" style="padding:16px;display:flex;gap:12px;align-items:flex-end">
+    <textarea id="aiChatInput" placeholder="Запитай про крипту, ринок, монету..." rows="1" class="input-field" style="flex:1;resize:none;min-height:42px;max-height:120px;padding:10px 16px;font-size:14px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}"></textarea>
+    <button onclick="aiSend()" id="aiSendBtn" class="btn-primary" style="background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));height:42px;width:42px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:12px;font-size:18px">➤</button>
+   </div>
+   <!-- Data sources badge -->
+   <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <span style="font-size:10px;color:var(--text-tertiary)">Джерела:</span>
+    <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,159,10,.08);color:var(--accent-orange)">CoinGecko</span>
+    <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(10,132,255,.08);color:var(--accent-blue)">CryptoCompare</span>
+    <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(48,209,88,.08);color:var(--accent-green)">Binance</span>
+    <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(191,90,242,.08);color:var(--accent-purple)">On-Chain</span>
+    <span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(100,210,255,.08);color:var(--accent-cyan)">Fear&Greed</span>
+   </div>
   </div>
 
   <!-- ═══ WATCHLIST ═══ -->

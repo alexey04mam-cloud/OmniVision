@@ -839,6 +839,233 @@ def generate_advice(user_id: int, db: Session) -> dict:
         "disclaimer": "Це не фінансова порада. Завжди досліджуйте самостійно перед інвестуванням."
     }
 
+# ──── AI Chat Assistant ────
+
+import httpx as _httpx_ai
+
+async def _gather_market_context() -> dict:
+    """Gather real-time market data from all sources for AI context"""
+    ctx = {}
+    async with _httpx_ai.AsyncClient(timeout=8) as client:
+        # 1. Top crypto prices
+        try:
+            r = await client.get("https://api.coingecko.com/api/v3/coins/markets",
+                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 20,
+                        "sparkline": False, "price_change_percentage": "1h,24h,7d"})
+            coins = r.json()
+            ctx["top_crypto"] = [{"symbol": c.get("symbol","").upper(), "name": c.get("name"),
+                "price": c.get("current_price"), "change_24h": c.get("price_change_percentage_24h"),
+                "change_7d": c.get("price_change_percentage_7d_in_currency"),
+                "market_cap": c.get("market_cap"), "volume": c.get("total_volume"),
+                "rank": c.get("market_cap_rank")} for c in (coins if isinstance(coins, list) else [])]
+        except: ctx["top_crypto"] = []
+
+        # 2. Fear & Greed
+        try:
+            r = await client.get("https://api.alternative.me/fng/?limit=1&format=json")
+            fng = r.json()
+            if fng.get("data"):
+                ctx["fear_greed"] = {"value": int(fng["data"][0]["value"]),
+                    "label": fng["data"][0].get("value_classification", "")}
+        except: ctx["fear_greed"] = None
+
+        # 3. BTC dominance & global data
+        try:
+            r = await client.get("https://api.coingecko.com/api/v3/global")
+            g = r.json().get("data", {})
+            ctx["global"] = {"total_market_cap": g.get("total_market_cap", {}).get("usd"),
+                "total_volume": g.get("total_volume", {}).get("usd"),
+                "btc_dominance": g.get("market_cap_percentage", {}).get("btc"),
+                "eth_dominance": g.get("market_cap_percentage", {}).get("eth"),
+                "active_crypto": g.get("active_cryptocurrencies"),
+                "market_cap_change_24h": g.get("market_cap_change_percentage_24h_usd")}
+        except: ctx["global"] = None
+
+        # 4. Trending on CoinGecko
+        try:
+            r = await client.get("https://api.coingecko.com/api/v3/search/trending")
+            tr = r.json()
+            ctx["trending"] = [{"symbol": c["item"]["symbol"], "name": c["item"]["name"],
+                "rank": c["item"].get("market_cap_rank")}
+                for c in (tr.get("coins", []))[:7]]
+        except: ctx["trending"] = []
+
+        # 5. Latest crypto news headlines
+        try:
+            r = await client.get("https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest",
+                headers={"Accept": "application/json"})
+            news = r.json().get("Data", [])[:8]
+            ctx["news"] = [{"title": n.get("title"), "source": n.get("source"),
+                "categories": n.get("categories", ""),
+                "published": n.get("published_on")} for n in news]
+        except: ctx["news"] = []
+
+    return ctx
+
+
+def _build_ai_prompt(question: str, market_ctx: dict, user_portfolio: list, user_risk: str) -> str:
+    """Build a comprehensive prompt with all gathered data"""
+    parts = []
+    parts.append("Ти — Omni-Vision AI, експертний крипто-аналітик. Відповідай УКРАЇНСЬКОЮ.")
+    parts.append("Аналізуй на основі реальних даних нижче. Будь конкретним, давай цифри, ціни, відсотки.")
+    parts.append("Якщо питання про конкретну монету — дай повний аналіз: ціна, тренд, обсяг, рекомендація.")
+    parts.append("Завжди додавай disclaimer що це не фінансова порада.")
+    parts.append("")
+
+    # Global market
+    g = market_ctx.get("global")
+    if g:
+        parts.append(f"=== ГЛОБАЛЬНИЙ РИНОК ===")
+        parts.append(f"Загальна капіталізація: ${g.get('total_market_cap',0)/1e12:.2f}T")
+        parts.append(f"Обсяг 24h: ${g.get('total_volume',0)/1e9:.1f}B")
+        parts.append(f"BTC домінація: {g.get('btc_dominance',0):.1f}%")
+        parts.append(f"ETH домінація: {g.get('eth_dominance',0):.1f}%")
+        parts.append(f"Зміна капіталізації 24h: {g.get('market_cap_change_24h',0):.2f}%")
+        parts.append("")
+
+    # Fear & Greed
+    fg = market_ctx.get("fear_greed")
+    if fg:
+        parts.append(f"=== FEAR & GREED INDEX ===")
+        parts.append(f"Значення: {fg['value']}/100 ({fg['label']})")
+        parts.append("")
+
+    # Top 20 crypto
+    top = market_ctx.get("top_crypto", [])
+    if top:
+        parts.append("=== ТОП-20 КРИПТОВАЛЮТ ===")
+        for c in top:
+            ch24 = c.get("change_24h") or 0
+            ch7d = c.get("change_7d") or 0
+            parts.append(f"{c['symbol']}: ${c.get('price',0):,.2f} | 24h: {ch24:+.1f}% | 7d: {ch7d:+.1f}% | Vol: ${c.get('volume',0)/1e9:.1f}B | MCap: ${c.get('market_cap',0)/1e9:.1f}B")
+        parts.append("")
+
+    # Trending
+    tr = market_ctx.get("trending", [])
+    if tr:
+        parts.append("=== ТРЕНДИ (CoinGecko) ===")
+        parts.append(", ".join([f"{t['symbol']} ({t['name']})" for t in tr]))
+        parts.append("")
+
+    # News
+    news = market_ctx.get("news", [])
+    if news:
+        parts.append("=== ОСТАННІ НОВИНИ ===")
+        for n in news:
+            parts.append(f"- {n.get('title','')} [{n.get('source','')}]")
+        parts.append("")
+
+    # User portfolio
+    if user_portfolio:
+        parts.append(f"=== ПОРТФЕЛЬ КОРИСТУВАЧА (профіль: {user_risk}) ===")
+        for p in user_portfolio:
+            pnl = p.get("pnl_pct", 0) or 0
+            parts.append(f"{p['symbol']}: вхід ${p.get('buy_price',0):.4f}, поточна ${p.get('current_price',0):.4f}, P&L: {pnl:+.1f}%, к-сть: {p.get('quantity',0)}")
+        parts.append("")
+
+    parts.append(f"=== ЗАПИТ КОРИСТУВАЧА ===")
+    parts.append(question)
+
+    return "\n".join(parts)
+
+
+async def _ai_generate(prompt: str) -> str:
+    """Generate AI response using free API (Groq/OpenRouter/local fallback)"""
+    # Try multiple free AI APIs
+    apis = [
+        {
+            "url": "https://api.groq.com/openai/v1/chat/completions",
+            "key_env": "GROQ_API_KEY",
+            "model": "llama-3.3-70b-versatile",
+        },
+        {
+            "url": "https://openrouter.ai/api/v1/chat/completions",
+            "key_env": "OPENROUTER_API_KEY",
+            "model": "meta-llama/llama-3.3-70b-instruct:free",
+        },
+    ]
+
+    for api in apis:
+        api_key = os.getenv(api["key_env"], "")
+        if not api_key:
+            continue
+        try:
+            async with _httpx_ai.AsyncClient(timeout=30) as client:
+                r = await client.post(api["url"],
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": api["model"],
+                        "messages": [
+                            {"role": "system", "content": "Ти Omni-Vision AI — експертний крипто-аналітик. Відповідай УКРАЇНСЬКОЮ. Будь конкретним, давай цифри. Використовуй емодзі. Формат: markdown."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 2000,
+                        "temperature": 0.7,
+                    })
+                data = r.json()
+                choices = data.get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "")
+        except Exception as e:
+            log.warning(f"AI API {api['key_env']} failed: {e}")
+            continue
+
+    # Fallback: rule-based analysis
+    return _fallback_analysis(prompt)
+
+
+def _fallback_analysis(prompt: str) -> str:
+    """Rule-based fallback when no AI API is available"""
+    return ("🤖 **AI аналіз (локальний режим)**\n\n"
+            "Для повноцінних відповідей додайте API ключ:\n"
+            "- `GROQ_API_KEY` — безкоштовно на groq.com\n"
+            "- `OPENROUTER_API_KEY` — безкоштовно на openrouter.ai\n\n"
+            "Поки що використовуйте вкладки Deep Analytics, Fear & Greed та новини для аналізу ринку.\n\n"
+            "⚠️ Це не фінансова порада.")
+
+
+class AiChatRequest(BaseModel):
+    message: str
+    context: str = "general"  # general / portfolio / coin:SYMBOL
+
+@app.post("/api/ai/chat")
+async def ai_chat(request: Request, body: AiChatRequest, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+
+    question = body.message.strip()
+    if not question or len(question) > 2000:
+        raise HTTPException(400, "Порожнє або занадто довге повідомлення")
+
+    # Gather market context
+    market_ctx = await _gather_market_context()
+
+    # Get user portfolio
+    portfolio = []
+    positions = db.query(Portfolio).filter(Portfolio.user_id == user["uid"], Portfolio.status == "open").all()
+    for p in positions:
+        portfolio.append({"symbol": p.symbol, "category": p.category, "buy_price": p.buy_price,
+            "quantity": p.quantity, "current_price": p.current_price, "pnl_pct": p.pnl_pct})
+
+    user_obj = db.query(User).filter(User.id == user["uid"]).first()
+    risk = user_obj.risk_profile if user_obj else "balanced"
+
+    # Build prompt and generate
+    prompt = _build_ai_prompt(question, market_ctx, portfolio, risk)
+    response = await _ai_generate(prompt)
+
+    return {
+        "response": response,
+        "market_snapshot": {
+            "fear_greed": market_ctx.get("fear_greed"),
+            "btc_price": next((c["price"] for c in market_ctx.get("top_crypto", []) if c["symbol"] == "BTC"), None),
+            "eth_price": next((c["price"] for c in market_ctx.get("top_crypto", []) if c["symbol"] == "ETH"), None),
+            "market_cap_change": market_ctx.get("global", {}).get("market_cap_change_24h") if market_ctx.get("global") else None,
+        },
+        "data_sources": ["CoinGecko", "CryptoCompare", "Alternative.me"],
+    }
+
 # ──── Dashboard (protected) ────
 
 @app.get("/", response_class=HTMLResponse)
