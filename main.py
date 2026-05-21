@@ -138,6 +138,8 @@ class User(Base):
     password_hash = Column(String(256), nullable=False)
     is_admin = Column(Integer, default=0)
     risk_profile = Column(String(16), default="balanced")
+    tier = Column(String(16), default="free")  # free / pro / vip
+    tier_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     wallets = relationship("Wallet", back_populates="owner")
     positions = relationship("Portfolio", back_populates="owner")
@@ -227,6 +229,23 @@ class WatchlistItem(Base):
     added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate: add tier columns if missing
+try:
+    from sqlalchemy import inspect as sa_inspect, text
+    insp = sa_inspect(engine)
+    cols = [c["name"] for c in insp.get_columns("users")]
+    with engine.connect() as conn:
+        if "tier" not in cols:
+            conn.execute(text('ALTER TABLE users ADD COLUMN tier VARCHAR(16) DEFAULT "free"'))
+            conn.commit()
+            log.info("Migration: added 'tier' column to users")
+        if "tier_expires" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN tier_expires DATETIME"))
+            conn.commit()
+            log.info("Migration: added 'tier_expires' column to users")
+except Exception as e:
+    log.warning(f"Auto-migration skipped: {e}")
 
 def get_db():
     db = SessionLocal()
@@ -822,6 +841,7 @@ def dashboard(request: Request, lang: str = Query(DEFAULT_LANG, pattern="^(ukr|e
         "{{HUNTED_COUNT}}": str(hc), "{{PORTFOLIO_COUNT}}": str(pc),
         "{{LANG}}": lang, "{{YEAR}}": str(datetime.now().year),
         "{{USER}}": user["user"],
+        "{{TIER}}": get_user_tier(user),
     }
     for k, v in replacements.items():
         html = html.replace(k, v)
@@ -1078,6 +1098,39 @@ def remove_from_watchlist(request: Request, item_id: int, db: Session = Depends(
 
 ADMIN_USER = os.getenv("ADMIN_USER", "boss")
 
+# ──── Premium Tiers ────
+TIER_LIMITS = {
+    "free":  {"wallets": 3,  "watchlist": 10, "portfolio": 10, "export": False, "deep_analytics": False, "advisor_daily": 3},
+    "pro":   {"wallets": 20, "watchlist": 100,"portfolio": 100,"export": True,  "deep_analytics": True,  "advisor_daily": 50},
+    "vip":   {"wallets": 999,"watchlist": 999,"portfolio": 999,"export": True,  "deep_analytics": True,  "advisor_daily": 999},
+}
+
+def get_user_tier(user_dict: dict, db_session=None) -> str:
+    """Get effective tier for user. Admin always gets VIP."""
+    if user_dict.get("user") == ADMIN_USER:
+        return "vip"
+    if db_session:
+        u = db_session.query(User).filter(User.id == user_dict["uid"]).first()
+        if u:
+            if u.username == ADMIN_USER or u.is_admin == 1:
+                return "vip"
+            if u.tier_expires and u.tier_expires < datetime.now(timezone.utc):
+                u.tier = "free"
+                u.tier_expires = None
+                db_session.commit()
+                return "free"
+            return u.tier or "free"
+    return "free"
+
+def check_tier_limit(user_dict: dict, feature: str, db_session=None) -> tuple:
+    """Returns (allowed: bool, tier: str, limit: int/bool)"""
+    tier = get_user_tier(user_dict, db_session)
+    limits = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
+    val = limits.get(feature)
+    if isinstance(val, bool):
+        return (val, tier, val)
+    return (True, tier, val)
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page(request: Request):
     user = get_current_user(request)
@@ -1127,15 +1180,72 @@ a{{color:#00e0ff;text-decoration:none}}a:hover{{text-decoration:underline}}
 <p style="font-size:13px;color:rgba(255,255,255,.6)">Останній результат: {hunt_status.get("last_count",0)} активів</p>
 </div>
 <div class="card"><h3 style="margin-bottom:16px;font-size:16px">Користувачі</h3>
-<table><tr><th>#</th><th>Ім\'я</th><th>Email</th><th>Стиль</th><th>Роль</th><th>Зареєстрований</th></tr>'''
+<table><tr><th>#</th><th>Ім\'я</th><th>Email</th><th>Стиль</th><th>Тариф</th><th>Роль</th><th>Зареєстрований</th></tr>'''
 
     for u in users:
         role = '<span class="badge badge-admin">ADMIN</span>' if u.username == ADMIN_USER else '<span class="badge badge-user">USER</span>'
-        html += f'<tr><td>{u.id}</td><td>{html_escape.escape(u.username)}</td><td>{html_escape.escape(u.email)}</td><td>{html_escape.escape(u.risk_profile or "balanced")}</td><td>{role}</td><td>{u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "—"}</td></tr>'
+        tier_badge = {"vip": '<span class="badge" style="background:rgba(255,214,10,.15);color:#ffd60a">VIP</span>',
+                      "pro": '<span class="badge" style="background:rgba(10,132,255,.15);color:#0a84ff">PRO</span>',
+                      "free": '<span class="badge" style="background:rgba(255,255,255,.06);color:rgba(255,255,255,.4)">FREE</span>'}.get(u.tier or "free", "FREE")
+        html += f'<tr><td>{u.id}</td><td>{html_escape.escape(u.username)}</td><td>{html_escape.escape(u.email)}</td><td>{html_escape.escape(u.risk_profile or "balanced")}</td><td>{tier_badge}</td><td>{role}</td><td>{u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "—"}</td></tr>'
 
     html += '''</table></div></div></body></html>'''
     db.close()
     return HTMLResponse(content=html)
+
+# ──── Premium Tiers API ────
+
+@app.get("/api/tier")
+def get_tier(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        return {"tier": "free", "limits": TIER_LIMITS["free"]}
+    tier = get_user_tier(user, db)
+    u = db.query(User).filter(User.id == user["uid"]).first()
+    return {
+        "tier": tier,
+        "limits": TIER_LIMITS.get(tier, TIER_LIMITS["free"]),
+        "expires": u.tier_expires.isoformat() if u and u.tier_expires else None,
+        "is_admin": user.get("user") == ADMIN_USER
+    }
+
+@app.get("/api/tier/plans")
+def tier_plans():
+    return {
+        "plans": [
+            {"id": "free", "name": "Free", "price": 0, "features": TIER_LIMITS["free"],
+             "description": "Базовий доступ до платформи"},
+            {"id": "pro", "name": "Pro", "price": 9.99, "features": TIER_LIMITS["pro"],
+             "description": "Розширена аналітика та портфель"},
+            {"id": "vip", "name": "VIP", "price": 29.99, "features": TIER_LIMITS["vip"],
+             "description": "Повний доступ без обмежень"}
+        ]
+    }
+
+class TierUpgrade(BaseModel):
+    tier: str
+    duration_days: int = 30
+
+@app.post("/api/admin/tier/set")
+def admin_set_tier(request: Request, body: TierUpgrade, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Admin-only: set user tier"""
+    admin = get_current_user(request)
+    if not admin:
+        raise HTTPException(401)
+    db_admin = db.query(User).filter(User.id == admin["uid"]).first()
+    if not db_admin or (db_admin.is_admin != 1 and db_admin.username != ADMIN_USER):
+        raise HTTPException(403, "Admin only")
+    if body.tier not in ("free", "pro", "vip"):
+        raise HTTPException(400, "Invalid tier")
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    from datetime import timedelta
+    target.tier = body.tier
+    target.tier_expires = datetime.now(timezone.utc) + timedelta(days=body.duration_days) if body.tier != "free" else None
+    db.commit()
+    return {"status": "updated", "user": target.username, "tier": body.tier,
+            "expires": target.tier_expires.isoformat() if target.tier_expires else None}
 
 # ──── Boss API (admin only via header) ────
 
@@ -1154,6 +1264,11 @@ async def add_wallet(request: Request, body: WalletCreate, db: Session = Depends
     uid = user["uid"]
     if db.query(Wallet).filter(Wallet.address == body.address, Wallet.user_id == uid).first():
         raise HTTPException(status_code=409, detail="Гаманець вже відстежується.")
+    # Tier limit check
+    allowed, tier, limit = check_tier_limit(user, "wallets", db)
+    wallet_count = db.query(Wallet).filter(Wallet.user_id == uid).count()
+    if wallet_count >= limit:
+        raise HTTPException(status_code=403, detail=f"Ліміт гаманців ({limit}) для плану {tier.upper()}. Оновіть план!")
     price_data = await crypto_scanner.get_token_price(body.address)
     wallet = Wallet(user_id=uid, address=body.address, blockchain=body.blockchain, label=body.label,
                     asset=body.asset or (price_data.get("symbol") if price_data.get("found") else None))
