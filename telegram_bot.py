@@ -16,6 +16,8 @@ import httpx
 log = logging.getLogger("omni-tg-bot")
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TON_WALLET = os.getenv("TON_WALLET", "UQAHQhdeLLuZerZxlVPiB-PVAFPhEzbvTX69qrpr_bT8TmV-")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 
@@ -105,6 +107,7 @@ async def cmd_start(chat_id, username=""):
              {"text": "📰 Новини", "callback_data": "news"}],
             [{"text": "🔔 Мої алерти", "callback_data": "my_alerts"},
              {"text": "⚙️ Налаштування", "callback_data": "settings"}],
+            [{"text": "👑 Premium", "callback_data": "premium"}],
         ]
     }
 
@@ -378,6 +381,98 @@ async def cmd_news(chat_id):
     await send_message(chat_id, "\n".join(lines), parse_mode="HTML")
 
 
+async def cmd_premium(chat_id):
+    """Show premium plans"""
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "⭐ Pro — $9.99/міс", "callback_data": "buy_pro"}],
+            [{"text": "👑 VIP — $29.99/міс", "callback_data": "buy_vip"}],
+            [{"text": "◀️ Назад", "callback_data": "back_menu"}],
+        ]
+    }
+    await send_message(chat_id,
+        "👑 <b>Omni-Vision Premium</b>\n\n"
+        "🆓 <b>Free</b> — Базовий доступ\n"
+        "├ 3 гаманці, 10 watchlist\n"
+        "├ 3 AI запити/день\n"
+        "└ Без експорту\n\n"
+        "⭐ <b>Pro — $9.99/міс</b>\n"
+        "├ 20 гаманців, 100 watchlist\n"
+        "├ 50 AI запитів/день\n"
+        "├ CSV експорт\n"
+        "└ Deep Analytics\n\n"
+        "👑 <b>VIP — $29.99/міс</b>\n"
+        "├ Без обмежень\n"
+        "├ Необмежено AI запитів\n"
+        "├ Пріоритетна підтримка\n"
+        "└ Всі функції\n\n"
+        "Оберіть план:",
+        reply_markup=keyboard
+    )
+
+
+async def cmd_buy_tier(chat_id, tier, username=""):
+    """Show payment instructions for tier"""
+    prices = {"pro": 9.99, "vip": 29.99}
+    price_usd = prices.get(tier, 9.99)
+
+    # Get TON price
+    ton_price = 3.0
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get("https://api.coingecko.com/api/v3/simple/price",
+                                 params={"ids": "the-open-network", "vs_currencies": "usd"})
+            data = r.json()
+            ton_price = data.get("the-open-network", {}).get("usd", 3.0)
+    except:
+        pass
+
+    amount_ton = round(price_usd / ton_price, 4)
+    order_comment = f"OV-TG-{chat_id}-{tier}-{int(time.time())}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "💎 Відкрити Tonkeeper", "url": f"https://app.tonkeeper.com/transfer/{TON_WALLET}?amount={int(amount_ton * 1e9)}&text={order_comment}"}],
+            [{"text": "✅ Я оплатив", "callback_data": f"paid_{tier}_{order_comment}"}],
+            [{"text": "🌐 Оплатити на сайті", "url": "https://dependable-tranquility-production-d86f.up.railway.app/?tab=plans"}],
+            [{"text": "◀️ Назад", "callback_data": "back_premium"}],
+        ]
+    }
+
+    await send_message(chat_id,
+        f"💎 <b>Оплата {tier.upper()}</b>\n\n"
+        f"💵 Сума: <b>${price_usd}</b>\n"
+        f"💎 В TON: <b>{amount_ton} TON</b>\n"
+        f"📊 Курс: 1 TON = ${ton_price:.2f}\n\n"
+        f"📋 <b>Адреса:</b>\n"
+        f"<code>{TON_WALLET}</code>\n\n"
+        f"📝 <b>Коментар (обов'язково!):</b>\n"
+        f"<code>{order_comment}</code>\n\n"
+        f"⚠️ <b>Важливо:</b> додайте коментар при переказі!\n\n"
+        f"Або оплатіть зручно на сайті (карта, Apple/Google Pay).",
+        reply_markup=keyboard
+    )
+
+    # Notify admin
+    if ADMIN_CHAT_ID:
+        try:
+            confirm_kb = {
+                "inline_keyboard": [
+                    [{"text": f"✅ Підтвердити {tier.upper()} для @{username}", "callback_data": f"admin_confirm_{chat_id}_{tier}"}],
+                ]
+            }
+            await send_message(ADMIN_CHAT_ID,
+                f"💰 <b>Запит на оплату!</b>\n\n"
+                f"👤 @{username} (chat: {chat_id})\n"
+                f"📋 План: {tier.upper()}\n"
+                f"💵 ${price_usd} (~{amount_ton} TON)\n"
+                f"🔑 <code>{order_comment}</code>",
+                reply_markup=confirm_kb
+            )
+        except:
+            pass
+
+
 async def cmd_settings(chat_id):
     """Show settings"""
     cid = str(chat_id)
@@ -432,9 +527,51 @@ async def handle_callback(callback_query, db_session_factory=None):
     elif data == "settings":
         await answer_callback(cb_id)
         await cmd_settings(chat_id)
+    elif data == "premium":
+        await answer_callback(cb_id)
+        await cmd_premium(chat_id)
     elif data == "back_menu":
         await answer_callback(cb_id)
         await cmd_start(chat_id)
+    elif data == "buy_pro":
+        await answer_callback(cb_id, "Pro план...")
+        username = callback_query.get("from", {}).get("username", "")
+        await cmd_buy_tier(chat_id, "pro", username)
+    elif data == "buy_vip":
+        await answer_callback(cb_id, "VIP план...")
+        username = callback_query.get("from", {}).get("username", "")
+        await cmd_buy_tier(chat_id, "vip", username)
+    elif data == "back_premium":
+        await answer_callback(cb_id)
+        await cmd_premium(chat_id)
+    elif data.startswith("paid_"):
+        await answer_callback(cb_id, "Дякуємо! Перевіряємо...")
+        parts = data.split("_", 2)
+        tier_name = parts[1] if len(parts) > 1 else "pro"
+        await send_message(chat_id,
+            "⏳ <b>Дякуємо!</b>\n\n"
+            "Ваш платіж перевіряється. Адмін отримав сповіщення "
+            "і підтвердить оплату найближчим часом.\n\n"
+            "Зазвичай це займає кілька хвилин. ⚡"
+        )
+    elif data.startswith("admin_confirm_"):
+        # Admin confirms payment
+        parts = data.replace("admin_confirm_", "").split("_", 1)
+        target_chat = parts[0] if parts else ""
+        tier_name = parts[1] if len(parts) > 1 else "pro"
+        await answer_callback(cb_id, f"Підтверджено {tier_name.upper()}!")
+        if target_chat:
+            try:
+                await send_message(int(target_chat),
+                    f"✅ <b>Оплату підтверджено!</b>\n\n"
+                    f"🎉 План <b>{tier_name.upper()}</b> активовано на 30 днів!\n"
+                    f"Дякуємо за підтримку Omni-Vision! 🚀"
+                )
+                await send_message(chat_id,
+                    f"✅ Підтверджено {tier_name.upper()} для chat {target_chat}"
+                )
+            except Exception as e:
+                await send_message(chat_id, f"Помилка: {e}")
     elif data.startswith("toggle_"):
         cid = str(chat_id)
         key = data.replace("toggle_", "notify_")
@@ -479,6 +616,8 @@ async def process_update(update: dict, db_session_factory=None):
             await cmd_del_alert(chat_id, text[10:])
         elif text.startswith("/settings"):
             await cmd_settings(chat_id)
+        elif text.startswith("/premium"):
+            await cmd_premium(chat_id)
         elif text.startswith("/help"):
             await send_message(chat_id,
                 "📋 <b>Команди:</b>\n\n"
@@ -489,6 +628,7 @@ async def process_update(update: dict, db_session_factory=None):
                 "/my_alerts — Мої алерти\n"
                 "/delalert 1 — Видалити алерт\n"
                 "/settings — Налаштування\n"
+                "/premium — Преміум плани\n"
                 "/help — Ця довідка")
         else:
             # Unknown command — show menu

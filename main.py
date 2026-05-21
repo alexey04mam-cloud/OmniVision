@@ -36,6 +36,11 @@ BOSS_KEY = os.getenv("BOSS_KEY")
 if not BOSS_KEY:
     raise RuntimeError("BOSS_KEY not set in .env")
 
+# Payment config
+TON_WALLET = os.getenv("TON_WALLET", "UQAHQhdeLLuZerZxlVPiB-PVAFPhEzbvTX69qrpr_bT8TmV-")
+CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN", "")  # From @CryptoBot -> Crypto Pay API
+PAYMENT_PRICES = {"pro": 9.99, "vip": 29.99}
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     SECRET_KEY = secrets.token_hex(32)
@@ -228,6 +233,23 @@ class WatchlistItem(Base):
     triggered = Column(Integer, default=0)
     added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    order_id = Column(String(64), unique=True, nullable=False, index=True)
+    tier = Column(String(16), nullable=False)  # pro / vip
+    amount_usd = Column(Float, nullable=False)
+    amount_ton = Column(Float, nullable=True)
+    method = Column(String(32), nullable=False)  # ton_direct / cryptobot / stars
+    status = Column(String(16), default="pending")  # pending / paid / confirmed / expired
+    tx_hash = Column(String(256), nullable=True)
+    cryptobot_invoice_id = Column(String(128), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    confirmed_at = Column(DateTime, nullable=True)
+    owner = relationship("User")
+
 Base.metadata.create_all(bind=engine)
 
 # Auto-migrate: add tier columns if missing
@@ -244,6 +266,10 @@ try:
             conn.execute(text("ALTER TABLE users ADD COLUMN tier_expires DATETIME"))
             conn.commit()
             log.info("Migration: added 'tier_expires' column to users")
+    # Create payments table if missing
+    if "payments" not in sa_inspect(engine).get_table_names():
+        Payment.__table__.create(engine)
+        log.info("Migration: created 'payments' table")
 except Exception as e:
     log.warning(f"Auto-migration skipped: {e}")
 
@@ -1246,6 +1272,249 @@ def admin_set_tier(request: Request, body: TierUpgrade, user_id: int = Query(...
     db.commit()
     return {"status": "updated", "user": target.username, "tier": body.tier,
             "expires": target.tier_expires.isoformat() if target.tier_expires else None}
+
+# ──── Payment System ────
+
+import httpx as _httpx
+
+async def _cryptobot_request(method: str, params: dict = None):
+    """Call CryptoBot API"""
+    if not CRYPTOBOT_TOKEN:
+        return None
+    try:
+        async with _httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                f"https://pay.crypt.bot/api/{method}",
+                headers={"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN},
+                params=params or {}
+            )
+            data = r.json()
+            return data.get("result") if data.get("ok") else None
+    except Exception as e:
+        log.error(f"CryptoBot API error: {e}")
+        return None
+
+@app.post("/api/payment/create")
+async def create_payment(request: Request, db: Session = Depends(get_db)):
+    """Create a payment order"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    body = await request.json()
+    tier = body.get("tier", "pro")
+    method = body.get("method", "ton_direct")  # ton_direct / cryptobot
+
+    if tier not in PAYMENT_PRICES:
+        raise HTTPException(400, "Invalid tier")
+
+    # Check if already VIP/admin
+    if get_user_tier(user, db) == "vip" and tier == "vip":
+        return {"status": "already_active", "message": "VIP вже активний"}
+
+    amount_usd = PAYMENT_PRICES[tier]
+    order_id = f"OV-{user['uid']}-{tier}-{secrets.token_hex(6)}"
+
+    # Get TON price for conversion
+    ton_price = 3.0  # fallback
+    try:
+        async with _httpx.AsyncClient(timeout=5) as client:
+            r = await client.get("https://api.coingecko.com/api/v3/simple/price",
+                                 params={"ids": "the-open-network", "vs_currencies": "usd"})
+            data = r.json()
+            ton_price = data.get("the-open-network", {}).get("usd", 3.0)
+    except:
+        pass
+
+    amount_ton = round(amount_usd / ton_price, 4) if ton_price > 0 else round(amount_usd / 3.0, 4)
+
+    payment = Payment(
+        user_id=user["uid"], order_id=order_id, tier=tier,
+        amount_usd=amount_usd, amount_ton=amount_ton, method=method
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    result = {
+        "order_id": order_id,
+        "tier": tier,
+        "amount_usd": amount_usd,
+        "amount_ton": amount_ton,
+        "ton_price_usd": ton_price,
+        "status": "pending",
+    }
+
+    if method == "ton_direct":
+        # TON deeplink — opens wallet app
+        comment = order_id
+        ton_link = f"ton://transfer/{TON_WALLET}?amount={int(amount_ton * 1e9)}&text={comment}"
+        tonkeeper_link = f"https://app.tonkeeper.com/transfer/{TON_WALLET}?amount={int(amount_ton * 1e9)}&text={comment}"
+        result["ton_link"] = ton_link
+        result["tonkeeper_link"] = tonkeeper_link
+        result["wallet"] = TON_WALLET
+        result["comment"] = comment
+
+    elif method == "cryptobot":
+        if not CRYPTOBOT_TOKEN:
+            raise HTTPException(400, "CryptoBot не налаштований. Використайте TON переказ.")
+        # Create CryptoBot invoice (supports cards, Apple Pay, Google Pay)
+        invoice = await _cryptobot_request("createInvoice", {
+            "currency_type": "fiat",
+            "fiat": "USD",
+            "amount": str(amount_usd),
+            "description": f"Omni-Vision {tier.upper()} — 30 днів",
+            "payload": order_id,
+            "paid_btn_name": "openBot",
+            "paid_btn_url": "https://t.me/OmniVisionBot",
+            "allow_comments": False,
+            "allow_anonymous": False,
+        })
+        if invoice:
+            payment.cryptobot_invoice_id = str(invoice.get("invoice_id", ""))
+            db.commit()
+            result["pay_url"] = invoice.get("pay_url", "")
+            result["cryptobot_invoice_id"] = payment.cryptobot_invoice_id
+        else:
+            # Fallback: try crypto invoice
+            invoice = await _cryptobot_request("createInvoice", {
+                "currency_type": "crypto",
+                "asset": "TON",
+                "amount": str(amount_ton),
+                "description": f"Omni-Vision {tier.upper()} — 30 днів",
+                "payload": order_id,
+                "paid_btn_name": "openBot",
+                "paid_btn_url": "https://t.me/OmniVisionBot",
+            })
+            if invoice:
+                payment.cryptobot_invoice_id = str(invoice.get("invoice_id", ""))
+                db.commit()
+                result["pay_url"] = invoice.get("pay_url", "")
+
+    # Notify admin via Telegram
+    try:
+        admin_msg = (
+            f"💰 <b>Нове замовлення!</b>\n\n"
+            f"👤 Користувач: {user['user']}\n"
+            f"📋 План: {tier.upper()}\n"
+            f"💵 Сума: ${amount_usd} (~{amount_ton} TON)\n"
+            f"🔑 Order: <code>{order_id}</code>\n"
+            f"💳 Метод: {method}"
+        )
+        await telegram_bot.send_message(
+            os.getenv("ADMIN_CHAT_ID", ""),
+            admin_msg
+        )
+    except:
+        pass
+
+    return result
+
+@app.get("/api/payment/status/{order_id}")
+def payment_status(order_id: str, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    payment = db.query(Payment).filter(
+        Payment.order_id == order_id, Payment.user_id == user["uid"]
+    ).first()
+    if not payment:
+        raise HTTPException(404)
+    return {
+        "order_id": payment.order_id,
+        "tier": payment.tier,
+        "amount_usd": payment.amount_usd,
+        "amount_ton": payment.amount_ton,
+        "method": payment.method,
+        "status": payment.status,
+        "created_at": payment.created_at.isoformat() if payment.created_at else None,
+        "confirmed_at": payment.confirmed_at.isoformat() if payment.confirmed_at else None,
+    }
+
+@app.post("/api/payment/confirm/{order_id}")
+def confirm_payment(order_id: str, request: Request, db: Session = Depends(get_db)):
+    """Admin confirms payment and activates tier"""
+    admin = get_current_user(request)
+    if not admin:
+        raise HTTPException(401)
+    db_admin = db.query(User).filter(User.id == admin["uid"]).first()
+    if not db_admin or (db_admin.is_admin != 1 and db_admin.username != ADMIN_USER):
+        raise HTTPException(403, "Admin only")
+    payment = db.query(Payment).filter(Payment.order_id == order_id).first()
+    if not payment:
+        raise HTTPException(404)
+    if payment.status == "confirmed":
+        return {"status": "already_confirmed"}
+    from datetime import timedelta
+    payment.status = "confirmed"
+    payment.confirmed_at = datetime.now(timezone.utc)
+    # Activate tier
+    target = db.query(User).filter(User.id == payment.user_id).first()
+    if target:
+        target.tier = payment.tier
+        target.tier_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    db.commit()
+    # Notify user via Telegram
+    return {"status": "confirmed", "user": target.username if target else "?",
+            "tier": payment.tier, "expires": target.tier_expires.isoformat() if target else None}
+
+@app.post("/api/payment/cryptobot_webhook")
+async def cryptobot_webhook(request: Request, db: Session = Depends(get_db)):
+    """CryptoBot payment webhook — auto-confirms payment"""
+    body = await request.json()
+    if body.get("update_type") != "invoice_paid":
+        return {"ok": True}
+    payload = body.get("payload", {})
+    order_id = payload.get("payload", "")
+    if not order_id:
+        return {"ok": True}
+    payment = db.query(Payment).filter(Payment.order_id == order_id).first()
+    if not payment or payment.status == "confirmed":
+        return {"ok": True}
+    from datetime import timedelta
+    payment.status = "confirmed"
+    payment.confirmed_at = datetime.now(timezone.utc)
+    target = db.query(User).filter(User.id == payment.user_id).first()
+    if target:
+        target.tier = payment.tier
+        target.tier_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    db.commit()
+    log.info(f"CryptoBot payment confirmed: {order_id} -> {payment.tier}")
+    # Notify admin
+    try:
+        await telegram_bot.send_message(
+            os.getenv("ADMIN_CHAT_ID", ""),
+            f"✅ <b>Оплата підтверджена!</b>\nOrder: {order_id}\nПлан: {payment.tier.upper()}"
+        )
+    except:
+        pass
+    return {"ok": True}
+
+@app.get("/api/payment/methods")
+def payment_methods():
+    """Available payment methods"""
+    methods = [
+        {"id": "ton_direct", "name": "TON Переказ", "icon": "💎",
+         "description": "Пряма оплата в TON. Відкриється гаманець.",
+         "supports": ["crypto"], "available": True},
+    ]
+    if CRYPTOBOT_TOKEN:
+        methods.append({
+            "id": "cryptobot", "name": "CryptoBot", "icon": "🤖",
+            "description": "Крипто, карта, Apple Pay, Google Pay через @CryptoBot",
+            "supports": ["crypto", "card", "apple_pay", "google_pay"],
+            "available": True
+        })
+    return {"methods": methods, "wallet": TON_WALLET}
+
+@app.get("/api/payment/history")
+def payment_history(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    payments = db.query(Payment).filter(Payment.user_id == user["uid"]).order_by(Payment.created_at.desc()).limit(20).all()
+    return [{"order_id": p.order_id, "tier": p.tier, "amount_usd": p.amount_usd,
+             "method": p.method, "status": p.status,
+             "created_at": p.created_at.isoformat() if p.created_at else None} for p in payments]
 
 # ──── Boss API (admin only via header) ────
 
