@@ -2082,6 +2082,273 @@ def market_summary(db: Session = Depends(get_db)):
             "bearish_pct": round(bearish / len(assets) * 100, 1) if assets else 0}
 
 
+
+# ──── DEX Converter & Exchange Aggregator ────
+
+import httpx as _httpx_dex
+
+# Cache for DEX data (simple TTL cache)
+_dex_cache = {}
+_dex_cache_ttl = 30  # seconds
+
+def _dex_cache_get(key):
+    from time import time
+    entry = _dex_cache.get(key)
+    if entry and time() - entry["ts"] < _dex_cache_ttl:
+        return entry["data"]
+    return None
+
+def _dex_cache_set(key, data):
+    from time import time
+    _dex_cache[key] = {"data": data, "ts": time()}
+
+
+@app.get("/api/dex/search")
+async def dex_search(q: str = Query(..., min_length=1, max_length=50)):
+    """Search tokens across DEX platforms via DexScreener"""
+    cached = _dex_cache_get(f"search:{q}")
+    if cached:
+        return cached
+    try:
+        async with _httpx_dex.AsyncClient(timeout=8) as client:
+            r = await client.get(f"https://api.dexscreener.com/latest/dex/search?q={q}")
+            data = r.json()
+            pairs = data.get("pairs", [])[:20]
+            result = []
+            seen = set()
+            for p in pairs:
+                token = p.get("baseToken", {})
+                key = f"{token.get('symbol','')}-{p.get('chainId','')}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.append({
+                    "symbol": token.get("symbol", ""),
+                    "name": token.get("name", ""),
+                    "address": token.get("address", ""),
+                    "chain": p.get("chainId", ""),
+                    "dex": p.get("dexId", ""),
+                    "price_usd": float(p.get("priceUsd", 0) or 0),
+                    "price_native": p.get("priceNative", ""),
+                    "volume_24h": float(p.get("volume", {}).get("h24", 0) or 0),
+                    "liquidity_usd": float(p.get("liquidity", {}).get("usd", 0) or 0),
+                    "change_24h": float(p.get("priceChange", {}).get("h24", 0) or 0),
+                    "pair_address": p.get("pairAddress", ""),
+                    "url": p.get("url", ""),
+                })
+            resp = {"tokens": result[:10], "total": len(pairs)}
+            _dex_cache_set(f"search:{q}", resp)
+            return resp
+    except Exception as e:
+        log.warning(f"DEX search error: {e}")
+        return {"tokens": [], "total": 0, "error": str(e)[:100]}
+
+
+@app.get("/api/dex/pairs/{chain}/{pair_address}")
+async def dex_pair_info(chain: str, pair_address: str):
+    """Get detailed pair info from DexScreener"""
+    cached = _dex_cache_get(f"pair:{chain}:{pair_address}")
+    if cached:
+        return cached
+    try:
+        async with _httpx_dex.AsyncClient(timeout=8) as client:
+            r = await client.get(f"https://api.dexscreener.com/latest/dex/pairs/{chain}/{pair_address}")
+            data = r.json()
+            pair = data.get("pair") or (data.get("pairs", [None])[0] if data.get("pairs") else None)
+            if not pair:
+                return {"error": "Pair not found"}
+            result = {
+                "base": pair.get("baseToken", {}),
+                "quote": pair.get("quoteToken", {}),
+                "price_usd": pair.get("priceUsd"),
+                "price_native": pair.get("priceNative"),
+                "volume": pair.get("volume", {}),
+                "txns": pair.get("txns", {}),
+                "liquidity": pair.get("liquidity", {}),
+                "price_change": pair.get("priceChange", {}),
+                "dex": pair.get("dexId"),
+                "chain": pair.get("chainId"),
+                "url": pair.get("url"),
+            }
+            _dex_cache_set(f"pair:{chain}:{pair_address}", result)
+            return result
+    except Exception as e:
+        return {"error": str(e)[:100]}
+
+
+@app.get("/api/dex/quote")
+async def dex_quote(
+    from_token: str = Query(..., description="Token symbol or address"),
+    to_token: str = Query("USDT", description="Target token symbol"),
+    amount: float = Query(1.0, ge=0.0001, le=1e12),
+):
+    """Get conversion quote across multiple DEX sources"""
+    cached = _dex_cache_get(f"quote:{from_token}:{to_token}:{amount}")
+    if cached:
+        return cached
+    results = []
+    try:
+        async with _httpx_dex.AsyncClient(timeout=10) as client:
+            # DexScreener search for both tokens
+            r1 = await client.get(f"https://api.dexscreener.com/latest/dex/search?q={from_token}")
+            from_data = r1.json().get("pairs", [])
+
+            from_prices = {}
+            for p in from_data[:30]:
+                bt = p.get("baseToken", {})
+                if bt.get("symbol", "").upper() == from_token.upper():
+                    dex = p.get("dexId", "unknown")
+                    chain = p.get("chainId", "unknown")
+                    price = float(p.get("priceUsd", 0) or 0)
+                    liq = float(p.get("liquidity", {}).get("usd", 0) or 0)
+                    vol = float(p.get("volume", {}).get("h24", 0) or 0)
+                    if price > 0 and liq > 1000:
+                        key = f"{dex}_{chain}"
+                        if key not in from_prices or from_prices[key]["liquidity"] < liq:
+                            from_prices[key] = {
+                                "dex": dex, "chain": chain, "price_usd": price,
+                                "liquidity": liq, "volume_24h": vol,
+                                "pair_address": p.get("pairAddress", ""),
+                                "url": p.get("url", ""),
+                            }
+
+            # Get to_token price if not USDT/USDC
+            to_price_usd = 1.0
+            if to_token.upper() not in ("USDT", "USDC", "DAI", "BUSD", "USD"):
+                r2 = await client.get(f"https://api.dexscreener.com/latest/dex/search?q={to_token}")
+                to_data = r2.json().get("pairs", [])
+                for p in to_data[:10]:
+                    bt = p.get("baseToken", {})
+                    if bt.get("symbol", "").upper() == to_token.upper():
+                        tp = float(p.get("priceUsd", 0) or 0)
+                        if tp > 0:
+                            to_price_usd = tp
+                            break
+
+            for key, info in sorted(from_prices.items(), key=lambda x: -x[1]["liquidity"]):
+                receive = (info["price_usd"] * amount) / to_price_usd if to_price_usd > 0 else 0
+                results.append({
+                    "dex": info["dex"],
+                    "chain": info["chain"],
+                    "from_token": from_token.upper(),
+                    "to_token": to_token.upper(),
+                    "amount_in": amount,
+                    "amount_out": round(receive, 6),
+                    "rate": round(info["price_usd"] / to_price_usd, 6) if to_price_usd > 0 else 0,
+                    "price_usd": info["price_usd"],
+                    "liquidity_usd": info["liquidity"],
+                    "volume_24h": info["volume_24h"],
+                    "url": info["url"],
+                })
+    except Exception as e:
+        log.warning(f"DEX quote error: {e}")
+
+    results.sort(key=lambda x: -x.get("amount_out", 0))
+    resp = {
+        "quotes": results[:10],
+        "best": results[0] if results else None,
+        "from_token": from_token.upper(),
+        "to_token": to_token.upper(),
+        "amount": amount,
+        "sources_checked": len(results),
+    }
+    _dex_cache_set(f"quote:{from_token}:{to_token}:{amount}", resp)
+    return resp
+
+
+@app.get("/api/dex/trending")
+async def dex_trending():
+    """Get trending tokens from DexScreener"""
+    cached = _dex_cache_get("trending")
+    if cached:
+        return cached
+    try:
+        async with _httpx_dex.AsyncClient(timeout=8) as client:
+            # Get top gaining pairs
+            r = await client.get("https://api.dexscreener.com/token-boosts/top/v1")
+            data = r.json() if r.status_code == 200 else []
+            tokens = []
+            seen = set()
+            items = data if isinstance(data, list) else []
+            for item in items[:20]:
+                sym = item.get("tokenAddress", "")
+                if sym in seen:
+                    continue
+                seen.add(sym)
+                tokens.append({
+                    "address": item.get("tokenAddress", ""),
+                    "chain": item.get("chainId", ""),
+                    "description": item.get("description", ""),
+                    "icon": item.get("icon", ""),
+                    "url": item.get("url", ""),
+                    "amount": item.get("amount", 0),
+                })
+            resp = {"trending": tokens[:15]}
+            _dex_cache_set("trending", resp)
+            return resp
+    except Exception as e:
+        log.warning(f"DEX trending error: {e}")
+        return {"trending": [], "error": str(e)[:100]}
+
+
+# ──── BestChange Exchange Aggregator ────
+
+BESTCHANGE_API_KEY = os.getenv("BESTCHANGE_API_KEY", "")
+
+@app.get("/api/exchange/rates")
+async def exchange_rates(
+    from_cur: str = Query("BTC", description="Source currency"),
+    to_cur: str = Query("USDT", description="Target currency"),
+):
+    """Get best exchange rates from aggregator"""
+    if not BESTCHANGE_API_KEY:
+        # Return demo data + instructions when no key
+        return {
+            "rates": [
+                {"exchanger": "ChangeNow", "rate": 1.0, "reserve": "High", "min": 0.001, "features": ["fast", "no_kyc"], "demo": True},
+                {"exchanger": "FixedFloat", "rate": 0.998, "reserve": "High", "min": 0.0005, "features": ["fixed_rate"], "demo": True},
+                {"exchanger": "SimpleSwap", "rate": 0.995, "reserve": "Medium", "min": 0.001, "features": ["many_coins"], "demo": True},
+            ],
+            "from": from_cur,
+            "to": to_cur,
+            "demo": True,
+            "message": "Demo data. Add BESTCHANGE_API_KEY in Railway for real rates.",
+        }
+
+    cached = _dex_cache_get(f"bc:{from_cur}:{to_cur}")
+    if cached:
+        return cached
+
+    try:
+        async with _httpx_dex.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                f"https://www.bestchange.com/api/rates.php",
+                params={"key": BESTCHANGE_API_KEY, "from": from_cur, "to": to_cur},
+            )
+            data = r.json() if r.status_code == 200 else {}
+            resp = {"rates": data.get("rates", [])[:20], "from": from_cur, "to": to_cur, "demo": False}
+            _dex_cache_set(f"bc:{from_cur}:{to_cur}", resp)
+            return resp
+    except Exception as e:
+        log.warning(f"BestChange API error: {e}")
+        return {"rates": [], "from": from_cur, "to": to_cur, "error": str(e)[:100]}
+
+
+@app.get("/api/exchange/popular_pairs")
+def exchange_popular_pairs():
+    """Popular exchange pairs for quick access"""
+    return {"pairs": [
+        {"from": "BTC", "to": "USDT", "icon": "\u20bf", "label": "Bitcoin \u2192 Tether"},
+        {"from": "ETH", "to": "USDT", "icon": "\u039e", "label": "Ethereum \u2192 Tether"},
+        {"from": "USDT", "to": "UAH", "icon": "\U0001f4b5", "label": "Tether \u2192 \u0413\u0440\u0438\u0432\u043d\u044f"},
+        {"from": "BTC", "to": "UAH", "icon": "\u20bf", "label": "Bitcoin \u2192 \u0413\u0440\u0438\u0432\u043d\u044f"},
+        {"from": "USDT", "to": "RUB", "icon": "\U0001f4b5", "label": "Tether \u2192 \u0420\u0443\u0431\u043b\u044c"},
+        {"from": "TON", "to": "USDT", "icon": "\U0001f48e", "label": "TON \u2192 Tether"},
+        {"from": "SOL", "to": "USDT", "icon": "\u25ce", "label": "Solana \u2192 Tether"},
+        {"from": "BNB", "to": "USDT", "icon": "\u26a1", "label": "BNB \u2192 Tether"},
+    ]}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)

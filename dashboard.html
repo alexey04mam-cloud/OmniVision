@@ -373,7 +373,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <a class="nav-item" onclick="showTab('crypto')" id="tab-crypto"><span class="nav-icon">₿</span><span>Крипто</span></a>
    <a class="nav-item" onclick="showTab('stocks')" id="tab-stocks"><span class="nav-icon">📈</span><span>Акції</span></a>
    <a class="nav-item" onclick="showTab('commodities')" id="tab-commodities"><span class="nav-icon">⛏️</span><span>Копалини</span></a>
-   <a class="nav-item" onclick="showTab('dex')" id="tab-dex"><span class="nav-icon">📡</span><span>DEX Screener</span></a>
+   <a class="nav-item" onclick="showTab('dex')" id="tab-dex"><span class="nav-icon">💱</span><span>DEX & Exchange</span></a>
   </div>
   <div class="sidebar-section">
    <div class="sidebar-section-label">Інструменти</div>
@@ -854,13 +854,65 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <div id="whalesList"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:16px"><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div><div class="card skeleton" style="height:160px"></div></div></div>
   </div>
 
-  <!-- ═══ DEX ═══ -->
+  <!-- ═══ DEX & EXCHANGE ═══ -->
   <div id="panel-dex" class="tab-panel">
    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-    <div><h2 class="section-title">DEX Screener</h2><p class="section-subtitle" style="margin-bottom:0">Тренди та нові пари</p></div>
-    <div style="display:flex;gap:8px"><button onclick="loadDexTrending()" class="btn-primary" style="background:var(--accent-purple)">🔥 Trending</button><button onclick="loadDexNew()" class="btn-secondary">🆕 Нові</button></div>
+    <div><h2 class="section-title">DEX & Exchange</h2><p class="section-subtitle" style="margin-bottom:0">Конвертер, найкращі курси, тренди</p></div>
+    <div style="display:flex;gap:8px">
+     <button onclick="dexShowSection('converter')" class="btn-primary" id="dex-btn-converter" style="background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue))">💱 Конвертер</button>
+     <button onclick="dexShowSection('rates')" class="btn-secondary" id="dex-btn-rates">🔄 Обмiнники</button>
+     <button onclick="dexShowSection('trending')" class="btn-secondary" id="dex-btn-trending">🔥 Trending</button>
+    </div>
    </div>
-   <div id="dexContent"><p style="text-align:center;padding:40px 0;color:var(--text-tertiary)">Натисніть кнопку</p></div>
+
+   <!-- Converter Section -->
+   <div id="dex-converter" class="dex-section">
+    <div class="card" style="padding:28px;margin-bottom:20px">
+     <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end">
+      <div>
+       <label style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;display:block;margin-bottom:8px">&#x412;&#x456;&#x0434;&#x0434;&#x0430;&#x0454;&#x0442;&#x0435;</label>
+       <div style="display:flex;gap:8px">
+        <input id="dexFromToken" type="text" class="input-field" value="BTC" style="flex:1;text-transform:uppercase;font-weight:600;font-size:16px" placeholder="BTC">
+        <input id="dexAmount" type="number" class="input-field" value="1" min="0.0001" step="0.01" style="width:120px;font-size:16px;font-weight:600">
+       </div>
+      </div>
+      <button onclick="dexSwapTokens()" style="background:var(--card-bg);border:1px solid var(--border-primary);width:42px;height:42px;border-radius:50%;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;margin-bottom:4px" title="Swap">&#8644;</button>
+      <div>
+       <label style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;display:block;margin-bottom:8px">&#x041e;&#x0442;&#x0440;&#x0438;&#x043c;&#x0443;&#x0454;&#x0442;&#x0435;</label>
+       <input id="dexToToken" type="text" class="input-field" value="USDT" style="width:100%;text-transform:uppercase;font-weight:600;font-size:16px" placeholder="USDT">
+      </div>
+     </div>
+     <button onclick="dexGetQuote()" class="btn-primary" style="width:100%;margin-top:16px;background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));padding:14px;font-size:15px;font-weight:600">&#x1f50d; &#x041f;&#x043e;&#x0440;&#x0456;&#x0432;&#x043d;&#x044f;&#x0442;&#x0438; &#x043a;&#x0443;&#x0440;&#x0441;&#x0438;</button>
+    </div>
+    <!-- Quick pairs -->
+    <div id="dexQuickPairs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px"></div>
+    <!-- Results -->
+    <div id="dexQuoteResults"></div>
+   </div>
+
+   <!-- Exchange Rates Section -->
+   <div id="dex-rates" class="dex-section" style="display:none">
+    <div class="card" style="padding:28px;margin-bottom:20px">
+     <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0 0 16px">&#x041d;&#x0430;&#x0439;&#x043a;&#x0440;&#x0430;&#x0449;&#x0456; &#x043a;&#x0443;&#x0440;&#x0441;&#x0438; &#x043e;&#x0431;&#x043c;&#x0456;&#x043d;&#x043d;&#x0438;&#x043a;&#x0456;&#x0432;</h3>
+     <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px">
+       <label style="font-size:12px;color:var(--text-tertiary);font-weight:600;display:block;margin-bottom:6px">&#x0412;&#x0456;&#x0434;&#x0434;&#x0430;&#x044e;</label>
+       <input id="exchFrom" type="text" class="input-field" value="BTC" style="text-transform:uppercase;font-weight:600">
+      </div>
+      <div style="flex:1;min-width:150px">
+       <label style="font-size:12px;color:var(--text-tertiary);font-weight:600;display:block;margin-bottom:6px">&#x041e;&#x0442;&#x0440;&#x0438;&#x043c;&#x0443;&#x044e;</label>
+       <input id="exchTo" type="text" class="input-field" value="USDT" style="text-transform:uppercase;font-weight:600">
+      </div>
+      <button onclick="loadExchangeRates()" class="btn-primary" style="background:var(--accent-green);height:44px;padding:0 24px;white-space:nowrap">&#x1f50d; &#x041f;&#x043e;&#x0448;&#x0443;&#x043a;</button>
+     </div>
+    </div>
+    <div id="exchResults"></div>
+   </div>
+
+   <!-- Trending Section -->
+   <div id="dex-trending" class="dex-section" style="display:none">
+    <div id="dexContent"><p style="text-align:center;padding:40px 0;color:var(--text-tertiary)">&#x041d;&#x0430;&#x0442;&#x0438;&#x0441;&#x043d;&#x0456;&#x0442;&#x044c; &#x043a;&#x043d;&#x043e;&#x043f;&#x043a;&#x0443;</p></div>
+   </div>
   </div>
 
   <!-- ═══ ON-CHAIN ═══ -->
@@ -3097,6 +3149,168 @@ function formatAiText(text) {
 function escapeHtml(t) {
   return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+
+// ──── DEX Converter & Exchange ────
+function dexShowSection(name) {
+  var sections = document.querySelectorAll(".dex-section");
+  for (var i = 0; i < sections.length; i++) sections[i].style.display = "none";
+  var target = document.getElementById("dex-" + name);
+  if (target) target.style.display = "block";
+  // Update button styles
+  ["converter","rates","trending"].forEach(function(n) {
+    var btn = document.getElementById("dex-btn-" + n);
+    if (btn) {
+      if (n === name) {
+        btn.className = "btn-primary";
+        btn.style.background = "linear-gradient(135deg,var(--accent-purple),var(--accent-blue))";
+      } else {
+        btn.className = "btn-secondary";
+        btn.style.background = "";
+      }
+    }
+  });
+  if (name === "trending") loadDexTrending();
+  if (name === "rates") loadExchangeRates();
+  if (name === "converter") loadQuickPairs();
+}
+
+function loadQuickPairs() {
+  fetch("/api/exchange/popular_pairs").then(function(r){return r.json()}).then(function(d) {
+    var el = document.getElementById("dexQuickPairs");
+    if (!el || !d.pairs) return;
+    var h = "";
+    d.pairs.forEach(function(p) {
+      h += '<button onclick="dexSetPair(\x27' + p.from + '\x27,\x27' + p.to + '\x27)" class="btn-secondary btn-sm" style="font-size:12px;white-space:nowrap">' + p.icon + " " + p.from + "\u2192" + p.to + '</button>';
+    });
+    el.innerHTML = h;
+  }).catch(function(){});
+}
+
+function dexSetPair(from, to) {
+  document.getElementById("dexFromToken").value = from;
+  document.getElementById("dexToToken").value = to;
+  dexGetQuote();
+}
+
+function dexSwapTokens() {
+  var f = document.getElementById("dexFromToken");
+  var t = document.getElementById("dexToToken");
+  var tmp = f.value;
+  f.value = t.value;
+  t.value = tmp;
+}
+
+async function dexGetQuote() {
+  var from = (document.getElementById("dexFromToken").value || "").trim().toUpperCase();
+  var to = (document.getElementById("dexToToken").value || "").trim().toUpperCase();
+  var amount = parseFloat(document.getElementById("dexAmount").value) || 1;
+  if (!from) { showToast("\u0412\u043a\u0430\u0436\u0456\u0442\u044c \u0442\u043e\u043a\u0435\u043d", false); return; }
+
+  var el = document.getElementById("dexQuoteResults");
+  el.innerHTML = '<div class="card" style="padding:48px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text-secondary)">\u041f\u043e\u0440\u0456\u0432\u043d\u044e\u044e \u043a\u0443\u0440\u0441\u0438 \u043d\u0430 DEX...</p></div>';
+
+  try {
+    var r = await fetch("/api/dex/quote?from_token=" + encodeURIComponent(from) + "&to_token=" + encodeURIComponent(to) + "&amount=" + amount);
+    var d = await r.json();
+    if (!d.quotes || !d.quotes.length) {
+      el.innerHTML = '<div class="card" style="padding:32px;text-align:center"><p style="color:var(--text-tertiary);font-size:15px">\u041d\u0435 \u0437\u043d\u0430\u0439\u0434\u0435\u043d\u043e \u043f\u0430\u0440 \u0434\u043b\u044f ' + from + '/' + to + '</p><p style="color:var(--text-tertiary);font-size:13px;margin-top:8px">\u0421\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0456\u043d\u0448\u0456 \u0442\u043e\u043a\u0435\u043d\u0438</p></div>';
+      return;
+    }
+
+    var best = d.best;
+    var h = '';
+    // Best deal card
+    if (best) {
+      h += '<div class="card" style="padding:24px;margin-bottom:16px;border:1.5px solid var(--accent-green);background:rgba(52,199,89,0.05)">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:20px">\u2b50</span><span style="font-weight:700;font-size:16px;color:var(--accent-green)">\u041d\u0430\u0439\u043a\u0440\u0430\u0449\u0438\u0439 \u043a\u0443\u0440\u0441</span></div>';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">';
+      h += '<div><span style="font-size:28px;font-weight:700;color:var(--text-primary)">' + amount + ' ' + from + '</span>';
+      h += '<span style="font-size:20px;color:var(--text-tertiary);margin:0 12px">\u2192</span>';
+      h += '<span style="font-size:28px;font-weight:700;color:var(--accent-green)">' + fmtPrice(best.amount_out) + ' ' + to + '</span></div>';
+      h += '<div style="text-align:right"><p style="font-size:12px;color:var(--text-tertiary);margin:0">' + best.dex + ' \u00b7 ' + best.chain + '</p>';
+      if (best.url) h += '<a href="' + best.url + '" target="_blank" style="font-size:13px;color:var(--accent-purple);text-decoration:none;font-weight:600">\u041e\u0431\u043c\u0456\u043d\u044f\u0442\u0438 \u2192</a>';
+      h += '</div></div></div>';
+    }
+
+    // All quotes
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px">';
+    d.quotes.forEach(function(q, i) {
+      var isBest = best && q.dex === best.dex && q.chain === best.chain;
+      var borderStyle = isBest ? "border:1.5px solid var(--accent-green)" : "";
+      h += '<div class="card card-interactive fade-in" style="padding:20px;' + borderStyle + ';animation-delay:' + Math.min(i * 0.04, 0.3) + 's">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:center;gap:8px">';
+      h += '<span style="font-size:14px;font-weight:700;color:var(--text-primary)">' + q.dex + '</span>';
+      if (isBest) h += '<span style="background:var(--accent-green);color:#000;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700">BEST</span>';
+      h += '</div>';
+      h += '<span style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:3px 8px;border-radius:6px">' + q.chain + '</span>';
+      h += '</div>';
+      h += '<div style="margin-bottom:8px"><span style="font-size:22px;font-weight:700;color:var(--text-primary)">' + fmtPrice(q.amount_out) + '</span><span style="font-size:14px;color:var(--text-tertiary);margin-left:6px">' + to + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-tertiary)">';
+      h += '<span>\u041b\u0456\u043a\u0432\u0456\u0434\u043d\u0456\u0441\u0442\u044c: $' + fmtBig(q.liquidity_usd) + '</span>';
+      h += '<span>Vol 24h: $' + fmtBig(q.volume_24h) + '</span>';
+      h += '</div>';
+      if (q.url) h += '<a href="' + q.url + '" target="_blank" style="display:block;text-align:center;margin-top:12px;padding:8px;background:var(--bg-secondary);border-radius:8px;color:var(--accent-purple);text-decoration:none;font-weight:600;font-size:13px">\u041e\u0431\u043c\u0456\u043d\u044f\u0442\u0438 \u2192</a>';
+      h += '</div>';
+    });
+    h += '</div>';
+    el.innerHTML = h;
+    showToast(d.sources_checked + " DEX \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043d\u043e", true);
+  } catch(e) {
+    el.innerHTML = '<div class="card" style="padding:32px;text-align:center;color:var(--accent-red)">' + e.message + '</div>';
+  }
+}
+
+async function loadExchangeRates() {
+  var from = (document.getElementById("exchFrom").value || "BTC").trim().toUpperCase();
+  var to = (document.getElementById("exchTo").value || "USDT").trim().toUpperCase();
+  var el = document.getElementById("exchResults");
+  el.innerHTML = '<div class="card" style="padding:48px;text-align:center"><div class="spinner" style="margin:0 auto 16px"></div><p style="color:var(--text-secondary)">\u0417\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0443\u044e \u043a\u0443\u0440\u0441\u0438...</p></div>';
+  try {
+    var r = await fetch("/api/exchange/rates?from_cur=" + encodeURIComponent(from) + "&to_cur=" + encodeURIComponent(to));
+    var d = await r.json();
+    var rates = d.rates || [];
+    if (!rates.length) {
+      el.innerHTML = '<div class="card" style="padding:32px;text-align:center;color:var(--text-tertiary)">\u041d\u0435\u043c\u0430\u0454 \u0434\u0430\u043d\u0438\u0445</div>';
+      return;
+    }
+    var h = '';
+    if (d.demo) {
+      h += '<div class="card" style="padding:16px;margin-bottom:16px;border:1px solid var(--accent-yellow);background:rgba(255,159,10,0.06)"><p style="margin:0;font-size:13px;color:var(--accent-yellow)">\u26a0\ufe0f \u0414\u0435\u043c\u043e-\u0434\u0430\u043d\u0456. \u0414\u043e\u0434\u0430\u0439\u0442\u0435 BESTCHANGE_API_KEY \u0432 Railway \u0434\u043b\u044f \u0440\u0435\u0430\u043b\u044c\u043d\u0438\u0445 \u043a\u0443\u0440\u0441\u0456\u0432.</p></div>';
+    }
+    h += '<div style="display:grid;gap:12px">';
+    rates.forEach(function(rate, i) {
+      var feats = (rate.features || []).map(function(f) {
+        var labels = {fast:"\u26a1 \u0428\u0432\u0438\u0434\u043a\u0438\u0439", no_kyc:"\U0001f6e1\ufe0f No KYC", fixed_rate:"\U0001f512 \u0424\u0456\u043a\u0441.", many_coins:"\U0001f4b0 \u0411\u0430\u0433\u0430\u0442\u043e \u043c\u043e\u043d\u0435\u0442"};
+        return labels[f] || f;
+      }).join(" ");
+      h += '<div class="card card-interactive fade-in" style="padding:20px;animation-delay:' + Math.min(i * 0.05, 0.3) + 's">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">';
+      h += '<div><span style="font-size:16px;font-weight:700;color:var(--text-primary)">' + rate.exchanger + '</span>';
+      if (i === 0) h += ' <span style="background:var(--accent-green);color:#000;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700">BEST</span>';
+      h += '<p style="font-size:12px;color:var(--text-tertiary);margin:4px 0 0">' + feats + '</p></div>';
+      h += '<div style="text-align:right"><span style="font-size:20px;font-weight:700;color:var(--accent-green)">' + rate.rate + '</span>';
+      h += '<p style="font-size:11px;color:var(--text-tertiary);margin:4px 0 0">\u0420\u0435\u0437\u0435\u0440\u0432: ' + rate.reserve + ' | Min: ' + rate.min + '</p></div>';
+      h += '</div></div>';
+    });
+    h += '</div>';
+    el.innerHTML = h;
+  } catch(e) {
+    el.innerHTML = '<div class="card" style="padding:32px;text-align:center;color:var(--accent-red)">' + e.message + '</div>';
+  }
+}
+
+// Init quick pairs on tab load
+(function() {
+  var origShowTab = window.showTab;
+  if (origShowTab) {
+    window.showTab = function(name) {
+      origShowTab(name);
+      if (name === "dex") loadQuickPairs();
+    };
+  }
+})();
 
 
 </script>
