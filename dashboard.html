@@ -2983,6 +2983,122 @@ function _startPayCheck(orderId){
  setTimeout(function(){if(_payCheckTimer){clearInterval(_payCheckTimer);_payCheckTimer=null}},900000);
 }
 
+// ──── AI Chat Functions ────
+var _aiChatHistory = [];
+
+function aiAsk(q) {
+  var inp = document.getElementById("aiChatInput");
+  if (inp) { inp.value = q; }
+  aiSend();
+}
+
+async function aiSend() {
+  var inp = document.getElementById("aiChatInput");
+  var msgBox = document.getElementById("aiChatMessages");
+  var sendBtn = document.getElementById("aiSendBtn");
+  if (!inp || !msgBox) return;
+  var q = inp.value.trim();
+  if (!q) return;
+  inp.value = "";
+  inp.style.height = "42px";
+
+  // Add user message bubble
+  var userDiv = document.createElement("div");
+  userDiv.style.cssText = "display:flex;justify-content:flex-end";
+  userDiv.innerHTML = '<div style="background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));color:#fff;padding:12px 16px;border-radius:16px 16px 4px 16px;max-width:80%;font-size:14px;line-height:1.5;word-break:break-word">' + escapeHtml(q) + '</div>';
+  msgBox.appendChild(userDiv);
+
+  // Add typing indicator
+  var typingDiv = document.createElement("div");
+  typingDiv.id = "aiTyping";
+  typingDiv.style.cssText = "display:flex;justify-content:flex-start";
+  typingDiv.innerHTML = '<div style="background:var(--card-bg);border:1px solid var(--border-primary);padding:12px 16px;border-radius:16px 16px 16px 4px;font-size:14px;color:var(--text-secondary)"><span class="typing-dots">&#x1f504; &#1040;&#1085;&#1072;&#1083;&#1110;&#1079;&#1091;&#1102;...</span></div>';
+  msgBox.appendChild(typingDiv);
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  // Disable send
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    var resp = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({message: q})
+    });
+    var data = await resp.json();
+
+    // Remove typing indicator
+    var typ = document.getElementById("aiTyping");
+    if (typ) typ.remove();
+
+    if (data.error) {
+      addAiMessage("\u26a0\ufe0f \u041f\u043e\u043c\u0438\u043b\u043a\u0430: " + (data.detail || data.error || "\u0421\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0449\u0435"), true);
+    } else {
+      var text = data.response || "\u041d\u0435\u043c\u0430\u0454 \u0432\u0456\u0434\u043f\u043e\u0432\u0456\u0434\u0456";
+      addAiMessage(text, false);
+
+      // Show market snapshot if available
+      var snap = data.market_snapshot;
+      if (snap && snap.btc_price) {
+        var snapHtml = '<div style="margin-top:8px;padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:12px;color:var(--text-tertiary)">';
+        snapHtml += '\u0420\u0438\u043d\u043e\u043a: ';
+        if (snap.btc_price) snapHtml += 'BTC $' + Number(snap.btc_price).toLocaleString() + ' ';
+        if (snap.eth_price) snapHtml += '| ETH $' + Number(snap.eth_price).toLocaleString() + ' ';
+        if (snap.fear_greed) snapHtml += '| F&G: ' + snap.fear_greed.value + '/100';
+        snapHtml += '</div>';
+        var lastMsg = msgBox.lastElementChild;
+        if (lastMsg) lastMsg.querySelector(".ai-msg-content").insertAdjacentHTML("beforeend", snapHtml);
+      }
+    }
+  } catch(e) {
+    var typ2 = document.getElementById("aiTyping");
+    if (typ2) typ2.remove();
+    addAiMessage("\u26a0\ufe0f \u041f\u043e\u043c\u0438\u043b\u043a\u0430 \u0437\u0432\u2019\u044f\u0437\u043a\u0443. \u0421\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437.", true);
+  }
+
+  if (sendBtn) sendBtn.disabled = false;
+  msgBox.scrollTop = msgBox.scrollHeight;
+}
+
+function addAiMessage(text, isError) {
+  var msgBox = document.getElementById("aiChatMessages");
+  if (!msgBox) return;
+  var div = document.createElement("div");
+  div.style.cssText = "display:flex;justify-content:flex-start";
+  var bg = isError ? "rgba(255,69,58,0.1)" : "var(--card-bg)";
+  var border = isError ? "1px solid rgba(255,69,58,0.3)" : "1px solid var(--border-primary)";
+  // Convert markdown-like formatting
+  var html = formatAiText(text);
+  div.innerHTML = '<div class="ai-msg-content" style="background:' + bg + ';border:' + border + ';padding:12px 16px;border-radius:16px 16px 16px 4px;max-width:85%;font-size:14px;line-height:1.6;color:var(--text-primary);word-break:break-word">' + html + '</div>';
+  msgBox.appendChild(div);
+  msgBox.scrollTop = msgBox.scrollHeight;
+}
+
+function formatAiText(text) {
+  if (!text) return "";
+  // Escape HTML first
+  var s = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // Bold **text**
+  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Italic *text*
+  s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // Code `text`
+  s = s.replace(/`([^`]+)`/g, '<code style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;font-size:13px">$1</code>');
+  // Headers ### text
+  s = s.replace(/^### (.+)$/gm, '<div style="font-weight:700;font-size:15px;margin:8px 0 4px">$1</div>');
+  s = s.replace(/^## (.+)$/gm, '<div style="font-weight:700;font-size:16px;margin:10px 0 4px">$1</div>');
+  // List items
+  s = s.replace(/^- (.+)$/gm, '<div style="padding-left:12px">\u2022 $1</div>');
+  // Newlines
+  s = s.replace(/\n/g, "<br>");
+  return s;
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+
 </script>
 
 </body>

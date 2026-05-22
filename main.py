@@ -974,46 +974,64 @@ def _build_ai_prompt(question: str, market_ctx: dict, user_portfolio: list, user
 
 async def _ai_generate(prompt: str) -> str:
     """Generate AI response using free API (Groq/OpenRouter/local fallback)"""
-    # Try multiple free AI APIs
     apis = [
         {
             "url": "https://api.groq.com/openai/v1/chat/completions",
             "key_env": "GROQ_API_KEY",
             "model": "llama-3.3-70b-versatile",
+            "fallback_models": ["llama-3.1-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"],
         },
         {
             "url": "https://openrouter.ai/api/v1/chat/completions",
             "key_env": "OPENROUTER_API_KEY",
             "model": "meta-llama/llama-3.3-70b-instruct:free",
+            "fallback_models": [],
         },
     ]
 
+    last_error = ""
     for api in apis:
         api_key = os.getenv(api["key_env"], "")
         if not api_key:
+            log.info(f"AI: {api['key_env']} not set, skipping")
             continue
-        try:
-            async with _httpx_ai.AsyncClient(timeout=30) as client:
-                r = await client.post(api["url"],
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={
-                        "model": api["model"],
-                        "messages": [
-                            {"role": "system", "content": "Ти Omni-Vision AI — експертний крипто-аналітик. Відповідай УКРАЇНСЬКОЮ. Будь конкретним, давай цифри. Використовуй емодзі. Формат: markdown."},
-                            {"role": "user", "content": prompt}
-                        ],
-                        "max_tokens": 2000,
-                        "temperature": 0.7,
-                    })
-                data = r.json()
-                choices = data.get("choices", [])
-                if choices:
-                    return choices[0].get("message", {}).get("content", "")
-        except Exception as e:
-            log.warning(f"AI API {api['key_env']} failed: {e}")
-            continue
+        models_to_try = [api["model"]] + api.get("fallback_models", [])
+        for model_name in models_to_try:
+            try:
+                log.info(f"AI: trying {api['key_env']} model={model_name}")
+                async with _httpx_ai.AsyncClient(timeout=30) as client:
+                    r = await client.post(api["url"],
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model_name,
+                            "messages": [
+                                {"role": "system", "content": "\u0422\u0438 Omni-Vision AI \u2014 \u0435\u043a\u0441\u043f\u0435\u0440\u0442\u043d\u0438\u0439 \u043a\u0440\u0438\u043f\u0442\u043e-\u0430\u043d\u0430\u043b\u0456\u0442\u0438\u043a. \u0412\u0456\u0434\u043f\u043e\u0432\u0456\u0434\u0430\u0439 \u0423\u041a\u0420\u0410\u0407\u041d\u0421\u042c\u041a\u041e\u042e. \u0411\u0443\u0434\u044c \u043a\u043e\u043d\u043a\u0440\u0435\u0442\u043d\u0438\u043c, \u0434\u0430\u0432\u0430\u0439 \u0446\u0438\u0444\u0440\u0438. \u0412\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u043e\u0432\u0443\u0439 \u0435\u043c\u043e\u0434\u0437\u0456. \u0424\u043e\u0440\u043c\u0430\u0442: markdown."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            "max_tokens": 2000,
+                            "temperature": 0.7,
+                        })
+                    data = r.json()
+                    if r.status_code != 200:
+                        err_msg = data.get("error", {}).get("message", "") if isinstance(data.get("error"), dict) else str(data.get("error", ""))
+                        log.warning(f"AI API {api['key_env']} model={model_name} HTTP {r.status_code}: {err_msg}")
+                        last_error = f"{model_name}: {err_msg or r.status_code}"
+                        continue
+                    choices = data.get("choices", [])
+                    if choices:
+                        ai_content = choices[0].get("message", {}).get("content", "")
+                        if ai_content:
+                            log.info(f"AI: success with {api['key_env']} model={model_name}, {len(ai_content)} chars")
+                            return ai_content
+                    log.warning(f"AI: empty response from {model_name}")
+                    last_error = f"{model_name}: empty response"
+            except Exception as e:
+                log.warning(f"AI API {api['key_env']} model={model_name} exception: {e}")
+                last_error = f"{model_name}: {str(e)[:100]}"
+                continue
 
     # Fallback: rule-based analysis
+    log.info(f"AI: all APIs failed ({last_error}), using fallback")
     return _fallback_analysis(prompt)
 
 
@@ -1118,6 +1136,29 @@ def _fallback_analysis(prompt: str) -> str:
     
     return "\n".join(response_parts)
 
+
+
+@app.get("/api/ai/test")
+async def ai_test():
+    """Diagnostic endpoint: test if AI APIs are reachable"""
+    results = {}
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    results["groq_key_set"] = bool(groq_key)
+    results["groq_key_prefix"] = groq_key[:8] + "..." if len(groq_key) > 8 else "(empty)"
+    or_key = os.getenv("OPENROUTER_API_KEY", "")
+    results["openrouter_key_set"] = bool(or_key)
+    if groq_key:
+        try:
+            async with _httpx_ai.AsyncClient(timeout=10) as client:
+                r = await client.post("https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.3-70b-versatile",
+                          "messages": [{"role": "user", "content": "Say OK"}], "max_tokens": 5})
+                results["groq_status"] = r.status_code
+                results["groq_response"] = r.text[:300]
+        except Exception as e:
+            results["groq_error"] = str(e)[:200]
+    return results
 
 @app.post("/api/ai/chat")
 async def ai_chat(request: Request, db: Session = Depends(get_db)):
