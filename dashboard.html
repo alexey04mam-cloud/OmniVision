@@ -2926,22 +2926,46 @@ function loadTierInfo(){
  }).catch(function(){});
 }
 function requestUpgrade(tier){
- /* Create order and redirect to Tonkeeper immediately */
- showToast("Створюю замовлення...",true);
+ var prices={pro:"$9.99",vip:"$29.99"};
+ /* Show payment choice inline */
+ var overlay=document.createElement("div");
+ overlay.id="payChoiceOverlay";
+ overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px";
+ overlay.onclick=function(e){if(e.target===overlay)overlay.remove()};
+ overlay.innerHTML='<div style="background:var(--bg-card);border:1px solid var(--border-primary);border-radius:20px;max-width:400px;width:100%;padding:28px;animation:fadeIn .25s ease">'
+  +'<div style="text-align:center;margin-bottom:24px"><p style="font-size:12px;color:var(--text-tertiary);margin:0">Оплата</p><p style="font-size:24px;font-weight:800;color:var(--text-primary);margin:6px 0">'+tier.toUpperCase()+' '+prices[tier]+'</p></div>'
+  +'<div style="display:flex;flex-direction:column;gap:10px">'
+  +'<button onclick="payWithTon(\x27'+tier+'\x27)" style="display:flex;align-items:center;gap:12px;padding:16px;background:rgba(10,132,255,.08);border:1px solid rgba(10,132,255,.15);border-radius:14px;color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:600;width:100%;text-align:left">\u{1F48E} TON Wallet</button>'
+  +'<button onclick="payWithBot(\x27'+tier+'\x27)" style="display:flex;align-items:center;gap:12px;padding:16px;background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.15);border-radius:14px;color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:600;width:100%;text-align:left">\u{1F4B3} Карта / Apple Pay / Google Pay</button>'
+  +'</div>'
+  +'<button onclick="this.closest(\x27#payChoiceOverlay\x27).remove()" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;width:100%;margin-top:16px;padding:8px">Скасувати</button>'
+  +'</div>';
+ document.body.appendChild(overlay);
+}
+
+function payWithTon(tier){
+ var overlay=document.getElementById("payChoiceOverlay");
+ if(overlay)overlay.remove();
+ showToast("Відкриваю Tonkeeper...",true);
  fetch("/api/payment/create",{
   method:"POST",headers:{"Content-Type":"application/json"},
   body:JSON.stringify({tier:tier,method:"ton_direct"})
  }).then(function(r){return r.json()}).then(function(d){
-  if(d.status==="already_active"){showToast("Цей план вже активний!",true);return}
+  if(d.status==="already_active"){showToast("Вже активний!",true);return}
   if(d.tonkeeper_link){
-   /* Open Tonkeeper directly */
    window.open(d.tonkeeper_link,"_blank");
-   /* Show simple notification */
-   showToast("Відкриваю гаманець для оплати "+d.amount_ton+" TON",true);
-   /* Start checking in background */
+   showToast(d.amount_ton+" TON - оплатіть у гаманці",true);
    _startPayCheck(d.order_id);
   }
- }).catch(function(e){showToast("Помилка: "+e.message,false)});
+ }).catch(function(e){showToast(e.message,false)});
+}
+
+function payWithBot(tier){
+ var overlay=document.getElementById("payChoiceOverlay");
+ if(overlay)overlay.remove();
+ /* Open Telegram bot with /premium command for card payment */
+ window.open("https://t.me/OmniVisionBot?start=pay_"+tier,"_blank");
+ showToast("Відкриваю Telegram бот для оплати картою",true);
 }
 
 var _payCheckTimer=null;
@@ -2951,12 +2975,11 @@ function _startPayCheck(orderId){
   fetch("/api/payment/status/"+orderId).then(function(r){return r.json()}).then(function(d){
    if(d.status==="confirmed"){
     clearInterval(_payCheckTimer);
-    showToast("Оплату підтверджено! "+d.tier.toUpperCase()+" активовано!",true);
+    showToast(d.tier.toUpperCase()+" активовано!",true);
     loadTierInfo();
    }
   }).catch(function(){});
  },5000);
- /* Stop checking after 15 min */
  setTimeout(function(){if(_payCheckTimer){clearInterval(_payCheckTimer);_payCheckTimer=null}},900000);
 }
 

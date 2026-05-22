@@ -600,7 +600,14 @@ async def process_update(update: dict, db_session_factory=None):
         text = msg.get("text", "")
         username = msg.get("from", {}).get("username", "")
 
-        if text.startswith("/start"):
+        if text.startswith("/start pay_"):
+            tier = text.replace("/start pay_", "").strip()
+            if tier in ("pro", "vip"):
+                await cmd_start(chat_id, username)
+                await cmd_buy_tier(chat_id, tier, username)
+            else:
+                await cmd_start(chat_id, username)
+        elif text.startswith("/start"):
             await cmd_start(chat_id, username)
         elif text.startswith("/prices") or text.startswith("/p"):
             await cmd_prices(chat_id, db_session_factory)

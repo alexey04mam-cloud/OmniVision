@@ -846,7 +846,8 @@ import httpx as _httpx_ai
 async def _gather_market_context() -> dict:
     """Gather real-time market data from all sources for AI context"""
     ctx = {}
-    async with _httpx_ai.AsyncClient(timeout=8) as client:
+    try:
+      async with _httpx_ai.AsyncClient(timeout=6) as client:
         # 1. Top crypto prices
         try:
             r = await client.get("https://api.coingecko.com/api/v3/coins/markets",
@@ -900,6 +901,8 @@ async def _gather_market_context() -> dict:
                 "published": n.get("published_on")} for n in news]
         except: ctx["news"] = []
 
+    except Exception as e:
+        log.warning(f"Market context gather error: {e}")
     return ctx
 
 
@@ -1116,43 +1119,55 @@ def _fallback_analysis(prompt: str) -> str:
     return "\n".join(response_parts)
 
 
-class AiChatRequest(BaseModel):
-    message: str
-    context: str = "general"  # general / portfolio / coin:SYMBOL
-
 @app.post("/api/ai/chat")
-async def ai_chat(request: Request, body: AiChatRequest, db: Session = Depends(get_db)):
+async def ai_chat(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request)
     if not user:
         raise HTTPException(401)
 
-    question = body.message.strip()
+    try:
+        raw = await request.json()
+        question = (raw.get("message") or "").strip()
+    except:
+        raise HTTPException(400, "Bad request")
+
     if not question or len(question) > 2000:
         raise HTTPException(400, "Порожнє або занадто довге повідомлення")
 
-    # Gather market context
-    market_ctx = await _gather_market_context()
+    try:
+        # Gather market context (with timeout protection)
+        market_ctx = await _gather_market_context()
+    except Exception as e:
+        log.warning(f"AI market context failed: {e}")
+        market_ctx = {}
 
-    # Get user portfolio
-    portfolio = []
-    positions = db.query(Portfolio).filter(Portfolio.user_id == user["uid"], Portfolio.status == "open").all()
-    for p in positions:
-        portfolio.append({"symbol": p.symbol, "category": p.category, "buy_price": p.buy_price,
-            "quantity": p.quantity, "current_price": p.current_price, "pnl_pct": p.pnl_pct})
+    try:
+        # Get user portfolio
+        portfolio = []
+        positions = db.query(Portfolio).filter(Portfolio.user_id == user["uid"], Portfolio.status == "open").all()
+        for p in positions:
+            portfolio.append({"symbol": p.symbol, "category": p.category, "buy_price": p.buy_price,
+                "quantity": p.quantity, "current_price": p.current_price, "pnl_pct": p.pnl_pct})
+    except:
+        portfolio = []
 
     user_obj = db.query(User).filter(User.id == user["uid"]).first()
     risk = user_obj.risk_profile if user_obj else "balanced"
 
-    # Build prompt and generate
-    prompt = _build_ai_prompt(question, market_ctx, portfolio, risk)
-    response = await _ai_generate(prompt)
+    try:
+        # Build prompt and generate
+        prompt = _build_ai_prompt(question, market_ctx, portfolio, risk)
+        response = await _ai_generate(prompt)
+    except Exception as e:
+        log.error(f"AI generate failed: {e}")
+        response = f"Помилка AI: {str(e)[:200]}. Спробуйте ще раз."
 
     return {
         "response": response,
         "market_snapshot": {
             "fear_greed": market_ctx.get("fear_greed"),
-            "btc_price": next((c["price"] for c in market_ctx.get("top_crypto", []) if c["symbol"] == "BTC"), None),
-            "eth_price": next((c["price"] for c in market_ctx.get("top_crypto", []) if c["symbol"] == "ETH"), None),
+            "btc_price": next((c.get("price") for c in market_ctx.get("top_crypto", []) if c.get("symbol") == "BTC"), None),
+            "eth_price": next((c.get("price") for c in market_ctx.get("top_crypto", []) if c.get("symbol") == "ETH"), None),
             "market_cap_change": market_ctx.get("global", {}).get("market_cap_change_24h") if market_ctx.get("global") else None,
         },
         "data_sources": ["CoinGecko", "CryptoCompare", "Alternative.me"],
