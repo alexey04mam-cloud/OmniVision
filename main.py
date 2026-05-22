@@ -1015,13 +1015,105 @@ async def _ai_generate(prompt: str) -> str:
 
 
 def _fallback_analysis(prompt: str) -> str:
-    """Rule-based fallback when no AI API is available"""
-    return ("🤖 **AI аналіз (локальний режим)**\n\n"
-            "Для повноцінних відповідей додайте API ключ:\n"
-            "- `GROQ_API_KEY` — безкоштовно на groq.com\n"
-            "- `OPENROUTER_API_KEY` — безкоштовно на openrouter.ai\n\n"
-            "Поки що використовуйте вкладки Deep Analytics, Fear & Greed та новини для аналізу ринку.\n\n"
-            "⚠️ Це не фінансова порада.")
+    """Smart rule-based analysis using gathered market data"""
+    # Parse the prompt to extract market data that was embedded
+    lines = prompt.split("\n")
+    
+    response_parts = []
+    response_parts.append("🤖 **Omni-Vision AI — Аналіз ринку**\n")
+    
+    # Extract and format top crypto data
+    crypto_section = []
+    in_crypto = False
+    for line in lines:
+        if "ТОП-20 КРИПТОВАЛЮТ" in line:
+            in_crypto = True
+            continue
+        if line.startswith("===") and in_crypto:
+            in_crypto = False
+            continue
+        if in_crypto and line.strip():
+            crypto_section.append(line.strip())
+    
+    if crypto_section:
+        response_parts.append("📊 **Топ криптовалют зараз:**\n")
+        for i, coin in enumerate(crypto_section[:10]):
+            response_parts.append(f"  {coin}")
+        response_parts.append("")
+    
+    # Extract Fear & Greed
+    for line in lines:
+        if "FEAR & GREED" in line:
+            continue
+        if "Значення:" in line:
+            response_parts.append(f"🌡️ **Індекс страху та жадібності:** {line.strip()}\n")
+    
+    # Extract global market
+    global_lines = []
+    in_global = False
+    for line in lines:
+        if "ГЛОБАЛЬНИЙ РИНОК" in line:
+            in_global = True
+            continue
+        if line.startswith("===") and in_global:
+            in_global = False
+            continue
+        if in_global and line.strip():
+            global_lines.append(line.strip())
+    
+    if global_lines:
+        response_parts.append("🌍 **Глобальний ринок:**\n")
+        for g in global_lines:
+            response_parts.append(f"  {g}")
+        response_parts.append("")
+    
+    # Extract trending
+    for line in lines:
+        if line.startswith("==="):
+            continue
+        # trending is a comma-separated line after ТРЕНДИ header
+    
+    # Extract news
+    news_lines = []
+    in_news = False
+    for line in lines:
+        if "ОСТАННІ НОВИНИ" in line:
+            in_news = True
+            continue
+        if line.startswith("===") and in_news:
+            in_news = False
+            continue
+        if in_news and line.strip():
+            news_lines.append(line.strip())
+    
+    if news_lines:
+        response_parts.append("📰 **Останні новини:**\n")
+        for n in news_lines[:5]:
+            response_parts.append(f"  {n}")
+        response_parts.append("")
+    
+    # Portfolio if present
+    port_lines = []
+    in_port = False
+    for line in lines:
+        if "ПОРТФЕЛЬ КОРИСТУВАЧА" in line:
+            in_port = True
+            response_parts.append(f"💼 **{line.replace('===','').strip()}:**\n")
+            continue
+        if line.startswith("===") and in_port:
+            in_port = False
+            continue
+        if in_port and line.strip():
+            port_lines.append(line.strip())
+            response_parts.append(f"  {line.strip()}")
+    
+    if port_lines:
+        response_parts.append("")
+    
+    response_parts.append("\n💡 *Для більш детальних AI-відповідей додайте GROQ_API_KEY (безкоштовно на groq.com) в налаштуваннях Railway.*")
+    response_parts.append("\n⚠️ Це не фінансова порада. Завжди досліджуйте самостійно.")
+    
+    return "\n".join(response_parts)
 
 
 class AiChatRequest(BaseModel):

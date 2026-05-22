@@ -2926,194 +2926,41 @@ function loadTierInfo(){
  }).catch(function(){});
 }
 function requestUpgrade(tier){
- openPayModal(tier);
-}
-var _paySelectedMethod="";
-var _paySelectedTier="";
-var _payOrderData=null;
-var _payCheckInterval=null;
-var _payTimerInterval=null;
-
-function openPayModal(tier){
- _paySelectedTier=tier;
- _paySelectedMethod="";
- _payOrderData=null;
- document.getElementById("payTitle").textContent="Оплата "+tier.toUpperCase();
- document.getElementById("payPlanName").textContent=tier==="pro"?"Pro":"VIP";
- var prices={pro:9.99,vip:29.99};
- document.getElementById("payAmount").textContent="$"+prices[tier];
- document.getElementById("payAmountTon").textContent="";
- document.getElementById("payProceedBtn").disabled=true;
- document.querySelectorAll(".pay-step").forEach(function(s){s.classList.remove("active")});
- document.getElementById("payStep1").classList.add("active");
- /* Load methods */
- fetch("/api/payment/methods").then(function(r){return r.json()}).then(function(d){
-  var el=document.getElementById("payMethods");
-  var h="";
-  var methods=d.methods||[];
-  /* Always show TON direct first */
-  h+=_payMethodCard("ton_direct","💎","TON Переказ","Пряма оплата в TON з будь-якого гаманця",["TON","Tonkeeper"]);
-  for(var i=0;i<methods.length;i++){
-   if(methods[i].id==="ton_direct")continue;
-   var m=methods[i];
-   var tags=[];
-   if(m.supports.indexOf("card")>=0)tags.push("Visa/MC");
-   if(m.supports.indexOf("apple_pay")>=0)tags.push("Apple Pay");
-   if(m.supports.indexOf("google_pay")>=0)tags.push("Google Pay");
-   if(m.supports.indexOf("crypto")>=0)tags.push("Crypto");
-   h+=_payMethodCard(m.id,m.icon,m.name,m.description,tags);
-  }
-  el.innerHTML=h;
- }).catch(function(){});
- document.getElementById("payOverlay").classList.add("open");
-}
-
-function _payMethodCard(id,icon,name,desc,tags){
- var tagHtml="";
- for(var i=0;i<tags.length;i++){
-  tagHtml+='<span style="font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--text-tertiary)">'+tags[i]+"</span>";
- }
- return '<div class="pay-method" onclick="selectPayMethod(this,\x27'+id+'\x27)" data-method="'+id+'">'
-  +'<div class="pay-method-icon">'+icon+"</div>"
-  +'<div style="flex:1"><p style="font-weight:600;color:var(--text-primary);font-size:15px;margin:0">'+name+"</p>"
-  +'<p style="font-size:12px;color:var(--text-tertiary);margin:4px 0 0">'+desc+"</p>"
-  +(tagHtml?'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+tagHtml+"</div>":"")
-  +"</div></div>";
-}
-
-function selectPayMethod(el,method){
- _paySelectedMethod=method;
- document.querySelectorAll(".pay-method").forEach(function(m){m.classList.remove("selected")});
- el.classList.add("selected");
- document.getElementById("payProceedBtn").disabled=false;
-}
-
-function payProceed(){
- if(!_paySelectedMethod||!_paySelectedTier)return;
- var btn=document.getElementById("payProceedBtn");
- btn.textContent="Створюю замовлення...";btn.disabled=true;
+ /* Create order and redirect to Tonkeeper immediately */
+ showToast("Створюю замовлення...",true);
  fetch("/api/payment/create",{
   method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({tier:_paySelectedTier,method:_paySelectedMethod})
+  body:JSON.stringify({tier:tier,method:"ton_direct"})
  }).then(function(r){return r.json()}).then(function(d){
-  _payOrderData=d;
-  btn.textContent="Оплатити";btn.disabled=false;
-  if(d.status==="already_active"){showToast("Цей план вже активний!",true);closePayModal();return}
-  if(_paySelectedMethod==="ton_direct"){showTonPayStep(d)}
-  else if(_paySelectedMethod==="cryptobot"){showCryptobotStep(d)}
- }).catch(function(e){btn.textContent="Оплатити";btn.disabled=false;showToast("Помилка: "+e.message,false)});
+  if(d.status==="already_active"){showToast("Цей план вже активний!",true);return}
+  if(d.tonkeeper_link){
+   /* Open Tonkeeper directly */
+   window.open(d.tonkeeper_link,"_blank");
+   /* Show simple notification */
+   showToast("Відкриваю гаманець для оплати "+d.amount_ton+" TON",true);
+   /* Start checking in background */
+   _startPayCheck(d.order_id);
+  }
+ }).catch(function(e){showToast("Помилка: "+e.message,false)});
 }
 
-function showTonPayStep(d){
- document.querySelectorAll(".pay-step").forEach(function(s){s.classList.remove("active")});
- document.getElementById("payStep2").classList.add("active");
- var el=document.getElementById("payDetails");
- el.innerHTML='<div style="text-align:center;margin-bottom:20px"><p style="font-size:14px;color:var(--text-tertiary);margin:0 0 4px">Відправте точно</p><p style="font-size:36px;font-weight:800;color:var(--accent-cyan);margin:0">'+d.amount_ton+' TON</p><p style="font-size:13px;color:var(--text-tertiary);margin:4px 0 0">≈ $'+d.amount_usd+"</p></div>"
-  +'<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px;font-weight:600">Адреса гаманця:</p>'
-  +'<div class="ton-address" onclick="copyAddress(this)">'+d.wallet+"</div>"
-  +'<p style="font-size:13px;color:var(--text-secondary);margin:16px 0 8px;font-weight:600">Коментар (обов&#39;язково!):</p>'
-  +'<div class="ton-address" onclick="copyAddress(this)" style="color:var(--accent-orange);border-color:rgba(255,159,10,.2)">'+d.comment+"</div>"
-  +'<p style="font-size:11px;color:var(--accent-red);margin:8px 0 16px;text-align:center">⚠️ Без коментаря оплату не буде підтверджено автоматично!</p>'
-  +'<div style="display:flex;gap:10px;margin-bottom:16px"><a href="'+d.tonkeeper_link+'" target="_blank" class="btn-primary" style="flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,#0098EA,#00B2FF)">💎 Tonkeeper</a>'
-  +'<a href="'+d.ton_link+'" class="btn-primary" style="flex:1;text-align:center;text-decoration:none;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan))">📱 TON Wallet</a></div>'
-  +'<button onclick="payWaiting()" class="btn-secondary" style="width:100%">Я оплатив — перевірити</button>';
-}
-
-function showCryptobotStep(d){
- if(d.pay_url){
-  window.open(d.pay_url,"_blank");
-  payWaiting();
- }else{
-  showToast("CryptoBot недоступний. Спробуйте TON переказ.",false);
-  document.querySelectorAll(".pay-step").forEach(function(s){s.classList.remove("active")});
-  document.getElementById("payStep1").classList.add("active");
- }
-}
-
-function payWaiting(){
- document.querySelectorAll(".pay-step").forEach(function(s){s.classList.remove("active")});
- document.getElementById("payStep3").classList.add("active");
- document.getElementById("payResultIcon").textContent="⏳";
- document.getElementById("payResultTitle").textContent="Очікуємо підтвердження...";
- document.getElementById("payResultText").textContent="Адмін отримав сповіщення і підтвердить оплату.";
- if(_payOrderData)document.getElementById("payOrderId").textContent="Order: "+_payOrderData.order_id;
- /* Start checking */
- var timeLeft=900;
- if(_payTimerInterval)clearInterval(_payTimerInterval);
- _payTimerInterval=setInterval(function(){
-  timeLeft--;
-  var m=Math.floor(timeLeft/60),s=timeLeft%60;
-  document.getElementById("payTimer").textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
-  if(timeLeft<=0){clearInterval(_payTimerInterval);document.getElementById("payTimer").textContent="00:00"}
- },1000);
- if(_payCheckInterval)clearInterval(_payCheckInterval);
- _payCheckInterval=setInterval(function(){
-  if(!_payOrderData)return;
-  fetch("/api/payment/status/"+_payOrderData.order_id).then(function(r){return r.json()}).then(function(d){
+var _payCheckTimer=null;
+function _startPayCheck(orderId){
+ if(_payCheckTimer)clearInterval(_payCheckTimer);
+ _payCheckTimer=setInterval(function(){
+  fetch("/api/payment/status/"+orderId).then(function(r){return r.json()}).then(function(d){
    if(d.status==="confirmed"){
-    clearInterval(_payCheckInterval);clearInterval(_payTimerInterval);
-    document.getElementById("payResultIcon").textContent="✅";
-    document.getElementById("payResultTitle").textContent="Оплату підтверджено!";
-    document.getElementById("payResultText").textContent="План "+d.tier.toUpperCase()+" активовано. Дякуємо!";
-    document.getElementById("payTimer").style.display="none";
+    clearInterval(_payCheckTimer);
     showToast("Оплату підтверджено! "+d.tier.toUpperCase()+" активовано!",true);
     loadTierInfo();
    }
   }).catch(function(){});
  },5000);
-}
-
-function copyAddress(el){
- navigator.clipboard.writeText(el.textContent.trim()).then(function(){
-  showToast("Скопійовано!",true);
- });
-}
-
-function closePayModal(){
- document.getElementById("payOverlay").classList.remove("open");
- if(_payCheckInterval){clearInterval(_payCheckInterval);_payCheckInterval=null}
- if(_payTimerInterval){clearInterval(_payTimerInterval);_payTimerInterval=null}
+ /* Stop checking after 15 min */
+ setTimeout(function(){if(_payCheckTimer){clearInterval(_payCheckTimer);_payCheckTimer=null}},900000);
 }
 
 </script>
-
-<!-- ═══ PAYMENT MODAL ═══ -->
-<div class="pay-modal-overlay" id="payOverlay" onclick="if(event.target===this)closePayModal()">
- <div class="pay-modal">
-  <div class="pay-modal-header">
-   <h3 style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0" id="payTitle">Оплата</h3>
-   <button onclick="closePayModal()" style="background:none;border:none;color:var(--text-tertiary);font-size:22px;cursor:pointer;padding:0;line-height:1">&times;</button>
-  </div>
-  <div class="pay-modal-body">
-   <!-- Step 1: Choose method -->
-   <div class="pay-step active" id="payStep1">
-    <div style="text-align:center;margin-bottom:20px">
-     <p style="font-size:14px;color:var(--text-tertiary);margin:0">Обраний план</p>
-     <p style="font-size:28px;font-weight:800;color:var(--text-primary);margin:8px 0" id="payPlanName">—</p>
-     <p style="font-size:20px;font-weight:700;color:var(--accent-green);margin:0" id="payAmount">$0</p>
-     <p style="font-size:13px;color:var(--text-tertiary);margin:4px 0 0" id="payAmountTon"></p>
-    </div>
-    <p style="font-size:14px;color:var(--text-secondary);margin:0 0 14px;font-weight:600">Спосіб оплати:</p>
-    <div id="payMethods"></div>
-    <button onclick="payProceed()" id="payProceedBtn" class="btn-primary" style="width:100%;margin-top:16px;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));font-size:16px;padding:14px" disabled>Оплатити</button>
-   </div>
-   <!-- Step 2: Payment details -->
-   <div class="pay-step" id="payStep2">
-    <div id="payDetails"></div>
-   </div>
-   <!-- Step 3: Confirmation -->
-   <div class="pay-step" id="payStep3">
-    <div style="text-align:center;padding:20px 0">
-     <div style="font-size:48px;margin-bottom:12px" id="payResultIcon">⏳</div>
-     <p style="font-size:18px;font-weight:700;color:var(--text-primary);margin:0" id="payResultTitle">Очікуємо оплату...</p>
-     <p style="font-size:14px;color:var(--text-tertiary);margin:8px 0 0" id="payResultText"></p>
-     <div class="pay-timer" id="payTimer">15:00</div>
-     <p style="font-size:12px;color:var(--text-tertiary);margin:0" id="payOrderId"></p>
-    </div>
-   </div>
-  </div>
- </div>
-</div>
 
 </body>
 </html>
