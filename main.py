@@ -372,7 +372,19 @@ async def background_hunter():
                 if asset and asset.price_usd and wi.target_price:
                     if (wi.direction == "above" and asset.price_usd >= wi.target_price) or (wi.direction == "below" and asset.price_usd <= wi.target_price):
                         wi.triggered = 1
-                        log.info(f"Watchlist alert: {wi.symbol} досяг {wi.target_price}")
+                        arrow = "\u2b06\ufe0f" if wi.direction == "above" else "\u2b07\ufe0f"
+                        alert_msg = f"{arrow} <b>\u0410\u043b\u0435\u0440\u0442!</b> {wi.symbol} \u0434\u043e\u0441\u044f\u0433 ${asset.price_usd:,.4f}\n\u0426\u0456\u043b\u044c: ${wi.target_price:,.4f} ({wi.direction})"
+                        log.info(f"Watchlist alert: {wi.symbol} hit {wi.target_price}")
+                        # Send Telegram notification to the user
+                        try:
+                            user_obj = db.query(User).filter(User.id == wi.user_id).first()
+                            if user_obj:
+                                # Notify via admin chat (user-specific TG linking can be added later)
+                                admin_cid = os.getenv("ADMIN_CHAT_ID", "")
+                                if admin_cid:
+                                    await telegram_bot.send_message(admin_cid, alert_msg)
+                        except Exception as tg_e:
+                            log.warning(f"Alert TG notify failed: {tg_e}")
             db.commit(); db.close()
             hunt_status["last_run"] = datetime.now(timezone.utc).isoformat()
             hunt_status["last_count"] = result.get("hunted_count", 0)
@@ -2083,6 +2095,111 @@ def market_summary(db: Session = Depends(get_db)):
 
 
 
+
+# ──── Global Token Search ────
+
+@app.get("/api/search")
+async def global_search(q: str = Query(..., min_length=1, max_length=50), db: Session = Depends(get_db)):
+    """Search tokens across local DB and CoinGecko"""
+    q_upper = q.upper().strip()
+    results = []
+
+    # 1. Search local DB first
+    local = db.query(MarketAsset).filter(
+        (MarketAsset.symbol.ilike(f"%{q}%")) | (MarketAsset.name.ilike(f"%{q}%"))
+    ).limit(10).all()
+    for a in local:
+        results.append({
+            "symbol": a.symbol, "name": a.name, "category": a.category,
+            "price_usd": a.price_usd, "change_pct": a.change_pct,
+            "source": "local", "id": a.id,
+        })
+
+    # 2. Search CoinGecko if few local results
+    if len(results) < 5:
+        try:
+            async with _httpx_dex.AsyncClient(timeout=6) as client:
+                r = await client.get(f"https://api.coingecko.com/api/v3/search?query={q}")
+                cg = r.json()
+                for coin in (cg.get("coins", []))[:8]:
+                    sym = coin.get("symbol", "").upper()
+                    if not any(r["symbol"] == sym and r["source"] == "local" for r in results):
+                        results.append({
+                            "symbol": sym,
+                            "name": coin.get("name", ""),
+                            "category": "CRYPTO",
+                            "price_usd": None,
+                            "change_pct": None,
+                            "source": "coingecko",
+                            "thumb": coin.get("thumb", ""),
+                            "market_cap_rank": coin.get("market_cap_rank"),
+                        })
+        except Exception as e:
+            log.warning(f"CoinGecko search error: {e}")
+
+    return {"results": results[:15], "query": q}
+
+
+# ──── Portfolio Charts Data ────
+
+@app.get("/api/portfolio/chart")
+def portfolio_chart(request: Request, days: int = Query(30, ge=1, le=365), db: Session = Depends(get_db)):
+    """Portfolio value history for charts"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401)
+    from datetime import timedelta
+    positions = db.query(Portfolio).filter(Portfolio.user_id == user["uid"], Portfolio.status == "open").all()
+    if not positions:
+        return {"history": [], "distribution": [], "total_value": 0}
+
+    # Current distribution (pie chart data)
+    distribution = []
+    total_value = 0
+    for p in positions:
+        val = (p.current_price or p.buy_price) * p.quantity
+        total_value += val
+        distribution.append({
+            "symbol": p.symbol, "value": round(val, 2),
+            "quantity": p.quantity, "pnl_pct": p.pnl_pct or 0,
+        })
+    distribution.sort(key=lambda x: -x["value"])
+
+    # Price history for portfolio value over time
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    symbols = [p.symbol for p in positions]
+    quantities = {p.symbol: p.quantity for p in positions}
+
+    history_records = db.query(PriceHistory).filter(
+        PriceHistory.symbol.in_(symbols),
+        PriceHistory.recorded_at >= cutoff,
+    ).order_by(PriceHistory.recorded_at.asc()).all()
+
+    # Group by time buckets (daily)
+    daily = {}
+    for rec in history_records:
+        day = rec.recorded_at.strftime("%Y-%m-%d") if rec.recorded_at else ""
+        if day not in daily:
+            daily[day] = {}
+        daily[day][rec.symbol] = rec.price_usd
+
+    # Build timeline
+    history = []
+    last_prices = {}
+    for day in sorted(daily.keys()):
+        prices = daily[day]
+        last_prices.update(prices)
+        day_value = sum(last_prices.get(sym, 0) * quantities.get(sym, 0) for sym in symbols)
+        history.append({"date": day, "value": round(day_value, 2)})
+
+    return {
+        "history": history,
+        "distribution": distribution,
+        "total_value": round(total_value, 2),
+        "total_pnl_usd": round(sum(p.pnl_usd or 0 for p in positions), 2),
+        "total_pnl_pct": round(sum(p.pnl_usd or 0 for p in positions) / max(total_value - sum(p.pnl_usd or 0 for p in positions), 1) * 100, 2),
+    }
+
 # ──── DEX Converter & Exchange Aggregator ────
 
 import httpx as _httpx_dex
@@ -2292,46 +2409,162 @@ async def dex_trending():
 
 
 # ──── BestChange Exchange Aggregator ────
+# BestChange provides a public ZIP with exchange data (no API key needed)
+# Files inside: bm_cy.dat (currencies), bm_exch.dat (exchangers), bm_rates.dat (rates)
 
-BESTCHANGE_API_KEY = os.getenv("BESTCHANGE_API_KEY", "")
+import zipfile
+import io
+import csv
+from time import time as _time_now
+
+_bc_data = {"currencies": {}, "exchangers": {}, "rates": [], "loaded_at": 0}
+_bc_cache_ttl = 300  # 5 min cache
+
+async def _load_bestchange_data():
+    """Download and parse BestChange ZIP data"""
+    global _bc_data
+    if _time_now() - _bc_data["loaded_at"] < _bc_cache_ttl and _bc_data["rates"]:
+        return _bc_data
+
+    try:
+        async with _httpx_dex.AsyncClient(timeout=15) as client:
+            r = await client.get("https://api.bestchange.com/info.zip")
+            if r.status_code != 200:
+                # Try alternative URL
+                r = await client.get("https://api.bestchange.ru/info.zip")
+            if r.status_code != 200:
+                log.warning(f"BestChange ZIP download failed: HTTP {r.status_code}")
+                return _bc_data
+
+            z = zipfile.ZipFile(io.BytesIO(r.content))
+
+            # Parse currencies (bm_cy.dat)
+            currencies = {}
+            if "bm_cy.dat" in z.namelist():
+                for line in z.read("bm_cy.dat").decode("utf-8", errors="ignore").strip().split("\n"):
+                    parts = line.split(";")
+                    if len(parts) >= 3:
+                        cid = parts[0].strip()
+                        cname = parts[2].strip() if len(parts) > 2 else parts[1].strip()
+                        currencies[cid] = cname
+
+            # Parse exchangers (bm_exch.dat)
+            exchangers = {}
+            if "bm_exch.dat" in z.namelist():
+                for line in z.read("bm_exch.dat").decode("utf-8", errors="ignore").strip().split("\n"):
+                    parts = line.split(";")
+                    if len(parts) >= 2:
+                        eid = parts[0].strip()
+                        ename = parts[1].strip()
+                        exchangers[eid] = ename
+
+            # Parse rates (bm_rates.dat)
+            rates = []
+            if "bm_rates.dat" in z.namelist():
+                for line in z.read("bm_rates.dat").decode("utf-8", errors="ignore").strip().split("\n"):
+                    parts = line.split(";")
+                    if len(parts) >= 7:
+                        rates.append({
+                            "from_id": parts[0].strip(),
+                            "to_id": parts[1].strip(),
+                            "exch_id": parts[2].strip(),
+                            "rate_give": float(parts[3].strip() or 0),
+                            "rate_get": float(parts[4].strip() or 0),
+                            "reserve": float(parts[5].strip() or 0),
+                            "reviews": parts[6].strip() if len(parts) > 6 else "",
+                        })
+
+            _bc_data = {
+                "currencies": currencies,
+                "exchangers": exchangers,
+                "rates": rates,
+                "loaded_at": _time_now(),
+            }
+            log.info(f"BestChange loaded: {len(currencies)} currencies, {len(exchangers)} exchangers, {len(rates)} rates")
+    except Exception as e:
+        log.warning(f"BestChange load error: {e}")
+
+    return _bc_data
+
+
+def _find_currency_id(currencies: dict, symbol: str) -> list:
+    """Find currency IDs by symbol/name (case-insensitive)"""
+    symbol_up = symbol.upper()
+    matches = []
+    for cid, cname in currencies.items():
+        name_up = cname.upper()
+        if symbol_up == name_up or symbol_up in name_up:
+            matches.append(cid)
+    return matches
+
 
 @app.get("/api/exchange/rates")
 async def exchange_rates(
     from_cur: str = Query("BTC", description="Source currency"),
     to_cur: str = Query("USDT", description="Target currency"),
 ):
-    """Get best exchange rates from aggregator"""
-    if not BESTCHANGE_API_KEY:
-        # Return demo data + instructions when no key
-        return {
-            "rates": [
-                {"exchanger": "ChangeNow", "rate": 1.0, "reserve": "High", "min": 0.001, "features": ["fast", "no_kyc"], "demo": True},
-                {"exchanger": "FixedFloat", "rate": 0.998, "reserve": "High", "min": 0.0005, "features": ["fixed_rate"], "demo": True},
-                {"exchanger": "SimpleSwap", "rate": 0.995, "reserve": "Medium", "min": 0.001, "features": ["many_coins"], "demo": True},
-            ],
-            "from": from_cur,
-            "to": to_cur,
-            "demo": True,
-            "message": "Demo data. Add BESTCHANGE_API_KEY in Railway for real rates.",
-        }
-
+    """Get best exchange rates from BestChange aggregator"""
     cached = _dex_cache_get(f"bc:{from_cur}:{to_cur}")
     if cached:
         return cached
 
-    try:
-        async with _httpx_dex.AsyncClient(timeout=10) as client:
-            r = await client.get(
-                f"https://www.bestchange.com/api/rates.php",
-                params={"key": BESTCHANGE_API_KEY, "from": from_cur, "to": to_cur},
-            )
-            data = r.json() if r.status_code == 200 else {}
-            resp = {"rates": data.get("rates", [])[:20], "from": from_cur, "to": to_cur, "demo": False}
-            _dex_cache_set(f"bc:{from_cur}:{to_cur}", resp)
-            return resp
-    except Exception as e:
-        log.warning(f"BestChange API error: {e}")
-        return {"rates": [], "from": from_cur, "to": to_cur, "error": str(e)[:100]}
+    bc = await _load_bestchange_data()
+    if not bc["rates"]:
+        return {
+            "rates": [],
+            "from": from_cur,
+            "to": to_cur,
+            "error": "BestChange data unavailable. Try again later.",
+        }
+
+    # Find matching currency IDs
+    from_ids = _find_currency_id(bc["currencies"], from_cur)
+    to_ids = _find_currency_id(bc["currencies"], to_cur)
+
+    if not from_ids or not to_ids:
+        return {"rates": [], "from": from_cur, "to": to_cur,
+                "error": f"Currency not found: {from_cur if not from_ids else to_cur}"}
+
+    # Filter matching rates
+    results = []
+    from_set = set(from_ids)
+    to_set = set(to_ids)
+    for rate in bc["rates"]:
+        if rate["from_id"] in from_set and rate["to_id"] in to_set:
+            exch_name = bc["exchangers"].get(rate["exch_id"], f"Exchanger #{rate['exch_id']}")
+            if rate["rate_give"] > 0:
+                effective_rate = rate["rate_get"] / rate["rate_give"]
+            else:
+                effective_rate = 0
+            results.append({
+                "exchanger": exch_name,
+                "rate_give": rate["rate_give"],
+                "rate_get": rate["rate_get"],
+                "rate": round(effective_rate, 8),
+                "reserve": rate["reserve"],
+                "reviews": rate["reviews"],
+            })
+
+    # Sort by best rate (highest rate_get per unit given)
+    results.sort(key=lambda x: -x["rate"])
+
+    resp = {
+        "rates": results[:25],
+        "from": from_cur,
+        "to": to_cur,
+        "total_found": len(results),
+        "demo": False,
+    }
+    _dex_cache_set(f"bc:{from_cur}:{to_cur}", resp)
+    return resp
+
+
+@app.get("/api/exchange/currencies")
+async def exchange_currencies():
+    """List all available currencies from BestChange"""
+    bc = await _load_bestchange_data()
+    return {"currencies": [{"id": k, "name": v} for k, v in bc["currencies"].items()],
+            "total": len(bc["currencies"])}
 
 
 @app.get("/api/exchange/popular_pairs")
