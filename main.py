@@ -1700,18 +1700,24 @@ def admin_set_tier(request: Request, body: TierUpgrade, user_id: int = Query(...
 import httpx as _httpx
 
 async def _cryptobot_request(method: str, params: dict = None):
-    """Call CryptoBot API"""
+    """Call CryptoBot API (Crypto Pay)"""
     if not CRYPTOBOT_TOKEN:
+        log.warning("CryptoBot: no token configured")
         return None
     try:
         async with _httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(
+            r = await client.post(
                 f"https://pay.crypt.bot/api/{method}",
                 headers={"Crypto-Pay-API-Token": CRYPTOBOT_TOKEN},
-                params=params or {}
+                json=params or {}
             )
             data = r.json()
-            return data.get("result") if data.get("ok") else None
+            log.info(f"CryptoBot {method}: ok={data.get('ok')} error={data.get('error')}")
+            if data.get("ok"):
+                return data.get("result")
+            else:
+                log.error(f"CryptoBot error: {data.get('error')}")
+                return None
     except Exception as e:
         log.error(f"CryptoBot API error: {e}")
         return None
@@ -1781,10 +1787,10 @@ async def create_payment(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(400, "CryptoBot не налаштований. Використайте TON переказ.")
         # Create CryptoBot invoice (supports cards, Apple Pay, Google Pay)
         invoice = await _cryptobot_request("createInvoice", {
-            "currency_type": "fiat",
-            "fiat": "USD",
+            "currency_type": "crypto",
+            "asset": "USDT",
             "amount": str(amount_usd),
-            "description": f"Omni-Vision {tier.upper()} — 30 днів",
+            "description": f"Omni-Vision {tier.upper()} — 30 days",
             "payload": order_id,
             "paid_btn_name": "openBot",
             "paid_btn_url": "https://t.me/omnivision_alerts_bot",
@@ -1802,7 +1808,7 @@ async def create_payment(request: Request, db: Session = Depends(get_db)):
                 "currency_type": "crypto",
                 "asset": "TON",
                 "amount": str(amount_ton),
-                "description": f"Omni-Vision {tier.upper()} — 30 днів",
+                "description": f"Omni-Vision {tier.upper()} — 30 days",
                 "payload": order_id,
                 "paid_btn_name": "openBot",
                 "paid_btn_url": "https://t.me/omnivision_alerts_bot",
@@ -1811,6 +1817,9 @@ async def create_payment(request: Request, db: Session = Depends(get_db)):
                 payment.cryptobot_invoice_id = str(invoice.get("invoice_id", ""))
                 db.commit()
                 result["pay_url"] = invoice.get("pay_url", "")
+
+    if method == "cryptobot" and "pay_url" not in result:
+        result["error"] = "CryptoBot invoice creation failed. Try Telegram Stars."
 
     # Notify admin via Telegram
     try:
