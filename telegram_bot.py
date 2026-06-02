@@ -18,6 +18,7 @@ log = logging.getLogger("omni-tg-bot")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TON_WALLET = os.getenv("TON_WALLET", "UQAHQhdeLLuZerZxlVPiB-PVAFPhEzbvTX69qrpr_bT8TmV-")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "")
+CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "")  # @YourChannel or -100xxxxx
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 
@@ -412,65 +413,170 @@ async def cmd_premium(chat_id):
 
 
 async def cmd_buy_tier(chat_id, tier, username=""):
-    """Show payment instructions for tier"""
+    """Show payment options: Stars or site"""
     prices = {"pro": 9.99, "vip": 29.99}
+    stars_prices = {"pro": 250, "vip": 750}  # ~$5 per 100 Stars
     price_usd = prices.get(tier, 9.99)
-
-    # Get TON price
-    ton_price = 3.0
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get("https://api.coingecko.com/api/v3/simple/price",
-                                 params={"ids": "the-open-network", "vs_currencies": "usd"})
-            data = r.json()
-            ton_price = data.get("the-open-network", {}).get("usd", 3.0)
-    except:
-        pass
-
-    amount_ton = round(price_usd / ton_price, 4)
-    order_comment = f"OV-TG-{chat_id}-{tier}-{int(time.time())}"
+    stars = stars_prices.get(tier, 250)
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "💎 Відкрити Tonkeeper", "url": f"https://app.tonkeeper.com/transfer/{TON_WALLET}?amount={int(amount_ton * 1e9)}&text={order_comment}"}],
-            [{"text": "✅ Я оплатив", "callback_data": f"paid_{tier}_{order_comment}"}],
-            [{"text": "🌐 Оплатити на сайті", "url": "https://dependable-tranquility-production-d86f.up.railway.app/?tab=plans"}],
-            [{"text": "◀️ Назад", "callback_data": "back_premium"}],
+            [{"text": f"\u2b50 \u041e\u043f\u043b\u0430\u0442\u0438\u0442\u0438 {stars} Stars", "callback_data": f"stars_{tier}"}],
+            [{"text": "\U0001f4b3 \u041a\u0430\u0440\u0442\u0430 / Apple Pay (\u0441\u0430\u0439\u0442)", "url": SITE_URL + "/?tab=plans"}],
+            [{"text": "\u25c0\ufe0f \u041d\u0430\u0437\u0430\u0434", "callback_data": "back_premium"}],
         ]
     }
 
     await send_message(chat_id,
-        f"💎 <b>Оплата {tier.upper()}</b>\n\n"
-        f"💵 Сума: <b>${price_usd}</b>\n"
-        f"💎 В TON: <b>{amount_ton} TON</b>\n"
-        f"📊 Курс: 1 TON = ${ton_price:.2f}\n\n"
-        f"📋 <b>Адреса:</b>\n"
-        f"<code>{TON_WALLET}</code>\n\n"
-        f"📝 <b>Коментар (обов'язково!):</b>\n"
-        f"<code>{order_comment}</code>\n\n"
-        f"⚠️ <b>Важливо:</b> додайте коментар при переказі!\n\n"
-        f"Або оплатіть зручно на сайті (карта, Apple/Google Pay).",
+        f"\U0001f451 <b>\u041e\u043f\u043b\u0430\u0442\u0430 {tier.upper()}</b>\n\n"
+        f"\U0001f4b5 \u0421\u0443\u043c\u0430: <b>${price_usd}/\u043c\u0456\u0441</b>\n\n"
+        f"<b>\u0421\u043f\u043e\u0441\u043e\u0431\u0438 \u043e\u043f\u043b\u0430\u0442\u0438:</b>\n\n"
+        f"\u2b50 <b>Telegram Stars</b> \u2014 {stars} Stars\n"
+        f"   \u041e\u043f\u043b\u0430\u0442\u0430 \u0447\u0435\u0440\u0435\u0437 App Store / Google Play\n\n"
+        f"\U0001f4b3 <b>\u041a\u0430\u0440\u0442\u0430 / Apple Pay / Google Pay</b>\n"
+        f"   \u041e\u043f\u043b\u0430\u0442\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0456 \u0447\u0435\u0440\u0435\u0437 CryptoBot\n\n"
+        f"\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0441\u043f\u043e\u0441\u0456\u0431:",
         reply_markup=keyboard
     )
+async def _fetch_market_data():
+    """Fetch market summary for digest"""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # BTC price
+            r = await client.get("https://api.coingecko.com/api/v3/simple/price",
+                params={"ids": "bitcoin,ethereum", "vs_currencies": "usd", "include_24hr_change": "true"})
+            prices = r.json() if r.status_code == 200 else {}
 
-    # Notify admin
-    if ADMIN_CHAT_ID:
-        try:
-            confirm_kb = {
-                "inline_keyboard": [
-                    [{"text": f"✅ Підтвердити {tier.upper()} для @{username}", "callback_data": f"admin_confirm_{chat_id}_{tier}"}],
-                ]
-            }
-            await send_message(ADMIN_CHAT_ID,
-                f"💰 <b>Запит на оплату!</b>\n\n"
-                f"👤 @{username} (chat: {chat_id})\n"
-                f"📋 План: {tier.upper()}\n"
-                f"💵 ${price_usd} (~{amount_ton} TON)\n"
-                f"🔑 <code>{order_comment}</code>",
-                reply_markup=confirm_kb
-            )
-        except:
-            pass
+            # Top gainers/losers
+            r2 = await client.get("https://api.coingecko.com/api/v3/coins/markets",
+                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50, "page": 1,
+                         "sparkline": "false", "price_change_percentage": "24h"})
+            coins = r2.json() if r2.status_code == 200 else []
+
+            # Fear & Greed
+            r3 = await client.get("https://api.alternative.me/fng/?limit=1")
+            fng = r3.json().get("data", [{}])[0] if r3.status_code == 200 else {}
+
+        return {"prices": prices, "coins": coins, "fng": fng}
+    except Exception as e:
+        log.error(f"[TG] Market data fetch error: {e}")
+        return {"prices": {}, "coins": [], "fng": {}}
+
+
+async def _generate_digest():
+    """Generate formatted digest post"""
+    data = await _fetch_market_data()
+    prices = data["prices"]
+    coins = data["coins"]
+    fng = data["fng"]
+
+    btc = prices.get("bitcoin", {})
+    eth = prices.get("ethereum", {})
+    btc_price = btc.get("usd", 0)
+    btc_change = btc.get("usd_24h_change", 0)
+    eth_price = eth.get("usd", 0)
+    eth_change = eth.get("usd_24h_change", 0)
+
+    # Fear & Greed
+    fg_val = fng.get("value", "?")
+    fg_label = fng.get("value_classification", "?")
+    fg_int = int(fg_val) if str(fg_val).isdigit() else 50
+    if fg_int <= 25: fg_emoji = "\U0001f534"
+    elif fg_int <= 45: fg_emoji = "\U0001f7e0"
+    elif fg_int <= 55: fg_emoji = "\U0001f7e1"
+    elif fg_int <= 75: fg_emoji = "\U0001f7e2"
+    else: fg_emoji = "\U0001f7e2\U0001f7e2"
+
+    # Sentiment
+    with_change = [c for c in coins if c.get("price_change_percentage_24h") is not None]
+    bullish = sum(1 for c in with_change if c["price_change_percentage_24h"] > 0)
+    bearish = sum(1 for c in with_change if c["price_change_percentage_24h"] < 0)
+    total = len(with_change) or 1
+    sentiment = "BULLISH \U0001f7e2" if bullish > bearish else "BEARISH \U0001f534" if bearish > bullish else "NEUTRAL \U0001f7e1"
+    bull_pct = round(bullish / total * 100, 1)
+
+    # Top gainers & losers
+    sorted_up = sorted(with_change, key=lambda x: x["price_change_percentage_24h"], reverse=True)[:3]
+    sorted_dn = sorted(with_change, key=lambda x: x["price_change_percentage_24h"])[:3]
+
+    # Format
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+
+    text = f"\U0001f4ca <b>Omni-Vision | Market Digest</b>\n"
+    text += f"\U0001f4c5 {now}\n\n"
+
+    text += f"{fg_emoji} <b>Fear & Greed:</b> {fg_val} ({fg_label})\n"
+    text += f"\U0001f4e2 <b>\u041d\u0430\u0441\u0442\u0440\u0456\u0439:</b> {sentiment} ({bull_pct}% bullish)\n\n"
+
+    btc_arrow = "\u25B2" if btc_change >= 0 else "\u25BC"
+    eth_arrow = "\u25B2" if eth_change >= 0 else "\u25BC"
+    text += f"\u20BF <b>BTC:</b> ${btc_price:,.0f} {btc_arrow} {btc_change:+.2f}%\n"
+    text += f"\u039E <b>ETH:</b> ${eth_price:,.0f} {eth_arrow} {eth_change:+.2f}%\n\n"
+
+    text += "\U0001f525 <b>\u0422\u043E\u043F \u0437\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F:</b>\n"
+    for c in sorted_up:
+        sym = (c.get("symbol") or "").upper()
+        ch = c["price_change_percentage_24h"]
+        text += f"  \u25B2 {sym} <b>+{ch:.2f}%</b>\n"
+
+    text += "\n\u2744\uFE0F <b>\u0422\u043E\u043F \u043F\u0430\u0434\u0456\u043D\u043D\u044F:</b>\n"
+    for c in sorted_dn:
+        sym = (c.get("symbol") or "").upper()
+        ch = c["price_change_percentage_24h"]
+        text += f"  \u25BC {sym} <b>{ch:.2f}%</b>\n"
+
+    ref = REFERRAL_LINKS_BOT.get("bybit", "")
+    text += f"\n\U0001f680 <a href=\"{ref}\">\u0422\u043E\u0440\u0433\u0443\u0432\u0430\u0442\u0438 \u043D\u0430 Bybit</a>\n"
+    text += f"\U0001f4f1 <a href=\"{SITE_URL}\">Dashboard</a> | <a href=\"https://t.me/{BOT_USERNAME}\">Bot</a> | <a href=\"https://t.me/+fmJn1JHeb6NmZDRi\">\U0001f4e2 Канал</a>"
+
+    return text
+
+
+
+
+async def send_stars_invoice(chat_id, tier):
+    """Send Telegram Stars invoice"""
+    stars_prices = {"pro": 250, "vip": 750}
+    stars = stars_prices.get(tier, 250)
+    prices_usd = {"pro": 9.99, "vip": 29.99}
+
+    payload = f"OV-STARS-{chat_id}-{tier}-{int(time.time())}"
+
+    data = {
+        "chat_id": chat_id,
+        "title": f"Omni-Vision {tier.upper()} \u2014 30 \u0434\u043d\u0456\u0432",
+        "description": f"\u041f\u0456\u0434\u043f\u0438\u0441\u043a\u0430 {tier.upper()} \u043d\u0430 Omni-Vision. Deep Analytics, AI \u0437\u0430\u043f\u0438\u0442\u0438, CSV \u0435\u043a\u0441\u043f\u043e\u0440\u0442.",
+        "payload": payload,
+        "currency": "XTR",  # Telegram Stars
+        "prices": [{"label": f"{tier.upper()} Plan", "amount": stars}],
+    }
+
+    result = await tg_request("sendInvoice", data)
+    if not result.get("ok"):
+        await send_message(chat_id, f"\u274c \u041f\u043e\u043c\u0438\u043b\u043a\u0430 \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u043d\u044f \u0456\u043d\u0432\u043e\u0439\u0441\u0443: {result.get('description', 'unknown')}")
+    return result
+
+async def cmd_digest(chat_id):
+    """Generate and send market digest"""
+    await send_message(chat_id, "\u23F3 \u0413\u0435\u043D\u0435\u0440\u0443\u044E \u0434\u0430\u0439\u0434\u0436\u0435\u0441\u0442...")
+    text = await _generate_digest()
+    await send_message(chat_id, text)
+
+
+async def cmd_post_channel(chat_id):
+    """Post digest to the configured channel"""
+    if str(chat_id) != str(ADMIN_CHAT_ID):
+        await send_message(chat_id, "\u26D4 \u0422\u0456\u043B\u044C\u043A\u0438 \u0430\u0434\u043C\u0456\u043D \u043C\u043E\u0436\u0435 \u043F\u043E\u0441\u0442\u0438\u0442\u0438 \u0432 \u043A\u0430\u043D\u0430\u043B")
+        return
+    if not CHANNEL_ID:
+        await send_message(chat_id, "\u26A0 TELEGRAM_CHANNEL_ID \u043D\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u043E\u0432\u0430\u043D\u043E. \u0414\u043E\u0434\u0430\u0439 \u0432 Railway Variables.")
+        return
+    text = await _generate_digest()
+    try:
+        await send_message(CHANNEL_ID, text)
+        await send_message(chat_id, "\u2705 \u041E\u043F\u0443\u0431\u043B\u0456\u043A\u043E\u0432\u0430\u043D\u043E \u0432 \u043A\u0430\u043D\u0430\u043B!")
+    except Exception as e:
+        await send_message(chat_id, f"\u274C \u041F\u043E\u043C\u0438\u043B\u043A\u0430: {e}")
 
 
 async def cmd_settings(chat_id):
@@ -600,7 +706,14 @@ async def process_update(update: dict, db_session_factory=None):
         text = msg.get("text", "")
         username = msg.get("from", {}).get("username", "")
 
-        if text.startswith("/start pay_"):
+        if text.startswith("/start stars_"):
+            tier = text.replace("/start stars_", "").strip()
+            if tier in ("pro", "vip"):
+                await cmd_start(chat_id, username)
+                await send_stars_invoice(chat_id, tier)
+            else:
+                await cmd_start(chat_id, username)
+        elif text.startswith("/start pay_"):
             tier = text.replace("/start pay_", "").strip()
             if tier in ("pro", "vip"):
                 await cmd_start(chat_id, username)
@@ -623,6 +736,10 @@ async def process_update(update: dict, db_session_factory=None):
             await cmd_del_alert(chat_id, text[10:])
         elif text.startswith("/settings"):
             await cmd_settings(chat_id)
+        elif text.startswith("/digest"):
+            await cmd_digest(chat_id)
+        elif text.startswith("/post_channel") or text.startswith("/post"):
+            await cmd_post_channel(chat_id)
         elif text.startswith("/premium"):
             await cmd_premium(chat_id)
         elif text.startswith("/help"):
@@ -636,6 +753,8 @@ async def process_update(update: dict, db_session_factory=None):
                 "/delalert 1 — Видалити алерт\n"
                 "/settings — Налаштування\n"
                 "/premium — Преміум плани\n"
+                "/digest — Дайджест ринку\n"
+                "/post — Опублікувати в канал (admin)\n"
                 "/help — Ця довідка")
         else:
             # Unknown command — show menu
@@ -823,4 +942,4 @@ async def run_bot(db_session_factory=None):
         now = time.time()
         if now - last_alert_check > alert_check_interval:
             await check_price_alerts()
-            last_alert_check = now
+            last_alert_chec

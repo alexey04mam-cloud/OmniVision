@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Server (local)",
+      "type": "shell",
+      "command": "venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Deploy (git push)",
+      "type": "shell",
+      "command": "deploy.bat",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always" }
+    },
+    {
+      "label": "Quick Commit",
+      "type": "shell",
+      "command": "git add -A && git commit -m \"update\" && git push origin main",
+      "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Validate JS",
+      "type": "shell",
+      "command": "node -e \"const fs=require('fs'),html=fs.readFileSync('dashboard.html','utf8'),m=html.match(/<script>([\\s\\S]*?)<\\/script>/g);if(m){const s=m.map(x=>x.replace(/<\\/?script>/g,'')).join('\\n');fs.writeFileSync('_check.js',s);require('child_process').execSync('node --check _check.js');fs.unlinkSync('_check.js');console.log('JS OK')}\"",
+      "options": { "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } },
+      "problemMatcher": []
+    },
+    {
+      "label": "Validate Python",
+      "type": "shell",
+      "command": "venv\\Scripts\\python.exe -c \"import py_compile; py_compile.compile('main.py', doraise=True); print('main.py OK')\"",
+      "problemMatcher": []
+    }
+  ]
+}

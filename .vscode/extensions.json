@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.debugpy",
+    "ritwickdey.LiveServer",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-json",
+    "eamodio.gitlens"
+  ]
+}

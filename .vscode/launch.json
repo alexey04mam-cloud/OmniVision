@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--reload", "--port", "8000"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run Telegram Bot",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "telegram_bot.py",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    }
+  ]
+}
