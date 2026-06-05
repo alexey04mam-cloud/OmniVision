@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Google Analytics (replace G-XXXXXXXXXX with your GA4 ID) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-XXXXXXXXXX');</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omni-Vision — Crypto Analytics Platform</title>
+<meta name="description" content="32 professional crypto tools in one dashboard. AI assistant, market screener, DCA calculator, whale alerts, and more.">
+<meta property="og:title" content="Omni-Vision — Crypto Analytics Platform">
+<meta property="og:description" content="32 tools. AI assistant. Real-time crypto intelligence.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>&#x1F52D;</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#05070f;--card:rgba(15,20,35,.7);--border:rgba(255,255,255,.08);--blue:#0a84ff;--green:#30d158;--purple:#bf5af2;--cyan:#64d2ff;--text:#f5f5f7;--text2:#a1a1a6;--text3:#6e6e73}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;overflow-x:hidden}
+a{color:var(--blue);text-decoration:none}
+
+/* Nav */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;background:rgba(5,7,15,.8);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700}
+.nav-logo span{background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--text2);font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:12px;font-weight:600;font-size:14px;transition:all .2s;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(10,132,255,.3)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
+
+/* Hero */
+.hero{padding:140px 32px 80px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(10,132,255,.12) 0%,rgba(191,90,242,.08) 40%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;background:rgba(48,209,88,.1);border:1px solid rgba(48,209,88,.2);font-size:13px;color:var(--green);font-weight:600;margin-bottom:24px}
+.hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.1;margin-bottom:20px;background:linear-gradient(135deg,#fff 30%,var(--cyan) 70%,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:640px;margin:0 auto 36px;line-height:1.6}
+.hero-cta{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.hero-stats{display:flex;justify-content:center;gap:48px;flex-wrap:wrap}
+.hero-stat{text-align:center}
+.hero-stat .num{font-size:32px;font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-stat .label{font-size:13px;color:var(--text3);margin-top:4px}
+
+/* Features */
+.section{padding:80px 32px;max-width:1200px;margin:0 auto}
+.section-header{text-align:center;margin-bottom:48px}
+.section-header h2{font-size:clamp(28px,4vw,42px);font-weight:800;margin-bottom:12px}
+.section-header p{color:var(--text2);font-size:16px;max-width:500px;margin:0 auto}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
+.feature-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;transition:all .3s}
+.feature-card:hover{border-color:rgba(10,132,255,.3);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.feature-card .icon{font-size:32px;margin-bottom:14px}
+.feature-card h3{font-size:17px;font-weight:700;margin-bottom:8px}
+.feature-card p{font-size:13px;color:var(--text2);line-height:1.5}
+
+/* Pricing */
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:960px;margin:0 auto}
+.price-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;text-align:center;position:relative;transition:all .3s}
+.price-card.featured{border-color:var(--blue);box-shadow:0 0 40px rgba(10,132,255,.15)}
+.price-card.featured::before{content:'POPULAR';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:4px 16px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:1px}
+.price-card .tier{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700;margin-bottom:8px}
+.price-card .price{font-size:48px;font-weight:800;margin-bottom:4px}
+.price-card .period{font-size:14px;color:var(--text3);margin-bottom:24px}
+.price-card ul{list-style:none;text-align:left;margin-bottom:28px}
+.price-card li{padding:8px 0;font-size:14px;color:var(--text2);border-bottom:1px solid rgba(255,255,255,.04)}
+.price-card li::before{content:'&#x2713; ';color:var(--green);font-weight:700}
+.price-card li.no::before{content:'&#x2717; ';color:var(--text3)}
+.price-card li.no{color:var(--text3)}
+
+/* Tools showcase */
+.tools-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 32px 20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tools-scroll::-webkit-scrollbar{display:none}
+.tool-chip{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;background:var(--card);border:1px solid var(--border);font-size:14px;font-weight:500;white-space:nowrap;transition:border-color .2s}
+.tool-chip:hover{border-color:var(--blue)}
+
+/* CTA */
+.cta-section{text-align:center;padding:80px 32px;background:linear-gradient(180deg,transparent 0%,rgba(10,132,255,.04) 50%,transparent 100%)}
+.cta-section h2{font-size:clamp(28px,4vw,40px);font-weight:800;margin-bottom:16px}
+.cta-section p{color:var(--text2);font-size:16px;margin-bottom:32px}
+
+/* Footer */
+.footer{padding:40px 32px;text-align:center;border-top:1px solid var(--border);color:var(--text3);font-size:13px}
+.footer a{color:var(--text2)}
+
+@media(max-width:768px){
+  .nav{padding:12px 16px}
+  .nav-links a:not(.btn){display:none}
+  .hero{padding:100px 20px 60px}
+  .hero-stats{gap:24px}
+  .section{padding:48px 20px}
+  .pricing-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">&#x1F52D; <span>OMNI-VISION</span></div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#tools">Tools</a>
+    <a href="/login" class="btn btn-outline">Log in</a>
+    <a href="/register" class="btn btn-primary">Start Free</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">&#x26A1; v2.0 &mdash; 32 Professional Tools</div>
+  <h1>Crypto Intelligence<br>in One Dashboard</h1>
+  <p>Real-time analytics, AI-powered insights, and professional trading tools. Everything you need to make smarter crypto decisions.</p>
+  <div class="hero-cta">
+    <a href="/register" class="btn btn-primary" style="padding:14px 36px;font-size:16px">&#x1F680; Start Free</a>
+    <a href="#features" class="btn btn-outline" style="padding:14px 36px;font-size:16px">See Features</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">32</div><div class="label">Analytics Tools</div></div>
+    <div class="hero-stat"><div class="num">100+</div><div class="label">API Endpoints</div></div>
+    <div class="hero-stat"><div class="num">24/7</div><div class="label">Real-Time Data</div></div>
+    <div class="hero-stat"><div class="num">AI</div><div class="label">Chat Assistant</div></div>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="tools-scroll">
+    <div class="tool-chip">&#x1F50D; Screener</div>
+    <div class="tool-chip">&#x1F5FA;&#xFE0F; Heatmap</div>
+    <div class="tool-chip">&#x1F9E0; AI Chat</div>
+    <div class="tool-chip">&#x1F4B0; DCA Calculator</div>
+    <div class="tool-chip">&#x1F4CA; Indicators</div>
+    <div class="tool-chip">&#x1F30A; Whale Tracker</div>
+    <div class="tool-chip">&#x1F525; Trending</div>
+    <div class="tool-chip">&#x26FD; Gas Tracker</div>
+    <div class="tool-chip">&#x1F4A5; Liquidations</div>
+    <div class="tool-chip">&#x1F310; Correlation</div>
+    <div class="tool-chip">&#x1F3C6; Dominance</div>
+    <div class="tool-chip">&#x2696;&#xFE0F; Compare</div>
+    <div class="tool-chip">&#x1F4B1; DEX Exchange</div>
+    <div class="tool-chip">&#x1F4AC; Social Sentiment</div>
+    <div class="tool-chip">&#x1F513; Token Unlocks</div>
+    <div class="tool-chip">&#x1F4B8; Funding Rates</div>
+    <div class="tool-chip">&#x1F4C8; Multi-Chart</div>
+    <div class="tool-chip">&#x1F321;&#xFE0F; Fear &amp; Greed</div>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="section-header">
+    <h2>Built for Serious Traders</h2>
+    <p>Every tool you need, none of the noise</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="icon">&#x1F50D;</div>
+      <h3>Market Screener</h3>
+      <p>Filter 250+ coins by price, volume, market cap, and 24h change. Sort by any column. Export to CSV.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F9E0;</div>
+      <h3>AI Chat Assistant</h3>
+      <p>Ask anything about the market. Powered by LLaMA 3.3 70B with real-time market context.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F4CA;</div>
+      <h3>Technical Indicators</h3>
+      <p>RSI, SMA, EMA, MACD with clear BUY/SELL/HOLD signals for any coin.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F5FA;&#xFE0F;</div>
+      <h3>Market Heatmap</h3>
+      <p>Visual treemap of top 50 coins by market cap. Toggle 1h, 24h, 7d timeframes.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F4B0;</div>
+      <h3>DCA Calculator</h3>
+      <p>Backtest Dollar-Cost Averaging on historical data. Compare DCA vs lump sum investment.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F30A;</div>
+      <h3>Whale Alerts</h3>
+      <p>Detect unusual volume and price movements in real-time. Severity-based filtering.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F4A5;</div>
+      <h3>Liquidation Map</h3>
+      <p>See where leveraged positions will get liquidated. Support/resistance zones by leverage.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F310;</div>
+      <h3>Correlation Matrix</h3>
+      <p>Pearson correlation between 12 major coins. Find diversification opportunities.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#x1F514;</div>
+      <h3>Price Alerts</h3>
+      <p>Set target prices and get notified instantly via Telegram when they hit.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="pricing">
+  <div class="section-header">
+    <h2>Simple Pricing</h2>
+    <p>Start free, upgrade when you need more</p>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="tier">Free</div>
+      <div class="price">$0</div>
+      <div class="period">forever</div>
+      <ul>
+        <li>All 32 analytics tools</li>
+        <li>3 AI questions per day</li>
+        <li>10 watchlist items</li>
+        <li>3 wallets</li>
+        <li class="no">CSV export</li>
+        <li class="no">Deep Analytics</li>
+      </ul>
+      <a href="/register" class="btn btn-outline" style="width:100%">Get Started</a>
+    </div>
+    <div class="price-card featured">
+      <div class="tier">Pro</div>
+      <div class="price">$9.99</div>
+      <div class="period">per month</div>
+      <ul>
+        <li>Everything in Free</li>
+        <li>50 AI questions per day</li>
+        <li>100 watchlist items</li>
+        <li>20 wallets</li>
+        <li>CSV export</li>
+        <li>Deep Analytics</li>
+      </ul>
+      <a href="/register" class="btn btn-primary" style="width:100%">Start Pro</a>
+    </div>
+    <div class="price-card">
+      <div class="tier">VIP</div>
+      <div class="price">$29.99</div>
+      <div class="period">per month</div>
+      <ul>
+        <li>Everything in Pro</li>
+        <li>Unlimited AI</li>
+        <li>Unlimited everything</li>
+        <li>Priority support</li>
+        <li>Early access to new tools</li>
+        <li>Custom alerts</li>
+      </ul>
+      <a href="/register" class="btn btn-outline" style="width:100%">Go VIP</a>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <h2>Ready to level up your trading?</h2>
+  <p>Join thousands of traders using Omni-Vision for smarter decisions.</p>
+  <a href="/register" class="btn btn-primary" style="padding:16px 48px;font-size:17px">&#x1F680; Create Free Account</a>
+</section>
+
+<footer class="footer">
+  <p>Omni-Vision &copy; 2024-2026 &middot; <a href="https://t.me/+fmJn1JHeb6NmZDRi">Telegram</a> &middot; <a href="https://t.me/omnivision_alerts_bot">Bot</a></p>
+</footer>
+
+</body>
+</html>

@@ -935,7 +935,23 @@ async def run_bot(db_session_factory=None):
     alert_check_interval = 60  # Check alerts every 60 seconds
     last_alert_check = 0
 
+
+    # Auto-post digest to channel every 12 hours
+    auto_post_interval = 43200  # 12 hours
+    last_auto_post = 0
+
     while True:
+        # Auto-post check
+        if CHANNEL_ID and time.time() - last_auto_post > auto_post_interval:
+            try:
+                digest = await _generate_digest()
+                await send_message(CHANNEL_ID, digest)
+                last_auto_post = time.time()
+                log.info("[TG] Auto-posted digest to channel")
+            except Exception as e:
+                log.error(f"[TG] Auto-post error: {e}")
+                last_auto_post = time.time()  # Don't retry immediately
+
         await poll_updates(db_session_factory)
 
         # Periodic alert check

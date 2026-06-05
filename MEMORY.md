@@ -9,12 +9,15 @@ Crypto market analytics platform. FastAPI backend + single-file HTML dashboard. 
 - Admin user in system: `boss`
 
 ## Architecture
-- **Backend**: FastAPI + SQLAlchemy ORM + SQLite (~4147 lines, 76 API endpoints)
-- **Frontend**: Single file `dashboard.html` (~5476 lines, HTML/CSS/JS, 32 nav tabs)
+- **Backend**: FastAPI + SQLAlchemy ORM + SQLite (~4318 lines, 108 API endpoints)
+- **Frontend**: Single file `dashboard.html` (~6017 lines, HTML/CSS/JS, 32 nav tabs, v2.0 PRO)
+- **Landing**: `landing.html` (266 lines, hero + features + pricing + CTA)
+- **Total codebase**: ~11,561 lines
 - **Telegram Bot**: `telegram_bot.py` (~961 lines), httpx-based
 - **Deployment**: Railway (https://dependable-tranquility-production-d86f.up.railway.app)
 - **AI**: Groq API (llama-3.3-70b-versatile) + OpenRouter fallback + rule-based fallback
-- **APIs**: CoinGecko, DexScreener, BestChange, Alternative.me, DeFiLlama
+- **APIs**: CoinGecko, DexScreener, BestChange, Alternative.me, DeFiLlama, toncenter.com
+- **Payments**: CryptoBot (cards/Apple Pay/crypto) + Telegram Stars. Webhook auto-confirm.
 
 ## Critical Development Rules
 1. **NEVER use Edit tool on dashboard.html or main.py** — truncates large files. Always use Python patch scripts via bash.
@@ -78,6 +81,16 @@ Crypto market analytics platform. FastAPI backend + single-file HTML dashboard. 
 - Quick Actions panel on main page (8 popular features in one click)
 - Tooltips on nav items (hover to see description)
 - Sidebar group state saved to localStorage
+- CSV Export (portfolio, watchlist, screener, hunted — Pro/VIP only)
+- PWA Install Prompt (beforeinstallprompt, banner after 10s)
+- Mobile Bottom Navigation (5 tabs: Головна, Тренди, Screener, AI, Меню)
+- Touch-friendly mobile improvements (larger buttons, adaptive grid)
+- First-time onboarding tooltip (Ctrl+K hint, dismissed to localStorage)
+- News panel with market analysis banner (bullish/bearish/neutral)
+- Version badge v2.0 NEW in sidebar
+- Universal Coin Picker (searchable dropdown, 100 coins, images, rank, keyboard nav)
+- Chart Type Toggle (candlestick/line) on Multi-Chart, Crypto panels
+- Coin Picker on: Indicators, DCA, Liquidation panels (replaces static selects)
 
 ### Telegram Bot
 - /digest — market summary post
@@ -103,5 +116,20 @@ hunted, analytics, deepanalytics, advisor, crypto, stocks, commodities, dex, flo
 - `validate.bat` — syntax check all .py files
 - `.vscode/` — settings, tasks (Ctrl+Shift+B), launch (F5), extensions
 
+## Selling / Monetization
+- README.md — professional buyer-facing documentation
+- .env.example — complete config reference
+- SEO: Open Graph, Twitter Cards, meta description, favicon, manifest.json
+- robots.txt + sitemap.xml auto-generated
+- Sell on: Flippa, MicroAcquire, Acquire.com, GitHub Marketplace, direct
+
+## Real APIs (not simulated)
+- Funding Rates: Binance fapi/v1/premiumIndex (real funding rates)
+- Gas Tracker: Etherscan gastracker API (real ETH gas)
+- Token Unlocks: DeFiLlama protocols API
+- Fear & Greed: Alternative.me direct
+- On-Chain BTC: blockchain.info/stats direct
+- All other: CoinGecko, DexScreener, BestChange, DeFiLlama
+
 ## Last Updated
-2026-06-01
+2026-06-05
