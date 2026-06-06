@@ -109,7 +109,7 @@ a{color:var(--blue);text-decoration:none}
 </nav>
 
 <section class="hero">
-  <div class="hero-badge">&#x26A1; v2.0 &mdash; 32 Professional Tools</div>
+  <div class="hero-badge">&#x26A1; v2.3 &mdash; 34 Professional Tools + AI</div>
   <h1>Crypto Intelligence<br>in One Dashboard</h1>
   <p>Real-time analytics, AI-powered insights, and professional trading tools. Everything you need to make smarter crypto decisions.</p>
   <div class="hero-cta">
@@ -117,10 +117,26 @@ a{color:var(--blue);text-decoration:none}
     <a href="#features" class="btn btn-outline" style="padding:14px 36px;font-size:16px">See Features</a>
   </div>
   <div class="hero-stats">
-    <div class="hero-stat"><div class="num">32</div><div class="label">Analytics Tools</div></div>
-    <div class="hero-stat"><div class="num">100+</div><div class="label">API Endpoints</div></div>
+    <div class="hero-stat"><div class="num" id="statTools">34</div><div class="label">Analytics Tools</div></div>
+    <div class="hero-stat"><div class="num" id="statAPI">110</div><div class="label">API Endpoints</div></div>
     <div class="hero-stat"><div class="num">24/7</div><div class="label">Real-Time Data</div></div>
     <div class="hero-stat"><div class="num">AI</div><div class="label">Chat Assistant</div></div>
+  </div>
+
+  <!-- Live Market Preview -->
+  <div style="margin-top:48px;max-width:800px;margin-left:auto;margin-right:auto">
+   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;backdrop-filter:blur(20px)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+     <span style="font-size:13px;color:var(--text3)">&#x1F4CA; Live Market Data</span>
+     <span id="liveIndicator" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green)"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></span>LIVE</span>
+    </div>
+    <div id="heroMarket" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+     <div style="text-align:center;padding:12px;border-radius:10px;background:rgba(255,255,255,.03)"><p style="font-size:11px;color:var(--text3);margin-bottom:4px">BTC</p><p id="heroBtc" style="font-size:18px;font-weight:700;color:var(--text)">$---</p><p id="heroBtcCh" style="font-size:12px;color:var(--text3)">---</p></div>
+     <div style="text-align:center;padding:12px;border-radius:10px;background:rgba(255,255,255,.03)"><p style="font-size:11px;color:var(--text3);margin-bottom:4px">ETH</p><p id="heroEth" style="font-size:18px;font-weight:700;color:var(--text)">$---</p><p id="heroEthCh" style="font-size:12px;color:var(--text3)">---</p></div>
+     <div style="text-align:center;padding:12px;border-radius:10px;background:rgba(255,255,255,.03)"><p style="font-size:11px;color:var(--text3);margin-bottom:4px">SOL</p><p id="heroSol" style="font-size:18px;font-weight:700;color:var(--text)">$---</p><p id="heroSolCh" style="font-size:12px;color:var(--text3)">---</p></div>
+     <div style="text-align:center;padding:12px;border-radius:10px;background:rgba(255,255,255,.03)"><p style="font-size:11px;color:var(--text3);margin-bottom:4px">Fear &amp; Greed</p><p id="heroFng" style="font-size:18px;font-weight:700;color:var(--cyan)">--</p><p id="heroFngLbl" style="font-size:12px;color:var(--text3)">---</p></div>
+    </div>
+   </div>
   </div>
 </section>
 
@@ -258,9 +274,136 @@ a{color:var(--blue);text-decoration:none}
   <a href="/register" class="btn btn-primary" style="padding:16px 48px;font-size:17px">&#x1F680; Create Free Account</a>
 </section>
 
+<!-- Testimonials -->
+<section class="section">
+  <div class="section-header">
+    <h2>Trusted by Traders</h2>
+    <p>What our users say</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:960px;margin:0 auto">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px">
+      <div style="display:flex;gap:4px;margin-bottom:12px;color:#ffd60a">&#x2605;&#x2605;&#x2605;&#x2605;&#x2605;</div>
+      <p style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px">"Finally a platform that combines everything I need. The AI advisor and liquidation map are game changers."</p>
+      <p style="font-size:13px;font-weight:600;color:var(--text)">Alex T. <span style="color:var(--text3);font-weight:400">&mdash; Crypto Trader</span></p>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px">
+      <div style="display:flex;gap:4px;margin-bottom:12px;color:#ffd60a">&#x2605;&#x2605;&#x2605;&#x2605;&#x2605;</div>
+      <p style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px">"The screener with sparklines and the DCA calculator saved me hours of manual research every week."</p>
+      <p style="font-size:13px;font-weight:600;color:var(--text)">Maria K. <span style="color:var(--text3);font-weight:400">&mdash; DeFi Investor</span></p>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px">
+      <div style="display:flex;gap:4px;margin-bottom:12px;color:#ffd60a">&#x2605;&#x2605;&#x2605;&#x2605;&#x2605;</div>
+      <p style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px">"34 tools for free? And the Telegram bot sends me whale alerts before anyone else. Unreal value."</p>
+      <p style="font-size:13px;font-weight:600;color:var(--text)">Denis R. <span style="color:var(--text3);font-weight:400">&mdash; Swing Trader</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- Promo Banner -->
+<section style="padding:48px 32px;text-align:center">
+  <div style="max-width:640px;margin:0 auto;background:linear-gradient(135deg,rgba(10,132,255,.1),rgba(191,90,242,.1));border:1px solid rgba(10,132,255,.2);border-radius:20px;padding:36px">
+    <p style="font-size:28px;margin-bottom:8px">&#x1F381;</p>
+    <h3 style="font-size:20px;font-weight:700;margin-bottom:8px">Get 7 Days Pro Free</h3>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:20px">Use promo code <code style="background:rgba(255,255,255,.1);padding:4px 12px;border-radius:6px;font-weight:700;letter-spacing:2px;font-size:16px;color:var(--cyan)">WELCOME</code> after registration</p>
+    <a href="/register" class="btn btn-primary" style="padding:12px 32px">Claim Free Trial</a>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section">
+  <div class="section-header">
+    <h2>FAQ</h2>
+    <p>Frequently asked questions</p>
+  </div>
+  <div style="max-width:700px;margin:0 auto;display:flex;flex-direction:column;gap:12px">
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <summary style="font-weight:600;font-size:15px;cursor:pointer;color:var(--text)">Is it really free?</summary>
+      <p style="margin-top:12px;font-size:14px;color:var(--text2);line-height:1.6">Yes! All 34 analytics tools are available on the free plan. Pro and VIP unlock higher limits, CSV export, and Deep Analytics.</p>
+    </details>
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <summary style="font-weight:600;font-size:15px;cursor:pointer;color:var(--text)">Where does the data come from?</summary>
+      <p style="margin-top:12px;font-size:14px;color:var(--text2);line-height:1.6">We aggregate real-time data from CoinGecko, Binance, DeFiLlama, Etherscan, and Alternative.me. Prices update via WebSocket every second.</p>
+    </details>
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <summary style="font-weight:600;font-size:15px;cursor:pointer;color:var(--text)">Do you have a mobile app?</summary>
+      <p style="margin-top:12px;font-size:14px;color:var(--text2);line-height:1.6">Omni-Vision is a PWA (Progressive Web App). You can install it from your browser and it works like a native app on any device.</p>
+    </details>
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <summary style="font-weight:600;font-size:15px;cursor:pointer;color:var(--text)">How does the Telegram bot work?</summary>
+      <p style="margin-top:12px;font-size:14px;color:var(--text2);line-height:1.6">Our bot sends you price alerts, whale movements, market signals, and daily digests directly to Telegram. Free for all users.</p>
+    </details>
+    <details style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px">
+      <summary style="font-weight:600;font-size:15px;cursor:pointer;color:var(--text)">Can I pay with crypto?</summary>
+      <p style="margin-top:12px;font-size:14px;color:var(--text2);line-height:1.6">Yes! We accept Telegram Stars, cards (via CryptoBot), Apple Pay, and Google Pay.</p>
+    </details>
+  </div>
+</section>
+
 <footer class="footer">
   <p>Omni-Vision &copy; 2024-2026 &middot; <a href="https://t.me/+fmJn1JHeb6NmZDRi">Telegram</a> &middot; <a href="https://t.me/omnivision_alerts_bot">Bot</a></p>
 </footer>
+
+<style>
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+details[open] summary{color:var(--cyan)}
+details summary::-webkit-details-marker{color:var(--text3)}
+</style>
+
+<script>
+// Fetch live prices for hero
+fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true")
+.then(function(r){return r.json()})
+.then(function(d){
+  var coins={bitcoin:{el:"heroBtc",chEl:"heroBtcCh"},ethereum:{el:"heroEth",chEl:"heroEthCh"},solana:{el:"heroSol",chEl:"heroSolCh"}};
+  for(var id in coins){
+    if(!d[id])continue;
+    var price=d[id].usd;var ch=d[id].usd_24h_change||0;
+    var pEl=document.getElementById(coins[id].el);
+    var cEl=document.getElementById(coins[id].chEl);
+    if(pEl)pEl.textContent="$"+(price>=100?price.toLocaleString():price.toFixed(2));
+    if(cEl){cEl.textContent=(ch>=0?"+":"")+ch.toFixed(1)+"%";cEl.style.color=ch>=0?"#30d158":"#ff453a"}
+  }
+}).catch(function(){});
+
+fetch("https://api.alternative.me/fng/?limit=1")
+.then(function(r){return r.json()})
+.then(function(d){
+  var v=d.data&&d.data[0];if(!v)return;
+  var el=document.getElementById("heroFng");
+  var lbl=document.getElementById("heroFngLbl");
+  if(el)el.textContent=v.value;
+  if(lbl)lbl.textContent=v.value_classification;
+  if(el){
+    var val=parseInt(v.value);
+    el.style.color=val<=25?"#ff453a":val<=45?"#ff9f0a":val<=55?"#ffd60a":"#30d158";
+  }
+}).catch(function(){});
+
+// Animate stats on scroll
+var observed=false;
+var observer=new IntersectionObserver(function(entries){
+  if(entries[0].isIntersecting&&!observed){
+    observed=true;
+    animateNum("statTools",0,34,1500);
+    animateNum("statAPI",0,110,1500);
+  }
+},{threshold:0.5});
+var heroStats=document.querySelector(".hero-stats");
+if(heroStats)observer.observe(heroStats);
+
+function animateNum(id,start,end,dur){
+  var el=document.getElementById(id);if(!el)return;
+  var startTime=null;
+  function step(ts){
+    if(!startTime)startTime=ts;
+    var progress=Math.min((ts-startTime)/dur,1);
+    var eased=1-Math.pow(1-progress,3);
+    el.textContent=Math.round(start+eased*(end-start));
+    if(progress<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+</script>
 
 </body>
 </html>

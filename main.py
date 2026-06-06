@@ -307,6 +307,22 @@ try:
 except Exception as e:
     log.warning(f"Auto-migration skipped: {e}")
 
+
+class SmartAlert(Base):
+    __tablename__ = "smart_alerts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    alert_type = Column(String, nullable=False)  # volume_spike, sentiment_shift, whale_move, price_breakout, correlation_break
+    coin = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    severity = Column(String, default="medium")  # low, medium, high, critical
+    data_snapshot = Column(Text, default="{}")  # JSON with supporting data
+    ai_analysis = Column(Text, default="")
+    created_at = Column(DateTime, default=func.now)
+    is_read = Column(Boolean, default=False)
+    notified = Column(Boolean, default=False)
+
+
 def get_db():
     db = SessionLocal()
     try: yield db
@@ -2278,6 +2294,224 @@ def admin_toggle_promo(request: Request, promo_id: int, db: Session = Depends(ge
     promo.is_active = 0 if promo.is_active else 1
     db.commit()
     return {"status": "ok", "is_active": bool(promo.is_active)}
+
+
+
+# ═══ AI Smart Alerts API ═══
+
+@app.get("/api/smart-alerts")
+async def get_smart_alerts(limit: int = 20):
+    """Get recent smart alerts"""
+    async with async_session() as s:
+        result = await s.execute(
+            select(SmartAlert).order_by(SmartAlert.created_at.desc()).limit(limit)
+        )
+        alerts = result.scalars().all()
+        return [
+            {
+                "id": a.id,
+                "type": a.alert_type,
+                "coin": a.coin,
+                "title": a.title,
+                "description": a.description,
+                "severity": a.severity,
+                "ai_analysis": a.ai_analysis,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "is_read": a.is_read
+            }
+            for a in alerts
+        ]
+
+@app.post("/api/smart-alerts/{alert_id}/read")
+async def mark_alert_read(alert_id: int):
+    async with async_session() as s:
+        result = await s.execute(select(SmartAlert).where(SmartAlert.id == alert_id))
+        alert = result.scalar_one_or_none()
+        if alert:
+            alert.is_read = True
+            await s.commit()
+    return {"ok": True}
+
+@app.get("/api/smart-alerts/unread-count")
+async def unread_smart_alerts():
+    async with async_session() as s:
+        result = await s.execute(
+            select(func.count(SmartAlert.id)).where(SmartAlert.is_read == False)
+        )
+        count = result.scalar() or 0
+    return {"count": count}
+
+async def _analyze_market_for_smart_alerts():
+    """Background task: scan market data and generate AI-powered alerts"""
+    import json as _json
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Fetch market data
+            resp = await client.get(
+                "https://api.coingecko.com/api/v3/coins/markets",
+                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50, "page": 1, "sparkline": "false", "price_change_percentage": "1h,24h,7d"}
+            )
+            if resp.status_code != 200:
+                return
+            coins = resp.json()
+
+            # Fetch Fear & Greed
+            fg_resp = await client.get("https://api.alternative.me/fng/?limit=2")
+            fg_data = fg_resp.json().get("data", []) if fg_resp.status_code == 200 else []
+
+        alerts_to_create = []
+
+        for coin in coins:
+            symbol = (coin.get("symbol") or "").upper()
+            name = coin.get("name", symbol)
+            price = coin.get("current_price") or 0
+            change_1h = coin.get("price_change_percentage_1h_in_currency") or 0
+            change_24h = coin.get("price_change_percentage_24h") or 0
+            change_7d = coin.get("price_change_percentage_7d_in_currency") or 0
+            volume = coin.get("total_volume") or 0
+            mcap = coin.get("market_cap") or 1
+
+            vol_mcap_ratio = volume / mcap if mcap > 0 else 0
+
+            # 1. Volume Spike Detection (vol/mcap > 0.3 is unusual)
+            if vol_mcap_ratio > 0.35:
+                alerts_to_create.append({
+                    "alert_type": "volume_spike",
+                    "coin": symbol,
+                    "title": f"Abnormal Volume: {name}",
+                    "description": f"{name} ({symbol}) has unusual trading volume. Vol/MCap ratio: {vol_mcap_ratio:.2%} (normal < 15%). 24h volume: ${volume:,.0f}.",
+                    "severity": "high" if vol_mcap_ratio > 0.5 else "medium",
+                    "data_snapshot": _json.dumps({"vol_mcap": round(vol_mcap_ratio, 4), "volume": volume, "price": price, "change_24h": round(change_24h, 2)})
+                })
+
+            # 2. Price Breakout (>10% in 1h or >20% in 24h)
+            if abs(change_1h) > 10:
+                direction = "surged" if change_1h > 0 else "crashed"
+                alerts_to_create.append({
+                    "alert_type": "price_breakout",
+                    "coin": symbol,
+                    "title": f"Price Breakout: {name} {direction} {abs(change_1h):.1f}% in 1h",
+                    "description": f"{name} has {direction} {abs(change_1h):.1f}% in the last hour. Current price: ${price:,.2f}. 24h change: {change_24h:+.1f}%.",
+                    "severity": "critical" if abs(change_1h) > 20 else "high",
+                    "data_snapshot": _json.dumps({"change_1h": round(change_1h, 2), "change_24h": round(change_24h, 2), "price": price})
+                })
+            elif abs(change_24h) > 20:
+                direction = "surged" if change_24h > 0 else "dropped"
+                alerts_to_create.append({
+                    "alert_type": "price_breakout",
+                    "coin": symbol,
+                    "title": f"Major Move: {name} {change_24h:+.1f}% in 24h",
+                    "description": f"{name} has {direction} {abs(change_24h):.1f}% in 24 hours. Price: ${price:,.2f}. 7d trend: {change_7d:+.1f}%.",
+                    "severity": "high",
+                    "data_snapshot": _json.dumps({"change_24h": round(change_24h, 2), "change_7d": round(change_7d, 2), "price": price})
+                })
+
+            # 3. Trend Reversal (opposite 1h vs 7d with big magnitude)
+            if change_7d != 0 and change_1h != 0:
+                if (change_7d > 15 and change_1h < -5) or (change_7d < -15 and change_1h > 5):
+                    reversal_type = "bearish reversal" if change_1h < 0 else "bullish reversal"
+                    alerts_to_create.append({
+                        "alert_type": "correlation_break",
+                        "coin": symbol,
+                        "title": f"Trend Reversal Signal: {name}",
+                        "description": f"{name} showing {reversal_type}. 7d was {change_7d:+.1f}% but 1h just moved {change_1h:+.1f}%. Potential trend change.",
+                        "severity": "medium",
+                        "data_snapshot": _json.dumps({"change_1h": round(change_1h, 2), "change_7d": round(change_7d, 2), "reversal": reversal_type})
+                    })
+
+        # 4. Fear & Greed extreme
+        if fg_data:
+            fg_value = int(fg_data[0].get("value", 50))
+            if fg_value <= 15 or fg_value >= 85:
+                mood = "Extreme Fear" if fg_value <= 15 else "Extreme Greed"
+                prev_val = int(fg_data[1].get("value", 50)) if len(fg_data) > 1 else fg_value
+                alerts_to_create.append({
+                    "alert_type": "sentiment_shift",
+                    "coin": "MARKET",
+                    "title": f"Market Sentiment: {mood} ({fg_value})",
+                    "description": f"Fear & Greed Index at {fg_value}/100 ({mood}). Yesterday: {prev_val}. {'Historically, extreme fear = buying opportunity.' if fg_value <= 15 else 'Historically, extreme greed often precedes corrections.'}",
+                    "severity": "high",
+                    "data_snapshot": _json.dumps({"fg_value": fg_value, "fg_prev": prev_val, "mood": mood})
+                })
+
+        # Save alerts (deduplicate by type+coin in last 6 hours)
+        if alerts_to_create:
+            from datetime import timedelta
+            cutoff = datetime.utcnow() - timedelta(hours=6)
+            async with async_session() as s:
+                for alert_data in alerts_to_create[:10]:  # Max 10 per scan
+                    # Check for duplicate
+                    existing = await s.execute(
+                        select(SmartAlert).where(
+                            SmartAlert.alert_type == alert_data["alert_type"],
+                            SmartAlert.coin == alert_data["coin"],
+                            SmartAlert.created_at > cutoff
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    # Generate AI analysis
+                    ai_text = ""
+                    try:
+                        ai_text = await _generate_alert_ai_analysis(alert_data)
+                    except Exception:
+                        ai_text = alert_data["description"]
+
+                    new_alert = SmartAlert(
+                        alert_type=alert_data["alert_type"],
+                        coin=alert_data["coin"],
+                        title=alert_data["title"],
+                        description=alert_data["description"],
+                        severity=alert_data["severity"],
+                        data_snapshot=alert_data.get("data_snapshot", "{}"),
+                        ai_analysis=ai_text
+                    )
+                    s.add(new_alert)
+                await s.commit()
+
+    except Exception as e:
+        print(f"Smart alerts scan error: {e}")
+
+async def _generate_alert_ai_analysis(alert_data: dict) -> str:
+    """Generate AI explanation for a smart alert"""
+    prompt = f"""You are a crypto market analyst. Analyze this market event concisely (2-3 sentences):
+
+Type: {alert_data['alert_type']}
+Coin: {alert_data['coin']}
+Event: {alert_data['title']}
+Details: {alert_data['description']}
+
+Provide actionable insight: what does this mean for traders? Is it bullish, bearish, or neutral? Any recommended action?"""
+
+    try:
+        # Use the existing AI chat function
+        headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 150,
+                    "temperature": 0.3
+                }
+            )
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
+    return alert_data["description"]
+
+async def _smart_alerts_loop():
+    """Run smart alerts scan every 15 minutes"""
+    while True:
+        await asyncio.sleep(900)  # 15 min
+        try:
+            await _analyze_market_for_smart_alerts()
+        except Exception as e:
+            print(f"Smart alerts loop error: {e}")
 
 
 @app.get("/boss_panel", dependencies=[Depends(verify_boss_key)])

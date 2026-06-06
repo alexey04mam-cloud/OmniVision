@@ -482,9 +482,196 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 @media(max-width:600px){
  .stats-grid{grid-template-columns:repeat(2,1fr) !important}
 }
+
+/* ═══ Splash Screen ═══ */
+#splashScreen{position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:var(--bg-primary);display:flex;align-items:center;justify-content:center;flex-direction:column;transition:opacity .5s,visibility .5s}
+#splashScreen.hide{opacity:0;visibility:hidden;pointer-events:none}
+#splashScreen .splash-logo{font-size:64px;margin-bottom:16px;animation:splashPulse 1.5s ease-in-out infinite}
+#splashScreen .splash-name{font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:24px}
+#splashScreen .splash-bar{width:200px;height:3px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
+#splashScreen .splash-bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-green));border-radius:2px;animation:splashLoad 1.8s ease-out forwards}
+@keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+@keyframes splashLoad{0%{width:0}50%{width:70%}100%{width:100%}}
+
+/* ═══ Tab Transitions ═══ */
+.tab-panel{animation:fadeSlideIn .3s ease-out}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ Card Hover Effects ═══ */
+.card{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.card-interactive:hover{border-color:rgba(10,132,255,.3)}
+
+/* ═══ Skeleton Loader ═══ */
+.skeleton{background:linear-gradient(90deg,var(--bg-tertiary) 25%,rgba(255,255,255,.05) 50%,var(--bg-tertiary) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ═══ Number Counter Animation ═══ */
+.counter-animate{display:inline-block;transition:transform .3s ease}
+
+/* ═══ Smooth Scroll ═══ */
+html{scroll-behavior:smooth}
+
+/* ═══ Button Press Effect ═══ */
+.btn-primary:active,.btn-secondary:active{transform:scale(.97)}
+
+/* ═══ Badge Pulse ═══ */
+.badge-pulse{animation:badgePulse 2s ease-in-out infinite}
+@keyframes badgePulse{0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,.4)}50%{box-shadow:0 0 0 8px rgba(48,209,88,0)}}
+
+
+
+
+/* ═══ AI Smart Alerts ═══ */
+var _smartAlertsCache = [];
+var _smartAlertsFilter = "all";
+
+async function loadSmartAlerts(){
+  try {
+    var resp = await fetch("/api/smart-alerts?limit=30");
+    if(!resp.ok) throw new Error("API error");
+    _smartAlertsCache = await resp.json();
+    renderSmartAlerts();
+    updateSmartAlertBadge();
+  } catch(e){
+    console.warn("loadSmartAlerts error:", e);
+    document.getElementById("smartAlertsList").innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Failed to load alerts. Try again later.</div>';
+  }
+}
+
+function renderSmartAlerts(){
+  var container = document.getElementById("smartAlertsList");
+  if(!container) return;
+  var filtered = _smartAlertsFilter === "all" ? _smartAlertsCache : _smartAlertsCache.filter(function(a){ return a.type === _smartAlertsFilter });
+
+  if(filtered.length === 0){
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">\U0001f50d No alerts found. AI is monitoring the market 24/7.</div>';
+    return;
+  }
+
+  var typeLabels = {volume_spike:"Volume Spike",price_breakout:"Breakout",sentiment_shift:"Sentiment",whale_move:"Whale",correlation_break:"Reversal"};
+  var html = "";
+  filtered.forEach(function(a){
+    var timeAgo = _timeAgo(a.created_at);
+    html += '<div class="smart-alert-card' + (a.is_read ? '' : ' unread') + '" onclick="markSmartAlertRead(' + a.id + ',this)">';
+    html += '<div class="sa-header">';
+    html += '<span class="sa-type ' + a.type + '">' + (typeLabels[a.type]||a.type) + '</span>';
+    html += '<span class="sa-severity ' + a.severity + '">' + a.severity.toUpperCase() + '</span>';
+    html += '<span style="flex:1"></span>';
+    html += '<span class="sa-time">' + timeAgo + '</span>';
+    html += '</div>';
+    html += '<div class="sa-title">' + _escHtml(a.title) + '</div>';
+    html += '<div class="sa-desc">' + _escHtml(a.description) + '</div>';
+    if(a.ai_analysis && a.ai_analysis !== a.description){
+      html += '<div class="sa-ai">' + _escHtml(a.ai_analysis) + '</div>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function filterSmartAlerts(type, btn){
+  _smartAlertsFilter = type;
+  document.querySelectorAll("#saFilters button").forEach(function(b){b.classList.remove("active")});
+  if(btn) btn.classList.add("active");
+  renderSmartAlerts();
+}
+
+async function markSmartAlertRead(id, el){
+  if(el) el.classList.remove("unread");
+  try {
+    await fetch("/api/smart-alerts/" + id + "/read", {method:"POST"});
+    var a = _smartAlertsCache.find(function(x){return x.id===id});
+    if(a) a.is_read = true;
+    updateSmartAlertBadge();
+  } catch(e){ console.warn("markRead error:", e) }
+}
+
+async function updateSmartAlertBadge(){
+  try {
+    var resp = await fetch("/api/smart-alerts/unread-count");
+    var data = await resp.json();
+    var badge = document.getElementById("smartAlertBadge");
+    if(badge){
+      if(data.count > 0){
+        badge.textContent = data.count > 9 ? "9+" : data.count;
+        badge.style.display = "flex";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+  } catch(e){ console.warn("smartAlertBadge error:", e) }
+}
+
+function _timeAgo(iso){
+  if(!iso) return "";
+  var diff = (Date.now() - new Date(iso+"Z").getTime()) / 1000;
+  if(diff < 60) return "just now";
+  if(diff < 3600) return Math.floor(diff/60) + "m ago";
+  if(diff < 86400) return Math.floor(diff/3600) + "h ago";
+  return Math.floor(diff/86400) + "d ago";
+}
+
+function _escHtml(s){
+  if(!s) return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// Auto-load smart alerts on tab switch and periodically
+setInterval(function(){ updateSmartAlertBadge() }, 120000);
+
+
+/* ═══ Onboarding Tour ═══ */
+.onboard-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:99990;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);transition:opacity .3s}
+.onboard-tooltip{position:fixed;z-index:99991;background:var(--bg-secondary);border:1px solid var(--accent-blue);border-radius:16px;padding:24px;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4);animation:fadeSlideIn .3s ease-out}
+.onboard-tooltip h4{font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.onboard-tooltip p{font-size:13px;color:var(--text-secondary);line-height:1.5;margin:0 0 16px}
+.onboard-tooltip .onboard-step{font-size:11px;color:var(--text-tertiary);margin-bottom:12px}
+.onboard-tooltip .onboard-btns{display:flex;gap:8px;justify-content:flex-end}
+.onboard-tooltip .onboard-btns button{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.onboard-tooltip .ob-next{background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));color:#fff}
+.onboard-tooltip .ob-skip{background:transparent;color:var(--text-tertiary);border:1px solid var(--border-color) !important}
+.onboard-highlight{position:relative;z-index:99991;box-shadow:0 0 0 4px rgba(10,132,255,.4),0 0 0 9999px rgba(0,0,0,.5);border-radius:8px}
+
+
+/* ═══ AI Smart Alerts ═══ */
+.smart-alert-card{background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:12px;padding:16px;margin-bottom:12px;transition:all .2s;position:relative;overflow:hidden}
+.smart-alert-card:hover{border-color:var(--accent-blue);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.smart-alert-card.unread{border-left:3px solid var(--accent-blue)}
+.smart-alert-card .sa-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.smart-alert-card .sa-type{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
+.sa-type.volume_spike{background:rgba(255,149,0,.15);color:#ff9500}
+.sa-type.price_breakout{background:rgba(255,59,48,.15);color:#ff3b30}
+.sa-type.sentiment_shift{background:rgba(88,86,214,.15);color:#5856d6}
+.sa-type.whale_move{background:rgba(0,122,255,.15);color:#007aff}
+.sa-type.correlation_break{background:rgba(255,204,0,.15);color:#ffcc00}
+.smart-alert-card .sa-severity{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700}
+.sa-severity.critical{background:rgba(255,59,48,.2);color:#ff3b30}
+.sa-severity.high{background:rgba(255,149,0,.2);color:#ff9500}
+.sa-severity.medium{background:rgba(255,204,0,.15);color:#ffcc00}
+.sa-severity.low{background:rgba(52,199,89,.15);color:#34c759}
+.smart-alert-card .sa-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:6px}
+.smart-alert-card .sa-desc{font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:8px}
+.smart-alert-card .sa-ai{font-size:12px;color:var(--text-secondary);line-height:1.5;padding:10px 12px;background:var(--bg-tertiary);border-radius:8px;border-left:2px solid var(--accent-blue);margin-bottom:8px}
+.smart-alert-card .sa-ai::before{content:"\U0001f9e0 AI Analysis";display:block;font-size:10px;font-weight:700;color:var(--accent-blue);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.smart-alert-card .sa-time{font-size:11px;color:var(--text-tertiary)}
+.smart-alerts-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.smart-alerts-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.smart-alerts-filters button{padding:6px 12px;border-radius:8px;font-size:12px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border-primary);cursor:pointer;transition:all .2s}
+.smart-alerts-filters button.active{background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)}
+.sa-badge{position:absolute;top:8px;right:8px;min-width:18px;height:18px;border-radius:9px;background:var(--accent-blue);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+#smartAlertBadge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:#ff3b30;color:#fff;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;padding:0 3px}
+
 </style>
 </head>
 <body>
+<!-- Splash Screen -->
+<div id="splashScreen">
+ <div class="splash-logo">&#x1F52D;</div>
+ <div class="splash-name">OMNI-VISION</div>
+ <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+</div>
+
 
 <!-- Loading bar -->
 <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
@@ -554,6 +741,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <a class="nav-item" onclick="showTab('dominance')" id="tab-dominance" data-tip="BTC/ETH/ALT %"><span class="nav-icon">&#x1F3C6;</span><span>Dominance</span></a>
    <a class="nav-item" onclick="showTab('unlocks')" id="tab-unlocks" data-tip="Token vesting"><span class="nav-icon">&#x1F513;</span><span>Unlocks</span></a>
    <a class="nav-item" onclick="showTab('social')" id="tab-social" data-tip="Social metrics"><span class="nav-icon">&#x1F4AC;</span><span>Social</span></a>
+   <a class="nav-item" onclick="showTab('smartalerts')" id="tab-smartalerts" data-tip="AI Smart Alerts" style="position:relative"><span class="nav-icon">&#x1F9E0;</span><span data-i18n="nav_smartalerts">AI Alerts</span><span id="smartAlertBadge"></span></a>
   </div>
   <div class="sidebar-section" id="sg-tracking">
    <div class="sidebar-section-label" onclick="toggleSidebarGroup(&#39;sg-tracking&#39;)">&#x0421;&#x043F;&#x043E;&#x0441;&#x0442;&#x0435;&#x0440;&#x0435;&#x0436;&#x0435;&#x043D;&#x043D;&#x044F; <span class="chevron">&#x25BC;</span></div>
@@ -608,6 +796,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <span id="alertBadge" style="display:none;background:var(--accent-red);color:#fff;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;cursor:pointer" onclick="showTab(&#39;wallets&#39;)" title="\u0410\u043a\u0442\u0438\u0432\u043d\u0456 \u0430\u043b\u0435\u0440\u0442\u0438">0</span>
    <span id="hunterInfo" class="hide-mobile" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
    <span id="refreshCountdown" style="font-size:11px;color:var(--text-tertiary);font-family:monospace;min-width:28px;text-align:center" class="hide-mobile">30с</span>
+   <button id="langBtn" onclick="setLang(_lang==='en'?'uk':'en')" style="background:none;border:1px solid var(--border-color);color:var(--text-secondary);cursor:pointer;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;margin-right:6px;letter-spacing:0.5px">EN</button>
    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Light/Dark mode">&#x1F319;</button>
    <div class="lang-switch" style="display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px">
     <a href="/?lang=ukr" style="padding:5px 10px;font-size:12px;border-radius:6px;color:var(--text-secondary);text-decoration:none">UA</a>
@@ -1666,7 +1855,29 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
   </div>
 
     <!-- ═══ PLANS ═══ -->
-  <div id="panel-plans" class="tab-panel">
+  
+<!-- ═══ AI Smart Alerts Panel ═══ -->
+<div id="panel-smartalerts" class="panel" style="display:none">
+ <div class="smart-alerts-header">
+  <h2 style="font-size:20px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+   &#x1F9E0; <span data-i18n="smart_alerts_title">AI Smart Alerts</span>
+  </h2>
+  <button onclick="loadSmartAlerts()" class="btn-secondary" style="padding:6px 14px;font-size:12px">&#x21BB; Refresh</button>
+ </div>
+ <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px" data-i18n="smart_alerts_desc">AI continuously monitors the market and generates intelligent alerts for unusual activity, breakouts, sentiment shifts, and more.</p>
+ <div class="smart-alerts-filters" id="saFilters">
+  <button class="active" onclick="filterSmartAlerts('all',this)">All</button>
+  <button onclick="filterSmartAlerts('price_breakout',this)">&#x1F4C8; Breakouts</button>
+  <button onclick="filterSmartAlerts('volume_spike',this)">&#x1F4CA; Volume</button>
+  <button onclick="filterSmartAlerts('sentiment_shift',this)">&#x1F4AD; Sentiment</button>
+  <button onclick="filterSmartAlerts('correlation_break',this)">&#x1F504; Reversals</button>
+ </div>
+ <div id="smartAlertsList" style="max-height:600px;overflow-y:auto">
+  <div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading alerts...</div>
+ </div>
+</div>
+
+<div id="panel-plans" class="tab-panel">
    <h2 class="section-title">Тарифні плани</h2><p class="section-subtitle">Оберіть план що підходить вам</p>
    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:20px;margin-bottom:32px">
     <!-- FREE -->
@@ -1970,7 +2181,212 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
 
 <div id="toastBox"></div>
 
-<script>function loadRadar(cat){
+<script>
+/* ═══ INTERNATIONALIZATION (i18n) ═══ */
+var _lang = "en";
+try { _lang = localStorage.getItem("ov_lang") || "en" } catch(e){}
+
+var _i18n = {
+  en: {
+    // Sidebar
+    hunted: "Hunted", analytics: "Analytics", advisor: "AI Advisor",
+    crypto: "Crypto", stocks: "Stocks", commodities: "Commodities",
+    flow: "Fund Flows", whales: "Whale Tracker", converter: "Converter",
+    correlation: "Correlation", indicators: "Indicators",
+    liquidation: "Liquidations", wallets: "Wallets", plans: "Plans",
+    news: "News", channel: "Telegram Channel",
+    // Common
+    loading: "Loading...", no_data: "No data", error_load: "Failed to load",
+    refresh: "Refresh", updated: "Updated", save: "Save", cancel: "Cancel",
+    close: "Close", search: "Search...", all: "All",
+    // Main page
+    greeting_morning: "Good morning",
+    greeting_day: "Good afternoon",
+    greeting_evening: "Good evening",
+    market_overview: "Market Overview",
+    total_mcap: "Total Market Cap",
+    volume_24h: "24h Volume",
+    btc_dom: "BTC Dominance",
+    eth_dom: "ETH Dominance",
+    active_coins: "Active Coins",
+    quick_actions: "Quick Actions",
+    top_growth: "Top Gainers",
+    top_fall: "Top Losers",
+    // Panels
+    hunted_title: "Hunted Assets",
+    hunted_sub: "Auto-scanner catches momentum shifts",
+    analytics_title: "Analytics",
+    analytics_sub: "Market statistics and analysis",
+    deep_title: "Deep Analytics",
+    deep_sub: "Multi-timeframe analysis for professionals",
+    advisor_title: "AI Advisor",
+    advisor_sub: "Chat with AI about crypto markets",
+    screener_title: "Market Screener",
+    screener_sub: "Filter coins by any parameter",
+    sentiment_title: "Fear & Greed Index",
+    sentiment_sub: "Market mood indicator",
+    heatmap_title: "Market Heatmap",
+    heatmap_sub: "Visual market cap treemap",
+    correlation_title: "Correlation Matrix",
+    correlation_sub: "Pearson correlation between assets",
+    indicators_title: "Technical Indicators",
+    indicators_sub: "RSI, SMA, EMA, MACD signals",
+    liquidation_title: "Liquidation Map",
+    liquidation_sub: "Leverage liquidation zones",
+    trending_title: "Trending Coins",
+    trending_sub: "CoinGecko trending right now",
+    dominance_title: "Market Dominance",
+    dominance_sub: "BTC / ETH / Altcoin share",
+    funding_title: "Funding Rates",
+    funding_sub: "Perpetual futures rates",
+    gas_title: "Gas Tracker",
+    gas_sub: "Transaction fees across networks",
+    dca_title: "DCA Calculator",
+    dca_sub: "Dollar Cost Averaging backtest",
+    unlocks_title: "Token Unlocks",
+    unlocks_sub: "Upcoming token releases",
+    social_title: "Social Sentiment",
+    social_sub: "Twitter / Reddit / Telegram metrics",
+    onchain_title: "On-Chain Analytics",
+    onchain_sub: "DeFi TVL, protocols, stablecoins",
+    portfolio_title: "Portfolio",
+    portfolio_sub: "Track your holdings & P&L",
+    watchlist_title: "Watchlist",
+    watchlist_sub: "Your watched assets",
+    plans_title: "Pricing Plans",
+    plans_sub: "Choose the plan that fits you",
+    news_title: "News & Trends",
+    news_sub: "Crypto news and market sentiment",
+    compare_title: "Token Compare",
+    compare_sub: "Side-by-side comparison",
+    calculator_title: "Risk Calculator",
+    calculator_sub: "Position sizing & risk/reward",
+    multichart_title: "Multi-Chart",
+    multichart_sub: "View 2 or 4 charts simultaneously",
+    converter_title: "Crypto Converter",
+    converter_sub: "Crypto to Fiat conversion",
+    wallets_title: "Wallets",
+    wallets_sub: "Your crypto wallets",
+    // Alerts
+    alert_triggered: "ALERT TRIGGERED!",
+    price_above: "rose above",
+    price_below: "dropped below",
+    current_price: "Current price",
+    // Plans
+    free_plan: "Free", pro_plan: "Pro", vip_plan: "VIP",
+    current_plan: "Current", choose_pro: "Choose Pro", choose_vip: "Choose VIP",
+    your_plan: "Your current plan",
+    promo_code: "Promo Code",
+    promo_enter: "Enter code for bonus activation",
+    promo_placeholder: "Code, e.g.: WELCOME",
+    activate: "Activate",
+    // Bot / Referral
+    invite_friends: "Invite Friends",
+    // Fear & Greed
+    extreme_fear: "Extreme Fear", fear: "Fear", neutral: "Neutral",
+    greed: "Greed", extreme_greed: "Extreme Greed",
+    // Verdict
+    verdict: "Verdict", signals: "Signals",
+    // Misc
+    support_resistance: "Support / Resistance",
+    volatility: "Volatility",
+    high_30d: "High 30D", low_30d: "Low 30D",
+    invested: "Invested", portfolio_value: "Portfolio Value",
+    avg_buy: "Avg Buy Price", num_buys: "Number of Buys",
+    // Command palette
+    cmd_placeholder: "Search panels... (Ctrl+K)",
+    nothing_found: "Nothing found",
+  },
+  uk: {
+    // Sidebar
+    hunted: "\u0412\u043F\u043E\u043B\u044E\u0432\u0430\u043D\u043E", analytics: "\u0410\u043D\u0430\u043B\u0456\u0442\u0438\u043A\u0430", advisor: "AI \u0420\u0430\u0434\u043D\u0438\u043A",
+    crypto: "\u041A\u0440\u0438\u043F\u0442\u043E", stocks: "\u0410\u043A\u0446\u0456\u0457", commodities: "\u041A\u043E\u043F\u0430\u043B\u0438\u043D\u0438",
+    flow: "\u041F\u0435\u0440\u0435\u043B\u0438\u0432\u0438", whales: "Whale Tracker", converter: "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440",
+    correlation: "\u041A\u043E\u0440\u0435\u043B\u044F\u0446\u0456\u044F", indicators: "\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438",
+    liquidation: "\u041B\u0456\u043A\u0432\u0456\u0434\u0430\u0446\u0456\u0457", wallets: "\u0413\u0430\u043C\u0430\u043D\u0446\u0456", plans: "\u0422\u0430\u0440\u0438\u0444\u0438",
+    news: "\u041D\u043E\u0432\u0438\u043D\u0438", channel: "Telegram \u043A\u0430\u043D\u0430\u043B",
+    // Common
+    loading: "\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F...", no_data: "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u043D\u0438\u0445", error_load: "\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F",
+    refresh: "\u041E\u043D\u043E\u0432\u0438\u0442\u0438", updated: "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043E", save: "\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438", cancel: "\u0421\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438",
+    close: "\u0417\u0430\u043A\u0440\u0438\u0442\u0438", search: "\u041F\u043E\u0448\u0443\u043A...", all: "\u0412\u0441\u0456",
+    // Main page
+    greeting_morning: "\u0414\u043E\u0431\u0440\u043E\u0433\u043E \u0440\u0430\u043D\u043A\u0443",
+    greeting_day: "\u0414\u043E\u0431\u0440\u043E\u0433\u043E \u0434\u043D\u044F",
+    greeting_evening: "\u0414\u043E\u0431\u0440\u043E\u0433\u043E \u0432\u0435\u0447\u043E\u0440\u0430",
+    market_overview: "\u041E\u0433\u043B\u044F\u0434 \u0440\u0438\u043D\u043A\u0443",
+    total_mcap: "\u0417\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u043A\u0430\u043F\u0456\u0442\u0430\u043B\u0456\u0437\u0430\u0446\u0456\u044F",
+    volume_24h: "\u041E\u0431\u0441\u044F\u0433 24\u0433",
+    btc_dom: "BTC \u0434\u043E\u043C\u0456\u043D\u0430\u0446\u0456\u044F",
+    eth_dom: "ETH \u0434\u043E\u043C\u0456\u043D\u0430\u0446\u0456\u044F",
+    active_coins: "\u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u043C\u043E\u043D\u0435\u0442",
+    quick_actions: "\u0428\u0432\u0438\u0434\u043A\u0456 \u0434\u0456\u0457",
+    top_growth: "\u0422\u043E\u043F \u0437\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F",
+    top_fall: "\u0422\u043E\u043F \u043F\u0430\u0434\u0456\u043D\u043D\u044F",
+    // Plans
+    free_plan: "Free", pro_plan: "Pro", vip_plan: "VIP",
+    current_plan: "\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439", choose_pro: "\u041E\u0431\u0440\u0430\u0442\u0438 Pro", choose_vip: "\u041E\u0431\u0440\u0430\u0442\u0438 VIP",
+    your_plan: "\u0412\u0430\u0448 \u043F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u043F\u043B\u0430\u043D",
+    promo_code: "\u041F\u0440\u043E\u043C\u043E\u043A\u043E\u0434",
+    promo_enter: "\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043A\u043E\u0434 \u0434\u043B\u044F \u0430\u043A\u0442\u0438\u0432\u0430\u0446\u0456\u0457 \u0431\u043E\u043D\u0443\u0441\u0443",
+    promo_placeholder: "\u041A\u043E\u0434, \u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434: WELCOME",
+    activate: "\u0410\u043A\u0442\u0438\u0432\u0443\u0432\u0430\u0442\u0438",
+    invite_friends: "\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u0438 \u0434\u0440\u0443\u0437\u0456\u0432",
+    // F&G
+    extreme_fear: "\u0415\u043A\u0441\u0442\u0440\u0435\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0441\u0442\u0440\u0430\u0445",
+    fear: "\u0421\u0442\u0440\u0430\u0445", neutral: "\u041D\u0435\u0439\u0442\u0440\u0430\u043B\u044C\u043D\u043E",
+    greed: "\u0416\u0430\u0434\u0456\u0431\u043D\u0456\u0441\u0442\u044C", extreme_greed: "\u0415\u043A\u0441\u0442\u0440\u0435\u043C\u0430\u043B\u044C\u043D\u0430 \u0436\u0430\u0434\u0456\u0431\u043D\u0456\u0441\u0442\u044C",
+    verdict: "\u0412\u0435\u0440\u0434\u0438\u043A\u0442", signals: "\u0421\u0438\u0433\u043D\u0430\u043B\u0438",
+    support_resistance: "\u041F\u0456\u0434\u0442\u0440\u0438\u043C\u043A\u0430 / \u041E\u043F\u0456\u0440",
+    volatility: "\u0412\u043E\u043B\u0430\u0442\u0438\u043B\u044C\u043D\u0456\u0441\u0442\u044C",
+    high_30d: "High 30D", low_30d: "Low 30D",
+    invested: "\u0406\u043D\u0432\u0435\u0441\u0442\u043E\u0432\u0430\u043D\u043E", portfolio_value: "\u0412\u0430\u0440\u0442\u0456\u0441\u0442\u044C \u043F\u043E\u0440\u0442\u0444\u0435\u043B\u044F",
+    avg_buy: "\u0421\u0435\u0440. \u0446\u0456\u043D\u0430 \u043A\u0443\u043F\u0456\u0432\u043B\u0456", num_buys: "\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C",
+    cmd_placeholder: "\u041F\u043E\u0448\u0443\u043A \u043F\u0430\u043D\u0435\u043B\u0435\u0439... (Ctrl+K)",
+    nothing_found: "\u041D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E",
+    panels_title_hunted: "\u0412\u043F\u043E\u043B\u044E\u0432\u0430\u043D\u043E",
+    panels_title_analytics: "\u0410\u043D\u0430\u043B\u0456\u0442\u0438\u043A\u0430",
+  }
+};
+
+function t(key) {
+  return (_i18n[_lang] && _i18n[_lang][key]) || (_i18n["en"] && _i18n["en"][key]) || key;
+}
+
+function setLang(lang) {
+  _lang = lang;
+  try { localStorage.setItem("ov_lang", lang) } catch(e){}
+  applyLang();
+}
+
+function applyLang() {
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll("[data-i18n]").forEach(function(el) {
+    var key = el.getAttribute("data-i18n");
+    var text = t(key);
+    if(el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+      el.placeholder = text;
+    } else {
+      el.textContent = text;
+    }
+  });
+  // Update lang toggle button
+  var btn = document.getElementById("langBtn");
+  if(btn) btn.textContent = _lang === "en" ? "UK" : "EN";
+}
+
+
+/* ═══ Splash Screen Controller ═══ */
+window.addEventListener("load", function() {
+  setTimeout(function() {
+    var splash = document.getElementById("splashScreen");
+    if(splash) {
+      splash.classList.add("hide");
+      setTimeout(function(){ splash.remove() }, 600);
+    }
+  }, 1800);
+});
+
+function loadRadar(cat){
   cat=cat||"crypto";
   fetch(API+"/api/radar/"+cat).then(function(r){return r.json()}).then(function(d){
     if(typeof updateRadarUI==="function")updateRadarUI(d);
@@ -6003,6 +6419,242 @@ function startPanelAutoRefresh(tabId) {
   }, cfg.interval);
 }
 
+
+
+
+
+/* ═══ AI Smart Alerts ═══ */
+var _smartAlertsCache = [];
+var _smartAlertsFilter = "all";
+
+async function loadSmartAlerts(){
+  try {
+    var resp = await fetch("/api/smart-alerts?limit=30");
+    if(!resp.ok) throw new Error("API error");
+    _smartAlertsCache = await resp.json();
+    renderSmartAlerts();
+    updateSmartAlertBadge();
+  } catch(e){
+    console.warn("loadSmartAlerts error:", e);
+    document.getElementById("smartAlertsList").innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Failed to load alerts. Try again later.</div>';
+  }
+}
+
+function renderSmartAlerts(){
+  var container = document.getElementById("smartAlertsList");
+  if(!container) return;
+  var filtered = _smartAlertsFilter === "all" ? _smartAlertsCache : _smartAlertsCache.filter(function(a){ return a.type === _smartAlertsFilter });
+
+  if(filtered.length === 0){
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">\U0001f50d No alerts found. AI is monitoring the market 24/7.</div>';
+    return;
+  }
+
+  var typeLabels = {volume_spike:"Volume Spike",price_breakout:"Breakout",sentiment_shift:"Sentiment",whale_move:"Whale",correlation_break:"Reversal"};
+  var html = "";
+  filtered.forEach(function(a){
+    var timeAgo = _timeAgo(a.created_at);
+    html += '<div class="smart-alert-card' + (a.is_read ? '' : ' unread') + '" onclick="markSmartAlertRead(' + a.id + ',this)">';
+    html += '<div class="sa-header">';
+    html += '<span class="sa-type ' + a.type + '">' + (typeLabels[a.type]||a.type) + '</span>';
+    html += '<span class="sa-severity ' + a.severity + '">' + a.severity.toUpperCase() + '</span>';
+    html += '<span style="flex:1"></span>';
+    html += '<span class="sa-time">' + timeAgo + '</span>';
+    html += '</div>';
+    html += '<div class="sa-title">' + _escHtml(a.title) + '</div>';
+    html += '<div class="sa-desc">' + _escHtml(a.description) + '</div>';
+    if(a.ai_analysis && a.ai_analysis !== a.description){
+      html += '<div class="sa-ai">' + _escHtml(a.ai_analysis) + '</div>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function filterSmartAlerts(type, btn){
+  _smartAlertsFilter = type;
+  document.querySelectorAll("#saFilters button").forEach(function(b){b.classList.remove("active")});
+  if(btn) btn.classList.add("active");
+  renderSmartAlerts();
+}
+
+async function markSmartAlertRead(id, el){
+  if(el) el.classList.remove("unread");
+  try {
+    await fetch("/api/smart-alerts/" + id + "/read", {method:"POST"});
+    var a = _smartAlertsCache.find(function(x){return x.id===id});
+    if(a) a.is_read = true;
+    updateSmartAlertBadge();
+  } catch(e){ console.warn("markRead error:", e) }
+}
+
+async function updateSmartAlertBadge(){
+  try {
+    var resp = await fetch("/api/smart-alerts/unread-count");
+    var data = await resp.json();
+    var badge = document.getElementById("smartAlertBadge");
+    if(badge){
+      if(data.count > 0){
+        badge.textContent = data.count > 9 ? "9+" : data.count;
+        badge.style.display = "flex";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+  } catch(e){ console.warn("smartAlertBadge error:", e) }
+}
+
+function _timeAgo(iso){
+  if(!iso) return "";
+  var diff = (Date.now() - new Date(iso+"Z").getTime()) / 1000;
+  if(diff < 60) return "just now";
+  if(diff < 3600) return Math.floor(diff/60) + "m ago";
+  if(diff < 86400) return Math.floor(diff/3600) + "h ago";
+  return Math.floor(diff/86400) + "d ago";
+}
+
+function _escHtml(s){
+  if(!s) return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// Auto-load smart alerts on tab switch and periodically
+setInterval(function(){ updateSmartAlertBadge() }, 120000);
+
+
+/* ═══ Onboarding Tour ═══ */
+function _getOnboardSteps(){
+  var isUk = (typeof _currentLang !== "undefined" && _currentLang === "uk");
+  return [
+    {
+      title: isUk ? "\U0001f44b \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u0434\u043E Omni-Vision!" : "\U0001f44b Welcome to Omni-Vision!",
+      text: isUk ? "\u041F\u043E\u043A\u0430\u0436\u0435\u043C\u043E \u043E\u0441\u043D\u043E\u0432\u043D\u0456 \u0444\u0443\u043D\u043A\u0446\u0456\u0457 \u0437\u0430 30 \u0441\u0435\u043A\u0443\u043D\u0434. \u0426\u0435 \u0434\u043E\u043F\u043E\u043C\u043E\u0436\u0435 \u043E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0432\u0456\u0434 \u043F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0438." : "Let me show you around. This tour takes 30 seconds and will help you get the most out of the platform.",
+      target: null, tab: null
+    },
+    {
+      title: isUk ? "\U0001f50d \u041A\u043E\u043C\u0430\u043D\u0434\u043D\u0430 \u043F\u0430\u043D\u0435\u043B\u044C" : "\U0001f50d Command Palette",
+      text: isUk ? "\u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C Ctrl+K \u0431\u0443\u0434\u044C-\u043A\u043E\u043B\u0438, \u0449\u043E\u0431 \u0448\u0432\u0438\u0434\u043A\u043E \u0437\u043D\u0430\u0439\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0438\u0439 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442." : "Press Ctrl+K anytime to quickly find any tool. Try it!",
+      target: "#cmdPaletteHint", tab: null
+    },
+    {
+      title: isUk ? "\U0001f4ca \u0421\u043A\u0440\u0438\u043D\u0435\u0440 \u0440\u0438\u043D\u043A\u0443" : "\U0001f4ca Market Screener",
+      text: isUk ? "\u0424\u0456\u043B\u044C\u0442\u0440\u0443\u0439\u0442\u0435 250+ \u043C\u043E\u043D\u0435\u0442 \u0437\u0430 \u0446\u0456\u043D\u043E\u044E, \u043E\u0431\u0441\u044F\u0433\u043E\u043C, \u043A\u0430\u043F\u0456\u0442\u0430\u043B\u0456\u0437\u0430\u0446\u0456\u0454\u044E. \u041A\u043B\u0456\u043A\u043D\u0456\u0442\u044C \u0440\u044F\u0434\u043E\u043A \u0434\u043B\u044F \u0434\u0435\u0442\u0430\u043B\u0435\u0439." : "Filter 250+ coins by price, volume, market cap. Sort by any column and click rows for details.",
+      target: "#tab-screener", tab: "screener"
+    },
+    {
+      title: isUk ? "\U0001f9e0 AI \u0420\u0430\u0434\u043D\u0438\u043A" : "\U0001f9e0 AI Advisor",
+      text: isUk ? "\u0417\u0430\u043F\u0438\u0442\u0430\u0439\u0442\u0435 \u0431\u0443\u0434\u044C-\u0449\u043E \u043F\u0440\u043E \u043A\u0440\u0438\u043F\u0442\u043E\u0440\u0438\u043D\u043E\u043A. AI \u0430\u043D\u0430\u043B\u0456\u0437\u0443\u0454 \u0434\u0430\u043D\u0456 \u0432 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u043C\u0443 \u0447\u0430\u0441\u0456." : "Ask anything about crypto markets. Our AI analyzes real-time data to give you insights.",
+      target: "#tab-advisor", tab: "advisor"
+    },
+    {
+      title: isUk ? "\U0001f525 \u0422\u0440\u0435\u043D\u0434\u0438 \u0456 Heatmap" : "\U0001f525 Trending & Heatmap",
+      text: isUk ? "\u0414\u0438\u0432\u0456\u0442\u044C\u0441\u044F, \u0449\u043E \u0437\u0430\u0440\u0430\u0437 \u0433\u0430\u0440\u044F\u0447\u0435. \u0422\u0440\u0435\u043D\u0434\u043E\u0432\u0456 \u043C\u043E\u043D\u0435\u0442\u0438 \u0442\u0430 \u0432\u0456\u0437\u0443\u0430\u043B\u044C\u043D\u0430 \u043A\u0430\u0440\u0442\u0430 \u0440\u0438\u043D\u043A\u0443." : "See what\u2019s hot right now. Trending coins from CoinGecko and visual market heatmap.",
+      target: "#tab-trending", tab: "trending"
+    },
+    {
+      title: isUk ? "\U0001f514 \u0426\u0456\u043D\u043E\u0432\u0456 \u0441\u043F\u043E\u0432\u0456\u0449\u0435\u043D\u043D\u044F" : "\U0001f514 Price Alerts",
+      text: isUk ? "\u0412\u0441\u0442\u0430\u043D\u043E\u0432\u0456\u0442\u044C \u0446\u0456\u043B\u044C\u043E\u0432\u0456 \u0446\u0456\u043D\u0438 \u0456 \u043E\u0442\u0440\u0438\u043C\u0443\u0439\u0442\u0435 \u0441\u043F\u043E\u0432\u0456\u0449\u0435\u043D\u043D\u044F \u0447\u0435\u0440\u0435\u0437 Telegram." : "Set price targets and get notified via Telegram when they trigger. Never miss a move.",
+      target: "#alertBadge", tab: null
+    },
+    {
+      title: isUk ? "\U0001f451 \u0413\u043E\u0442\u043E\u0432\u043E!" : "\U0001f451 You\u2019re all set!",
+      text: isUk ? "\u0414\u043E\u0441\u043B\u0456\u0434\u0436\u0443\u0439\u0442\u0435 34 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u0438 \u0432 \u0431\u0456\u0447\u043D\u0456\u0439 \u043F\u0430\u043D\u0435\u043B\u0456. \u041F\u0440\u043E\u043C\u043E\u043A\u043E\u0434 WELCOME \u2014 7 \u0434\u043D\u0456\u0432 Pro!" : "Explore 34 tools in the sidebar. Use promo code WELCOME for 7 days of Pro access!",
+      target: null, tab: "plans"
+    }
+  ];
+}
+var _onboardSteps = [];
+
+var _onboardIdx = 0;
+var _onboardOverlay = null;
+
+function startOnboarding() {
+  try {
+    if(localStorage.getItem("ov_onboard_done")) return;
+  } catch(e){}
+  _onboardSteps = _getOnboardSteps();
+  _onboardIdx = 0;
+  showOnboardStep();
+}
+
+function showOnboardStep() {
+  // Clean previous
+  if(_onboardOverlay) _onboardOverlay.remove();
+  document.querySelectorAll(".onboard-highlight").forEach(function(el){el.classList.remove("onboard-highlight")});
+
+  if(_onboardIdx >= _onboardSteps.length) {
+    finishOnboarding();
+    return;
+  }
+
+  var step = _onboardSteps[_onboardIdx];
+
+  // Switch tab if needed
+  if(step.tab) showTab(step.tab);
+
+  // Create overlay
+  _onboardOverlay = document.createElement("div");
+  _onboardOverlay.className = "onboard-overlay";
+  _onboardOverlay.onclick = function(e){ if(e.target === _onboardOverlay) nextOnboardStep() };
+
+  // Create tooltip
+  var tooltip = document.createElement("div");
+  tooltip.className = "onboard-tooltip";
+  tooltip.innerHTML = '<div class="onboard-step">Step ' + (_onboardIdx+1) + ' of ' + _onboardSteps.length + '</div>' +
+    '<h4>' + step.title + '</h4>' +
+    '<p>' + step.text + '</p>' +
+    '<div class="onboard-btns">' +
+    '<button class="ob-skip" onclick="finishOnboarding()">Skip</button>' +
+    '<button class="ob-next" onclick="nextOnboardStep()">' + (_onboardIdx === _onboardSteps.length-1 ? "Finish \u2713" : "Next \u2192") + '</button>' +
+    '</div>';
+
+  // Position tooltip
+  if(step.target) {
+    var target = document.querySelector(step.target);
+    if(target) {
+      target.classList.add("onboard-highlight");
+      var rect = target.getBoundingClientRect();
+      tooltip.style.top = Math.min(rect.bottom + 12, window.innerHeight - 200) + "px";
+      tooltip.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - 360)) + "px";
+    } else {
+      tooltip.style.top = "50%";
+      tooltip.style.left = "50%";
+      tooltip.style.transform = "translate(-50%, -50%)";
+    }
+  } else {
+    tooltip.style.top = "50%";
+    tooltip.style.left = "50%";
+    tooltip.style.transform = "translate(-50%, -50%)";
+  }
+
+  document.body.appendChild(_onboardOverlay);
+  document.body.appendChild(tooltip);
+  _onboardOverlay._tooltip = tooltip;
+}
+
+function nextOnboardStep() {
+  if(_onboardOverlay && _onboardOverlay._tooltip) _onboardOverlay._tooltip.remove();
+  _onboardIdx++;
+  showOnboardStep();
+}
+
+function finishOnboarding() {
+  if(_onboardOverlay) _onboardOverlay.remove();
+  if(_onboardOverlay && _onboardOverlay._tooltip) _onboardOverlay._tooltip.remove();
+  document.querySelectorAll(".onboard-highlight").forEach(function(el){el.classList.remove("onboard-highlight")});
+  _onboardOverlay = null;
+  try { localStorage.setItem("ov_onboard_done", "1") } catch(e){}
+  showTab("hunted");
+}
+
+// Auto-start onboarding for new users (after splash)
+setTimeout(function() {
+  try {
+    if(!localStorage.getItem("ov_onboard_done")) startOnboarding();
+  } catch(e){}
+}, 2500);
+
+
 /* ═══ Command Palette (Ctrl+K) ═══ */
 var cmdPaletteItems=[
   {icon:"\uD83C\uDFAF",label:"\u0412\u043F\u043E\u043B\u044E\u0432\u0430\u043D\u043E",tab:"hunted",desc:"\u0410\u0432\u0442\u043E-\u0441\u043A\u0430\u043D\u0435\u0440"},
@@ -6651,7 +7303,7 @@ function renderAnalytics(d){
 }
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", function(){
-  restoreTheme();
+  restoreTheme();applyLang();
   // Init coin pickers
   setTimeout(function(){
     window._indPicker=createCoinPicker("indCoinPicker","bitcoin",function(id){loadIndicators()});

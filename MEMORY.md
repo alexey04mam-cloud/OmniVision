@@ -155,5 +155,15 @@ hunted, analytics, deepanalytics, advisor, crypto, stocks, commodities, dex, flo
 - **Last Updated Timestamps**: Utility function for panel freshness indication.
 - **Total codebase**: ~12,883 lines (110 API endpoints, 34 panels, 222 JS functions)
 
+## Session 4 Improvements (2026-06-07)
+- **i18n System**: Full EN/UK translation object (100+ keys each), t() function, setLang(), applyLang(), language toggle button in header. English as primary language with Ukrainian toggle.
+- **Landing Page Redesign**: Live market preview (BTC/ETH/SOL prices from CoinGecko), Fear & Greed widget, testimonials section (3 reviews), promo banner with WELCOME code CTA, FAQ with 5 collapsible details, animated number counters.
+- **Design Polish**: Splash screen with CSS animations (auto-remove after 1.8s), fadeSlideIn tab transitions, card hover effects with translate, skeleton shimmer loading, button press animations, smooth scroll.
+- **Onboarding Tour**: 7-step guided tour for first-time users. Highlights: welcome, Ctrl+K palette, screener, AI advisor, trending, price alerts, finish with promo. Auto-starts on first visit, tracked via localStorage. Full EN/UK i18n support.
+- **AI Smart Alerts**: Background task scans market every 15 min. Detects: volume spikes (vol/mcap > 35%), price breakouts (>10% 1h / >20% 24h), trend reversals (opposite 1h vs 7d), extreme Fear & Greed (<15 or >85). AI generates analysis via Groq. SmartAlert DB model, 3 API endpoints (/api/smart-alerts, mark-read, unread-count). Frontend panel with filter buttons, severity badges, AI analysis cards, auto-badge in sidebar. Deduplication: max 1 alert per type+coin per 6 hours.
+- **Sidebar**: Added AI Smart Alerts nav item (35th panel)
+- **Command Palette**: Added AI Smart Alerts entry
+- **Total codebase**: ~12,161 lines (main.py: 4793, dashboard.html: 7368)
+
 ## Last Updated
-2026-06-06
+2026-06-07
