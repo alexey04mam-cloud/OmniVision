@@ -632,6 +632,9 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <p style="font-size:15px;color:var(--text-tertiary);margin:0">{{DASHBOARD_TITLE}}</p>
   </div>
 
+  <!-- Market Pulse -->
+  <div id="marketPulse" style="margin-bottom:16px"></div>
+
   <!-- Global Market Summary -->
   <div id="marketSummaryBlock" class="card" style="padding:14px 20px;margin-bottom:20px;background:linear-gradient(135deg,rgba(10,132,255,.04),rgba(100,210,255,.04));border:1px solid rgba(10,132,255,.12)">
    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -955,6 +958,8 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     </div>
     <div id="stocksTable"><p style="text-align:center;padding:40px 0;color:var(--text-tertiary)">Натисніть «Сканувати»</p></div>
    </div>
+  
+   <div id="stocksList" class="card" style="padding:20px;margin-top:16px"><p style="text-align:center;color:var(--text-tertiary)">Натисніть Оновити</p></div>
   </div>
 
   <!-- ═══ COMMODITIES ═══ -->
@@ -1122,6 +1127,12 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     <button onclick="aiAsk('Проаналізуй мій портфель та дай рекомендації')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">💼 Мій портфель</button>
     <button onclick="aiAsk('Які останні важливі новини в крипто?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">📰 Новини</button>
     <button onclick="aiAsk('Що таке DeFi та які проєкти цікаві зараз?')" class="btn-secondary btn-sm" style="white-space:nowrap;font-size:12px">🏦 DeFi</button>
+   </div>
+   <!-- Advisor recommendations (portfolio analysis) -->
+   <div id="advisorContent" style="display:none;margin-bottom:16px"></div>
+   <!-- AI typing indicator -->
+   <div id="aiTyping" style="display:none;padding:8px 16px;color:var(--text-tertiary);font-size:13px">
+    <span style="display:inline-flex;gap:4px;align-items:center"><span class="ws-live-dot"></span> AI думає...</span>
    </div>
    <!-- Chat messages -->
    <div id="aiChatMessages" class="card" style="padding:20px;min-height:300px;max-height:60vh;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:16px">
@@ -1728,6 +1739,8 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
  </div>
   <!-- ═══ ASSET DETAIL PAGE ═══ -->
   <div id="panel-asset" class="tab-panel">
+   <div id="assetVolChart" style="display:none;height:200px;margin-top:16px"></div>
+
    <div class="asset-page" id="assetPage">
     <button class="asset-back" onclick="closeAssetPage()">← Назад</button>
 
@@ -2121,7 +2134,7 @@ function loadCommChart(){
 }
 
 /* ── Heatmap ── */
-function loadHeatmap(category,targetId){
+function _loadHeatmapForTab(category,targetId){
  fetch(API+"/api/heatmap/"+category).then(function(r){return r.json()}).then(function(d){
   var el=document.getElementById(targetId);
   if(!d.assets||!d.assets.length){el.innerHTML='<p style="text-align:center;padding:20px;color:var(--text-tertiary);grid-column:1/-1">Немає даних</p>';return}
@@ -3386,6 +3399,8 @@ function addWallet(){
 /* ── AI Advisor ── */
 function loadAdvisor(){
  var el=document.getElementById("advisorContent");
+ if(!el)return;
+ el.style.display="block";
  el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Аналізую ринок...</p></div>';
  fetch(API+"/api/advisor").then(function(r){return r.json()}).then(function(d){
   if(!d||(!d.recommendations&&!d.summary)){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає рекомендацій</div>';return}
@@ -4885,7 +4900,7 @@ function loadCorrelation(days) {
    TECHNICAL INDICATORS
    ══════════════════════════════════════════════════════ */
 function loadIndicators() {
-  var coin = document.getElementById("indCoin").value;
+  var coin = (window._indPicker ? window._indPicker.getSelectedId() : "bitcoin");
   var wrap = document.getElementById("indicatorsResult");
   if(!wrap) return;
   wrap.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--text-tertiary)">\u0410\u043d\u0430\u043b\u0456\u0437...</div>';
@@ -6288,11 +6303,66 @@ function loadStocksData(){
     var el=document.getElementById("stocksList");
     if(!el)return;
     var stocks=d.stocks||d.data||[];
-    if(!stocks.length){el.innerHTML="<p style=\"text-align:center;padding:20px;color:var(--text-tertiary)\">No data</p>";return}
-  }).catch(function(){});
+    if(!stocks.length){el.innerHTML="<p style=\"text-align:center;padding:20px;color:var(--text-tertiary)\">\u041d\u0435\u043c\u0430\u0454 \u0434\u0430\u043d\u0438\u0445</p>";return}
+    var h='<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    h+='<thead><tr style="border-bottom:2px solid var(--bg-tertiary)">';
+    h+='<th style="padding:10px 8px;text-align:left;color:var(--text-tertiary);font-size:11px">Symbol</th>';
+    h+='<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">Price</th>';
+    h+='<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">Change</th>';
+    h+='<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">Volume</th>';
+    h+='</tr></thead><tbody>';
+    stocks.forEach(function(s){
+      var ch=s.change||s.change_pct||0;
+      h+='<tr style="border-bottom:1px solid var(--bg-tertiary)">';
+      h+='<td style="padding:10px 8px;font-weight:600;color:var(--text-primary)">'+(s.symbol||s.name||"")+'</td>';
+      h+='<td style="padding:10px 8px;text-align:right;color:var(--text-primary)">$'+fmtPrice(s.price||0)+'</td>';
+      h+='<td style="padding:10px 8px;text-align:right;color:'+(ch>=0?'var(--accent-green)':'var(--accent-red)')+';font-weight:600">'+(ch>=0?'+':'')+ch.toFixed(2)+'%</td>';
+      h+='<td style="padding:10px 8px;text-align:right;color:var(--text-secondary)">'+fmtVol(s.volume||0)+'</td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table>';
+    el.innerHTML=h;
+  }).catch(function(e){
+    var el=document.getElementById("stocksList");
+    if(el)el.innerHTML="<p style=\"text-align:center;padding:20px;color:var(--accent-red)\">"+e.message+"</p>";
+  });
 }
 function renderAnalytics(d){
-  /* Analytics data is rendered by existing loadMarketPulse and stats blocks */
+  if(!d)return;
+  /* Update stats on main page */
+  var el=document.getElementById("panel-analytics");
+  if(!el)return;
+  var wrap=el.querySelector(".analytics-data")||el;
+  if(!d.total_assets&&!d.market_summary)return;
+  var h="";
+  if(d.market_summary){
+    var ms=d.market_summary;
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px">';
+    h+='<div class="card" style="padding:20px;text-align:center"><p style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">\u0417;\u0430\u0433\u0430\u043b\u044c\u043d\u043e \u0430\u043a\u0442\u0438\u0432\u0456\u0432</p><p style="font-size:28px;font-weight:700;color:var(--accent-blue);margin:0">'+(d.total_assets||0)+'</p></div>';
+    h+='<div class="card" style="padding:20px;text-align:center"><p style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">\u0411\u0443\u043b\u043b\u0456\u0448;</p><p style="font-size:28px;font-weight:700;color:var(--accent-green);margin:0">'+(ms.bullish||0)+'</p></div>';
+    h+='<div class="card" style="padding:20px;text-align:center"><p style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">\u0411\u0435\u0440\u0456\u0448;</p><p style="font-size:28px;font-weight:700;color:var(--accent-red);margin:0">'+(ms.bearish||0)+'</p></div>';
+    h+='<div class="card" style="padding:20px;text-align:center"><p style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">Avg Change</p><p style="font-size:28px;font-weight:700;color:'+(ms.avg_change>=0?'var(--accent-green)':'var(--accent-red)')+';margin:0">'+(ms.avg_change>=0?'+':'')+ms.avg_change.toFixed(2)+'%</p></div>';
+    h+='</div>';
+  }
+  if(d.top_gainers&&d.top_gainers.length){
+    h+='<div class="card" style="padding:20px;margin-bottom:16px"><h3 style="font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 12px">\ud83d\udcc8 Top Gainers</h3><div style="display:grid;gap:8px">';
+    d.top_gainers.slice(0,5).forEach(function(g){
+      h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-tertiary)"><span style="font-weight:600;color:var(--text-primary)">'+g.symbol+'</span><span style="color:var(--accent-green);font-weight:600">+'+(g.change_pct||0).toFixed(1)+'%</span></div>';
+    });
+    h+='</div></div>';
+  }
+  if(d.top_losers&&d.top_losers.length){
+    h+='<div class="card" style="padding:20px;margin-bottom:16px"><h3 style="font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 12px">\ud83d\udcc9 Top Losers</h3><div style="display:grid;gap:8px">';
+    d.top_losers.slice(0,5).forEach(function(g){
+      h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-tertiary)"><span style="font-weight:600;color:var(--text-primary)">'+g.symbol+'</span><span style="color:var(--accent-red);font-weight:600">'+(g.change_pct||0).toFixed(1)+'%</span></div>';
+    });
+    h+='</div></div>';
+  }
+  if(h){
+    var dataDiv=el.querySelector(".analytics-data");
+    if(!dataDiv){dataDiv=document.createElement("div");dataDiv.className="analytics-data";el.appendChild(dataDiv)}
+    dataDiv.innerHTML=h;
+  }
 }
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", function(){
@@ -6337,6 +6407,17 @@ document.addEventListener("DOMContentLoaded", function(){
 
 <!-- Toast notifications -->
 <div id="toastBox" style="position:fixed;bottom:80px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
+
+<!-- PWA Install Banner -->
+<div id="pwaInstallBanner" class="pwa-install-banner">
+ <span style="font-size:28px">&#x1F4F1;</span>
+ <div style="flex:1">
+  <div style="font-size:14px;font-weight:600;color:var(--text-primary)">Встановити Omni-Vision</div>
+  <div style="font-size:12px;color:var(--text-tertiary)">Додай на головний екран для швидкого доступу</div>
+ </div>
+ <button onclick="installPWA()" class="btn-primary" style="padding:8px 16px;font-size:13px">Встановити</button>
+ <button onclick="dismissPWA()" style="background:none;border:none;color:var(--text-tertiary);font-size:18px;cursor:pointer;padding:4px">&#x2715;</button>
+</div>
 
 <!-- Mobile Bottom Nav -->
 <div class="mobile-bottom-nav">
