@@ -262,6 +262,28 @@ class Payment(Base):
     confirmed_at = Column(DateTime, nullable=True)
     owner = relationship("User")
 
+class PromoCode(Base):
+    __tablename__ = "promo_codes"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(64), unique=True, nullable=False, index=True)
+    promo_type = Column(String(32), nullable=False)  # upgrade / discount / trial
+    tier = Column(String(16), nullable=True)  # pro / vip (for upgrade type)
+    discount_pct = Column(Integer, nullable=True)  # 10-100 (for discount type)
+    duration_days = Column(Integer, default=30)
+    max_uses = Column(Integer, default=1)  # 0 = unlimited
+    used_count = Column(Integer, default=0)
+    is_active = Column(Integer, default=1)
+    created_by = Column(String(64), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class PromoUsage(Base):
+    __tablename__ = "promo_usage"
+    id = Column(Integer, primary_key=True, index=True)
+    promo_id = Column(Integer, ForeignKey("promo_codes.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    activated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 Base.metadata.create_all(bind=engine)
 
 # Auto-migrate: add tier columns if missing
@@ -2040,6 +2062,182 @@ def payment_history(request: Request, db: Session = Depends(get_db)):
              "created_at": p.created_at.isoformat() if p.created_at else None} for p in payments]
 
 # ──── Boss API (admin only via header) ────
+
+# ══════ PROMO CODES ══════
+
+class PromoActivate(BaseModel):
+    code: str
+
+class PromoCreate(BaseModel):
+    code: str
+    promo_type: str = "upgrade"  # upgrade / discount / trial
+    tier: str = "pro"
+    discount_pct: int = 0
+    duration_days: int = 30
+    max_uses: int = 1
+    expires_in_days: int = 0  # 0 = no expiry
+
+@app.post("/api/promo/activate")
+def activate_promo(request: Request, body: PromoActivate, db: Session = Depends(get_db)):
+    """Activate a promo code for the current user"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Login required")
+    
+    promo_code = body.code.strip().upper()
+    promo = db.query(PromoCode).filter(
+        PromoCode.code == promo_code,
+        PromoCode.is_active == 1
+    ).first()
+    
+    if not promo:
+        return {"status": "error", "message": "Промокод не знайдено або він неактивний"}
+    
+    # Check expiry
+    if promo.expires_at and datetime.now(timezone.utc) > promo.expires_at:
+        return {"status": "error", "message": "Термін дії промокоду закінчився"}
+    
+    # Check max uses
+    if promo.max_uses > 0 and promo.used_count >= promo.max_uses:
+        return {"status": "error", "message": "Промокод вже використано максимальну кількість разів"}
+    
+    # Check if user already used this promo
+    already_used = db.query(PromoUsage).filter(
+        PromoUsage.promo_id == promo.id,
+        PromoUsage.user_id == user["uid"]
+    ).first()
+    if already_used:
+        return {"status": "error", "message": "Ви вже використали цей промокод"}
+    
+    # Apply promo
+    db_user = db.query(User).filter(User.id == user["uid"]).first()
+    if not db_user:
+        raise HTTPException(404)
+    
+    from datetime import timedelta
+    result = {"status": "ok", "promo_type": promo.promo_type}
+    
+    if promo.promo_type == "upgrade":
+        # Direct tier upgrade
+        target_tier = promo.tier or "pro"
+        db_user.tier = target_tier
+        db_user.tier_expires = datetime.now(timezone.utc) + timedelta(days=promo.duration_days)
+        result["tier"] = target_tier
+        result["days"] = promo.duration_days
+        result["message"] = f"Вітаємо! {target_tier.upper()} активовано на {promo.duration_days} днів!"
+    
+    elif promo.promo_type == "trial":
+        # Free trial of a tier
+        target_tier = promo.tier or "pro"
+        db_user.tier = target_tier
+        db_user.tier_expires = datetime.now(timezone.utc) + timedelta(days=promo.duration_days)
+        result["tier"] = target_tier
+        result["days"] = promo.duration_days
+        result["message"] = f"Тріал {target_tier.upper()} активовано на {promo.duration_days} днів!"
+    
+    elif promo.promo_type == "discount":
+        # Store discount for next payment
+        result["discount"] = promo.discount_pct
+        result["message"] = f"Знижка {promo.discount_pct}% буде застосована при наступній оплаті!"
+    
+    # Record usage
+    usage = PromoUsage(promo_id=promo.id, user_id=user["uid"])
+    db.add(usage)
+    promo.used_count += 1
+    db.commit()
+    
+    return result
+
+@app.post("/api/admin/promo/create")
+def admin_create_promo(request: Request, body: PromoCreate, db: Session = Depends(get_db)):
+    """Admin-only: create a promo code"""
+    admin = get_current_user(request)
+    if not admin:
+        raise HTTPException(401)
+    db_admin = db.query(User).filter(User.id == admin["uid"]).first()
+    if not db_admin or (db_admin.is_admin != 1 and db_admin.username != ADMIN_USER):
+        raise HTTPException(403, "Admin only")
+    
+    promo_code = body.code.strip().upper()
+    
+    # Check if code already exists
+    existing = db.query(PromoCode).filter(PromoCode.code == promo_code).first()
+    if existing:
+        return {"status": "error", "message": "Код вже існує"}
+    
+    from datetime import timedelta
+    promo = PromoCode(
+        code=promo_code,
+        promo_type=body.promo_type,
+        tier=body.tier if body.promo_type in ("upgrade", "trial") else None,
+        discount_pct=body.discount_pct if body.promo_type == "discount" else None,
+        duration_days=body.duration_days,
+        max_uses=body.max_uses,
+        created_by=admin.get("user", "admin"),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=body.expires_in_days) if body.expires_in_days > 0 else None
+    )
+    db.add(promo)
+    db.commit()
+    
+    return {
+        "status": "ok",
+        "code": promo_code,
+        "type": body.promo_type,
+        "tier": body.tier,
+        "duration_days": body.duration_days,
+        "max_uses": body.max_uses,
+        "message": f"Промокод {promo_code} створено!"
+    }
+
+@app.get("/api/admin/promo/list")
+def admin_list_promos(request: Request, db: Session = Depends(get_db)):
+    """Admin-only: list all promo codes"""
+    admin = get_current_user(request)
+    if not admin:
+        raise HTTPException(401)
+    db_admin = db.query(User).filter(User.id == admin["uid"]).first()
+    if not db_admin or (db_admin.is_admin != 1 and db_admin.username != ADMIN_USER):
+        raise HTTPException(403, "Admin only")
+    
+    promos = db.query(PromoCode).order_by(PromoCode.created_at.desc()).all()
+    return {
+        "promos": [
+            {
+                "id": p.id,
+                "code": p.code,
+                "type": p.promo_type,
+                "tier": p.tier,
+                "discount_pct": p.discount_pct,
+                "duration_days": p.duration_days,
+                "max_uses": p.max_uses,
+                "used_count": p.used_count,
+                "is_active": bool(p.is_active),
+                "expires_at": p.expires_at.isoformat() if p.expires_at else None,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "created_by": p.created_by,
+            }
+            for p in promos
+        ]
+    }
+
+@app.post("/api/admin/promo/toggle/{promo_id}")
+def admin_toggle_promo(request: Request, promo_id: int, db: Session = Depends(get_db)):
+    """Admin-only: enable/disable promo code"""
+    admin = get_current_user(request)
+    if not admin:
+        raise HTTPException(401)
+    db_admin = db.query(User).filter(User.id == admin["uid"]).first()
+    if not db_admin or (db_admin.is_admin != 1 and db_admin.username != ADMIN_USER):
+        raise HTTPException(403, "Admin only")
+    
+    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+    if not promo:
+        raise HTTPException(404, "Promo not found")
+    
+    promo.is_active = 0 if promo.is_active else 1
+    db.commit()
+    return {"status": "ok", "is_active": bool(promo.is_active)}
+
 
 @app.get("/boss_panel", dependencies=[Depends(verify_boss_key)])
 def boss_panel(lang: str = Query(DEFAULT_LANG, pattern="^(ukr|eng|rus)$"), db: Session = Depends(get_db)):

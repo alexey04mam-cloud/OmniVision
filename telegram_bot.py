@@ -698,6 +698,50 @@ async def handle_callback(callback_query, db_session_factory=None):
 # UPDATE PROCESSOR
 # ══════════════════════════════════════════
 
+
+async def cmd_promo(chat_id, args: str):
+    """Activate a promo code via Telegram"""
+    promo_code = args.strip().upper()
+    if not promo_code:
+        await send_message(chat_id,
+            "🎫 <b>Промокод</b>\n\n"
+            "Введіть: /promo КОД\n\n"
+            "Наприклад: <code>/promo WELCOME30</code>\n\n"
+            "Промокоди дають безкоштовний доступ до Pro/VIP тарифів!")
+        return
+    
+    site_url = os.getenv("SITE_URL", "")
+    if not site_url:
+        await send_message(chat_id,
+            "🎫 Активуйте промокод <code>" + promo_code + "</code> на сайті:\n"
+            "Тарифи → Промокод → Активувати")
+        return
+    
+    # Try to activate via API
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                f"{site_url}/api/promo/activate",
+                json={"code": promo_code}
+            )
+            d = r.json()
+            if d.get("status") == "ok":
+                msg = d.get("message", "Промокод активовано!")
+                tier = d.get("tier", "")
+                days = d.get("days", 0)
+                await send_message(chat_id,
+                    "🎉 <b>" + msg + "</b>\n\n"
+                    + ("👑 Тариф: <b>" + tier.upper() + "</b>\n" if tier else "")
+                    + ("📅 Днів: <b>" + str(days) + "</b>\n" if days else "")
+                    + "\nВідкрийте сайт для використання!")
+            else:
+                error = d.get("message", "Невірний промокод")
+                await send_message(chat_id, "❌ " + error)
+    except Exception as e:
+        await send_message(chat_id,
+            "🎫 Активуйте промокод <code>" + promo_code + "</code> на сайті:\n"
+            "Тарифи → Промокод → Активувати")
+
 async def process_update(update: dict, db_session_factory=None):
     """Process a single Telegram update"""
     if "message" in update:
@@ -742,6 +786,10 @@ async def process_update(update: dict, db_session_factory=None):
             await cmd_post_channel(chat_id)
         elif text.startswith("/premium"):
             await cmd_premium(chat_id)
+        elif text.startswith("/promo "):
+            await cmd_promo(chat_id, text[7:])
+        elif text.startswith("/promo"):
+            await cmd_promo(chat_id, "")
         elif text.startswith("/help"):
             await send_message(chat_id,
                 "📋 <b>Команди:</b>\n\n"
@@ -755,6 +803,7 @@ async def process_update(update: dict, db_session_factory=None):
                 "/premium — Преміум плани\n"
                 "/digest — Дайджест ринку\n"
                 "/post — Опублікувати в канал (admin)\n"
+                "/promo КОД — Активувати промокод\n"
                 "/help — Ця довідка")
         else:
             # Unknown command — show menu

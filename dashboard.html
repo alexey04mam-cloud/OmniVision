@@ -1721,8 +1721,26 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     </div>
    </div>
    <div class="card" style="padding:24px;text-align:center">
-    <p style="font-size:14px;color:var(--text-tertiary);margin:0">Ваш поточний план: <span id="currentPlanLabel" class="tier-badge" style="font-size:12px">—</span></p>
+    <p style="font-size:14px;color:var(--text-tertiary);margin:0">&#x0412;&#x0430;&#x0448; &#x043f;&#x043e;&#x0442;&#x043e;&#x0447;&#x043d;&#x0438;&#x0439; &#x043f;&#x043b;&#x0430;&#x043d;: <span id="currentPlanLabel" class="tier-badge" style="font-size:12px">&#x2014;</span></p>
     <p id="planExpires" style="font-size:12px;color:var(--text-tertiary);margin:8px 0 0"></p>
+   </div>
+
+   <!-- Promo Code -->
+   <div class="card" style="padding:24px;margin-top:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+     <span style="font-size:24px">&#x1F3AB;</span>
+     <div>
+      <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">&#x041f;&#x0440;&#x043e;&#x043c;&#x043e;&#x043a;&#x043e;&#x0434;</h3>
+      <p style="font-size:12px;color:var(--text-tertiary);margin:2px 0 0">&#x0412;&#x0432;&#x0435;&#x0434;&#x0456;&#x0442;&#x044c; &#x043a;&#x043e;&#x0434; &#x0434;&#x043b;&#x044f; &#x0430;&#x043a;&#x0442;&#x0438;&#x0432;&#x0430;&#x0446;&#x0456;&#x0457; &#x0431;&#x043e;&#x043d;&#x0443;&#x0441;&#x0443;</p>
+     </div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:stretch">
+     <div style="flex:1;position:relative">
+      <input id="promoCodeInput" type="text" placeholder="&#x041a;&#x043e;&#x0434;, &#x043d;&#x0430;&#x043f;&#x0440;&#x0438;&#x043a;&#x043b;&#x0430;&#x0434;: WELCOME30" class="input-field" style="width:100%;padding:14px 16px;font-size:15px;text-transform:uppercase;letter-spacing:2px;font-weight:600" onkeydown="if(event.key===&#39;Enter&#39;)activatePromo()">
+     </div>
+     <button onclick="activatePromo()" id="promoActivateBtn" class="btn-primary" style="background:linear-gradient(135deg,var(--accent-green),var(--accent-cyan));padding:14px 28px;font-size:14px;font-weight:700;white-space:nowrap">&#x0410;&#x043a;&#x0442;&#x0438;&#x0432;&#x0443;&#x0432;&#x0430;&#x0442;&#x0438;</button>
+    </div>
+    <div id="promoResult" style="margin-top:12px;display:none"></div>
    </div>
   </div>
 
@@ -3866,6 +3884,48 @@ function togglePush(on){
 
 
 /* ══ Premium Plans ══ */
+
+/* ══════ PROMO CODE ══════ */
+function activatePromo(){
+  var input=document.getElementById("promoCodeInput");
+  var btn=document.getElementById("promoActivateBtn");
+  var result=document.getElementById("promoResult");
+  if(!input||!btn)return;
+  var code=input.value.trim();
+  if(!code){showToast("\u0412\u0432\u0435\u0434\u0456\u0442\u044c \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434",false);input.focus();return}
+  btn.disabled=true;btn.textContent="\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u044f\u044e...";
+  fetch(API+"/api/promo/activate",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code:code})
+  }).then(function(r){return r.json()}).then(function(d){
+    btn.disabled=false;btn.textContent="\u0410\u043a\u0442\u0438\u0432\u0443\u0432\u0430\u0442\u0438";
+    if(result){
+      result.style.display="block";
+      if(d.status==="ok"){
+        var icon=d.promo_type==="upgrade"?"\ud83c\udf89":d.promo_type==="trial"?"\u23f0":"\ud83d\udcb0";
+        result.innerHTML='<div style="padding:16px;background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.2);border-radius:12px;text-align:center">'
+          +'<div style="font-size:32px;margin-bottom:8px">'+icon+'</div>'
+          +'<p style="font-size:15px;font-weight:700;color:var(--accent-green);margin:0 0 4px">'+d.message+'</p>'
+          +(d.tier?'<p style="font-size:13px;color:var(--text-tertiary);margin:0">\u0422\u0430\u0440\u0438\u0444: <b>'+d.tier.toUpperCase()+'</b>'+(d.days?' \u2022 '+d.days+' \u0434\u043d\u0456\u0432':'')+'</p>':'')
+          +(d.discount?'<p style="font-size:13px;color:var(--text-tertiary);margin:0">\u0417\u043d\u0438\u0436\u043a\u0430: <b>'+d.discount+'%</b></p>':'')
+          +'</div>';
+        input.value="";
+        showToast(d.message,true);
+        /* Refresh tier info */
+        setTimeout(function(){loadTierInfo()},500);
+      }else{
+        result.innerHTML='<div style="padding:12px;background:rgba(255,69,58,.08);border:1px solid rgba(255,69,58,.2);border-radius:12px;text-align:center">'
+          +'<p style="font-size:14px;color:var(--accent-red);margin:0">\u2717 '+(d.message||"\u041f\u043e\u043c\u0438\u043b\u043a\u0430")+'</p></div>';
+        showToast(d.message||"\u041d\u0435\u0432\u0456\u0440\u043d\u0438\u0439 \u043a\u043e\u0434",false);
+      }
+    }
+  }).catch(function(e){
+    btn.disabled=false;btn.textContent="\u0410\u043a\u0442\u0438\u0432\u0443\u0432\u0430\u0442\u0438";
+    showToast(e.message,false);
+  });
+}
+
 function loadTierInfo(){
  fetch(API+"/api/tier").then(function(r){return r.json()}).then(function(d){
   var tier=d.tier||"free";
@@ -3906,7 +3966,13 @@ function requestUpgrade(tier){
   +'<button onclick="payWithCryptoBot(\x27'+tier+'\x27)" style="display:flex;align-items:center;gap:14px;padding:18px 16px;background:linear-gradient(135deg,rgba(10,132,255,.1),rgba(191,90,242,.1));border:1px solid rgba(10,132,255,.2);border-radius:14px;color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:600;width:100%;text-align:left;transition:transform .15s"><div><span style="font-size:22px">💳</span></div><div style="flex:1"><div>Карта / Apple Pay / Google Pay</div><div style="font-size:11px;color:var(--text-tertiary);font-weight:400;margin-top:2px">Visa, Mastercard, крипто</div></div><span style="color:var(--accent-green);font-size:12px">★ Рекомендовано</span></button>'
   +'<button onclick="payWithStars(\x27'+tier+'\x27)" style="display:flex;align-items:center;gap:14px;padding:18px 16px;background:rgba(255,214,10,.06);border:1px solid rgba(255,214,10,.15);border-radius:14px;color:var(--text-primary);cursor:pointer;font-size:15px;font-weight:600;width:100%;text-align:left;transition:transform .15s"><div><span style="font-size:22px">⭐</span></div><div style="flex:1"><div>Telegram Stars</div><div style="font-size:11px;color:var(--text-tertiary);font-weight:400;margin-top:2px">Оплата через Telegram</div></div></button>'
   +'</div>'
-  +'<button onclick="this.closest(\x27#payChoiceOverlay\x27).remove()" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;width:100%;margin-top:20px;padding:8px">Скасувати</button>'
+  +'<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-primary)">'
+  +'<div style="display:flex;gap:8px">'
+  +'<input id="payPromoInput" type="text" placeholder="\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434" class="input-field" style="flex:1;padding:10px 14px;font-size:13px;text-transform:uppercase;letter-spacing:1px" onkeydown="if(event.key===\x27Enter\x27)activatePromo()">'
+  +'<button onclick="var i=document.getElementById(\x27payPromoInput\x27);if(i){document.getElementById(\x27promoCodeInput\x27).value=i.value;activatePromo();this.closest(\x27#payChoiceOverlay\x27).remove()}" class="btn-secondary" style="padding:10px 16px;font-size:12px">\u0410\u043a\u0442\u0438\u0432\u0443\u0432\u0430\u0442\u0438</button>'
+  +'</div>'
+  +'</div>'
+  +'<button onclick="this.closest(\x27#payChoiceOverlay\x27).remove()" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;width:100%;margin-top:12px;padding:8px">\u0421\u043a\u0430\u0441\u0443\u0432\u0430\u0442\u0438</button>'
   +'</div>';
  document.body.appendChild(overlay);
 }
