@@ -436,8 +436,49 @@ async def background_hunter():
             hunt_status["running"] = False
         await asyncio.sleep(HUNT_INTERVAL)
 
+
+def seed_default_promos():
+    """Create default promo codes if they don't exist"""
+    db = SessionLocal()
+    try:
+        defaults = [
+            {"code": "WELCOME", "promo_type": "trial", "tier": "pro", "duration_days": 7, "max_uses": 0,
+             "created_by": "system"},
+            {"code": "FIRST30", "promo_type": "discount", "tier": None, "discount_pct": 30, "duration_days": 30,
+             "max_uses": 0, "created_by": "system"},
+            {"code": "VIP7DAYS", "promo_type": "trial", "tier": "vip", "duration_days": 7, "max_uses": 0,
+             "created_by": "system"},
+            {"code": "TRYPR0", "promo_type": "trial", "tier": "pro", "duration_days": 3, "max_uses": 100,
+             "created_by": "system"},
+            {"code": "LAUNCH2026", "promo_type": "trial", "tier": "vip", "duration_days": 14, "max_uses": 50,
+             "created_by": "system"},
+        ]
+        for d in defaults:
+            existing = db.query(PromoCode).filter(PromoCode.code == d["code"]).first()
+            if not existing:
+                promo = PromoCode(
+                    code=d["code"],
+                    promo_type=d["promo_type"],
+                    tier=d.get("tier"),
+                    discount_pct=d.get("discount_pct"),
+                    duration_days=d.get("duration_days", 30),
+                    max_uses=d.get("max_uses", 0),
+                    is_active=1,
+                    created_by=d.get("created_by", "system"),
+                )
+                db.add(promo)
+        db.commit()
+        log.info("[Promo] Default promo codes seeded")
+    except Exception as e:
+        db.rollback()
+        log.error(f"[Promo] Seed error: {e}")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app):
+    seed_default_promos()
     task = None
     tg_task = None
     if HUNT_INTERVAL > 0:

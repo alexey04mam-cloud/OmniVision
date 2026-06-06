@@ -1742,6 +1742,78 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     </div>
     <div id="promoResult" style="margin-top:12px;display:none"></div>
    </div>
+
+   <!-- Admin Promo Panel (visible only to admin) -->
+   <div id="adminPromoPanel" style="display:none;margin-top:24px">
+    <div class="card" style="padding:24px">
+     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+       <span style="font-size:24px">&#x2699;&#xFE0F;</span>
+       <div>
+        <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0">&#x0410;&#x0434;&#x043C;&#x0456;&#x043D;-&#x043F;&#x0430;&#x043D;&#x0435;&#x043B;&#x044C; &#x043F;&#x0440;&#x043E;&#x043C;&#x043E;&#x043A;&#x043E;&#x0434;&#x0456;&#x0432;</h3>
+        <p style="font-size:12px;color:var(--text-tertiary);margin:2px 0 0">&#x0421;&#x0442;&#x0432;&#x043E;&#x0440;&#x044E;&#x0439;&#x0442;&#x0435; &#x0442;&#x0430; &#x043A;&#x0435;&#x0440;&#x0443;&#x0439;&#x0442;&#x0435; &#x043F;&#x0440;&#x043E;&#x043C;&#x043E;&#x043A;&#x043E;&#x0434;&#x0430;&#x043C;&#x0438;</p>
+       </div>
+      </div>
+      <button onclick="loadAdminPromos()" class="btn-secondary" style="font-size:12px;padding:8px 16px">&#x27F3; &#x041E;&#x043D;&#x043E;&#x0432;&#x0438;&#x0442;&#x0438;</button>
+     </div>
+
+     <!-- Create new promo form -->
+     <div style="background:var(--bg-secondary);border-radius:12px;padding:16px;margin-bottom:20px">
+      <p style="font-size:13px;font-weight:600;color:var(--text-primary);margin:0 0 12px">&#x2795; &#x0421;&#x0442;&#x0432;&#x043E;&#x0440;&#x0438;&#x0442;&#x0438; &#x043D;&#x043E;&#x0432;&#x0438;&#x0439; &#x043F;&#x0440;&#x043E;&#x043C;&#x043E;&#x043A;&#x043E;&#x0434;</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+       <div>
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x041A;&#x043E;&#x0434;</label>
+        <input id="adminPromoCode" type="text" class="input-field" placeholder="MYCODE" style="width:100%;padding:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600">
+       </div>
+       <div>
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x0422;&#x0438;&#x043F;</label>
+        <select id="adminPromoType" class="input-field" style="width:100%;padding:10px" onchange="adminPromoTypeChanged()">
+         <option value="trial">Trial (&#x0431;&#x0435;&#x0437;&#x043A;&#x043E;&#x0448;&#x0442;&#x043E;&#x0432;&#x043D;&#x0438;&#x0439; &#x0434;&#x043E;&#x0441;&#x0442;&#x0443;&#x043F;)</option>
+         <option value="upgrade">Upgrade (&#x043F;&#x0456;&#x0434;&#x0432;&#x0438;&#x0449;&#x0435;&#x043D;&#x043D;&#x044F;)</option>
+         <option value="discount">Discount (&#x0437;&#x043D;&#x0438;&#x0436;&#x043A;&#x0430;)</option>
+        </select>
+       </div>
+       <div>
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x0422;&#x0430;&#x0440;&#x0438;&#x0444;</label>
+        <select id="adminPromoTier" class="input-field" style="width:100%;padding:10px">
+         <option value="pro">Pro</option>
+         <option value="vip">VIP</option>
+        </select>
+       </div>
+       <div id="adminDiscountWrap" style="display:none">
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x0417;&#x043D;&#x0438;&#x0436;&#x043A;&#x0430; %</label>
+        <input id="adminPromoDiscount" type="number" class="input-field" placeholder="30" min="5" max="100" style="width:100%;padding:10px">
+       </div>
+       <div>
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x0414;&#x043D;&#x0456;</label>
+        <input id="adminPromoDays" type="number" class="input-field" value="7" min="1" max="365" style="width:100%;padding:10px">
+       </div>
+       <div>
+        <label style="font-size:11px;color:var(--text-tertiary);display:block;margin-bottom:4px">&#x041C;&#x0430;&#x043A;&#x0441;. &#x0432;&#x0438;&#x043A;&#x043E;&#x0440;&#x0438;&#x0441;&#x0442;&#x0430;&#x043D;&#x044C; (0=&#x221E;)</label>
+        <input id="adminPromoMaxUses" type="number" class="input-field" value="0" min="0" style="width:100%;padding:10px">
+       </div>
+      </div>
+      <button onclick="createAdminPromo()" class="btn-primary" style="margin-top:12px;background:linear-gradient(135deg,var(--accent-green),var(--accent-cyan));padding:10px 24px;font-size:13px">&#x0421;&#x0442;&#x0432;&#x043E;&#x0440;&#x0438;&#x0442;&#x0438;</button>
+     </div>
+
+     <!-- Promo list table -->
+     <div style="overflow-x:auto">
+      <table id="adminPromoTable" style="width:100%;border-collapse:collapse;font-size:13px">
+       <thead>
+        <tr style="border-bottom:1px solid var(--border-color)">
+         <th style="padding:10px 8px;text-align:left;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x041A;&#x043E;&#x0434;</th>
+         <th style="padding:10px 8px;text-align:left;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x0422;&#x0438;&#x043F;</th>
+         <th style="padding:10px 8px;text-align:center;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x0414;&#x043D;&#x0456;</th>
+         <th style="padding:10px 8px;text-align:center;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x0412;&#x0438;&#x043A;&#x043E;&#x0440;.</th>
+         <th style="padding:10px 8px;text-align:center;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x0421;&#x0442;&#x0430;&#x0442;&#x0443;&#x0441;</th>
+         <th style="padding:10px 8px;text-align:center;color:var(--text-tertiary);font-weight:600;font-size:11px">&#x0414;&#x0456;&#x044F;</th>
+        </tr>
+       </thead>
+       <tbody id="adminPromoBody"></tbody>
+      </table>
+     </div>
+    </div>
+   </div>
   </div>
 
   <!-- ═══ NEWS ═══ -->
@@ -1902,7 +1974,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
   cat=cat||"crypto";
   fetch(API+"/api/radar/"+cat).then(function(r){return r.json()}).then(function(d){
     if(typeof updateRadarUI==="function")updateRadarUI(d);
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1958,7 +2030,7 @@ function showTab(n){
  if(n==="hunted"&&typeof loadMarketPulse==="function")loadMarketPulse();
  if(n==="crypto"&&typeof loadCryptoChart==="function")loadCryptoChart();
  if(n==="stocks"){if(typeof loadStocksData==="function")loadStocksData();}
- if(n==="analytics"){fetch(API+"/api/analytics").then(function(r){return r.json()}).then(function(d){if(typeof renderAnalytics==="function")renderAnalytics(d)}).catch(function(){});}
+ if(n==="analytics"){fetch(API+"/api/analytics").then(function(r){return r.json()}).then(function(d){if(typeof renderAnalytics==="function")renderAnalytics(d)}).catch(function(e){console.warn("[OV]",e)});}
  if(n==="screener"&&!document.getElementById("screenerResult").innerHTML.trim())runScreener();
  if(n==="heatmap"&&typeof loadHeatmap==="function")loadHeatmap();
  if(n==="correlation"&&typeof loadCorrelation==="function")loadCorrelation();
@@ -2007,7 +2079,7 @@ function loadTicker(){
    }
   }
   track.innerHTML=html;
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 
@@ -2116,7 +2188,7 @@ function loadCryptoChart(){
   var chEl=document.getElementById("cryptoChartChange");chEl.textContent=chIcon(d.change_pct)+" "+chS(d.change_pct);chEl.style.cssText=chC(d.change_pct);
   if(d.data.length>0){buildChart("cryptoMainChart",d.data);buildRSI("cryptoRsiChart",d.data)}
   else{document.getElementById("cryptoChartPrice").textContent="Немає даних"}
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ── Stock Chart ── */
@@ -2129,7 +2201,7 @@ function loadStockChart(){
   document.getElementById("stockChartPrice").textContent=fmtPrice(d.current_price);
   var chEl=document.getElementById("stockChartChange");chEl.textContent=chIcon(d.change_pct)+" "+chS(d.change_pct);chEl.style.cssText=chC(d.change_pct);
   if(d.data.length>0){buildChart("stockMainChart",d.data);buildRSI("stockRsiChart",d.data)}
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ── Commodity Chart ── */
@@ -2141,13 +2213,13 @@ function loadCommChart(){
   document.getElementById("commChartPrice").textContent=fmtPrice(d.current_price);
   var chEl=document.getElementById("commChartChange");chEl.textContent=chIcon(d.change_pct)+" "+chS(d.change_pct);chEl.style.cssText=chC(d.change_pct);
   if(d.data.length>0) buildChart("commMainChart",d.data);
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
  // Mini sparklines
  ["GOLD","OIL","GAS"].forEach(function(sym){
   var ids={GOLD:{canvas:"goldMini",price:"goldPrice"},OIL:{canvas:"oilMini",price:"oilPrice"},GAS:{canvas:"gasMini",price:"gasPrice"}};
   fetch(API+"/api/chart/"+sym+"?period=1d").then(function(r){return r.json()}).then(function(d){
    if(d.data.length>0){buildSparkline(ids[sym].canvas,d.data);document.getElementById(ids[sym].price).textContent=fmtPrice(d.current_price)}
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
  });
 }
 
@@ -2166,7 +2238,7 @@ function _loadHeatmapForTab(category,targetId){
    html+='<div class="heatmap-cell" data-symbol="'+a.symbol+'" style="background:'+bg+';cursor:pointer" onclick="openChart(\''+a.symbol+'\',\''+category.toUpperCase()+'\')"><div class="hm-sym">'+a.symbol+'</div><div class="hm-pct" style="'+(ch>=0?"":"color:rgba(255,200,200,.9)")+'">'+chS(ch)+'</div></div>';
   }
   el.innerHTML=html;
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ── Market Overview (Flow tab) ── */
@@ -2180,7 +2252,7 @@ function loadMarketTab(cat){
    html+='<div class="card card-interactive" style="padding:16px;cursor:pointer" onclick="openChart(\''+a.symbol+'\',\''+cat.toUpperCase()+'\')"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+coinIconHtml(a.symbol,28)+'<span style="font-weight:700;color:var(--text-primary);font-size:14px">'+a.symbol+'</span><span style="font-size:12px;font-weight:600;margin-left:auto;'+chC(ch)+'">'+chIcon(ch)+' '+chS(ch)+'</span></div><p style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0">'+fmtPrice(a.price)+'</p><p style="font-size:11px;color:var(--text-tertiary);margin:4px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.name||"")+'</p></div>';
   }
   el.innerHTML=html;
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ══════ ASSET DETAIL PAGE ══════ */
@@ -2657,7 +2729,7 @@ function _startLivePoll(symbol){
     }
     var chEl=document.querySelector("#panel-asset .asset-change-main");
     if(chEl){chEl.textContent=(ch24>=0?"+":"")+ch24.toFixed(2)+"%";chEl.style.color=ch24>=0?"var(--green)":"var(--red)"}
-   }).catch(function(){});
+   }).catch(function(e){console.warn("[OV]",e)});
  }
  poll();
  _livePollTimer=setInterval(poll,15000);
@@ -3069,9 +3141,9 @@ function loadDexTrending(){var el=document.getElementById("dexContent");el.inner
 function loadDexNew(){var el=document.getElementById("dexContent");el.innerHTML='<div class="card" style="padding:48px;text-align:center"><p style="color:var(--text-secondary)">Завантажую...</p></div>';fetch(API+"/api/dex/new-pairs").then(function(r){return r.json()}).then(function(d){var pairs=d.pairs||[];if(!pairs.length){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--text-tertiary)">Немає</div>';return}var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:16px">';for(var i=0;i<pairs.length;i++){var p=pairs[i];h+='<div class="card card-interactive fade-in" style="padding:20px;animation-delay:'+Math.min(i*.03,.3)+'s"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="color:var(--accent-green);font-size:20px">🆕</span><span style="color:var(--text-primary);font-weight:600;font-size:14px">'+(p.tokenAddress||"").slice(0,10)+'...</span></div><p style="font-size:12px;color:var(--text-tertiary);margin:0">Chain: '+(p.chainId||"")+'</p></div>'}h+='</div>';el.innerHTML=h;showToast("Нових: "+pairs.length,true)}).catch(function(e){el.innerHTML='<div class="card" style="padding:48px;text-align:center;color:var(--accent-red)">'+e.message+'</div>'})}
 
 /* ── On-Chain ── */
-function loadOnchain(){fetch("https://api.blockchain.info/stats?format=json").then(function(r){return r.json()}).then(function(d){if(d.status!=="ok"){document.getElementById("onchainStats").innerHTML='<p style="color:var(--accent-red);grid-column:1/-1">Unavailable</p>';return}var cards=[{l:"BTC Price",v:"$"+fmtBig(d.market_price_usd),c:"var(--accent-orange)"},{l:"Hash Rate",v:fmtBig(d.hash_rate)+" GH/s",c:"var(--accent-blue)"},{l:"TX (24h)",v:fmtBig(d.n_tx),c:"var(--accent-green)"},{l:"Block Time",v:(d.minutes_between_blocks||0).toFixed(1)+" min",c:"var(--accent-cyan)"},{l:"Difficulty",v:fmtBig(d.difficulty),c:"var(--accent-orange)"},{l:"Miner Revenue",v:"$"+fmtBig(d.miners_revenue_usd),c:"var(--accent-yellow)"},{l:"Trade Vol",v:"$"+fmtBig(d.trade_volume_usd),c:"var(--accent-green)"},{l:"Mempool",v:fmtBig(d.mempool_size)+" B",c:"var(--accent-blue)"}];var h="";for(var i=0;i<cards.length;i++){h+='<div class="card" style="padding:20px"><p style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin:0 0 10px">'+cards[i].l+'</p><p style="font-size:18px;font-weight:700;color:'+cards[i].c+';margin:0">'+cards[i].v+'</p></div>'}document.getElementById("onchainStats").innerHTML=h}).catch(function(){});
-fetch(API+"/api/correlation").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("corrMatrix");if(!d.symbols||d.symbols.length<2){el.innerHTML='<p style="text-align:center;padding:20px;color:var(--text-tertiary)">'+(d.note||"Недостатньо даних")+'</p>';return}var syms=d.symbols,m=d.matrix;var h='<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr><th style="padding:10px 14px"></th>';for(var i=0;i<syms.length;i++)h+='<th style="padding:10px 14px;color:var(--text-secondary);font-size:12px;font-weight:700">'+syms[i]+'</th>';h+='</tr></thead><tbody>';for(var i=0;i<syms.length;i++){h+='<tr><td style="padding:10px 14px;color:var(--text-secondary);font-size:12px;font-weight:700">'+syms[i]+'</td>';for(var j=0;j<syms.length;j++){var val=m[syms[i]]?m[syms[i]][syms[j]]:null;var bg="transparent",txt="var(--text-secondary)";if(val!==null){if(val>.7){bg="rgba(48,209,88,.2)";txt="#30d158"}else if(val>.3){bg="rgba(48,209,88,.1)"}else if(val>-.3){bg="rgba(255,255,255,.04)"}else if(val>-.7){bg="rgba(255,69,58,.1)"}else{bg="rgba(255,69,58,.2)";txt="#ff453a"}if(i===j){bg="rgba(10,132,255,.15)";txt="#0a84ff"}}h+='<td style="padding:10px 14px;text-align:center;font-size:13px;font-family:monospace;background:'+bg+';color:'+txt+';border-radius:4px">'+(val!==null?val.toFixed(2):"—")+'</td>'}h+='</tr>'}h+='</tbody></table>';el.innerHTML=h}).catch(function(){});
-fetch(API+"/api/liquidation_map/bitcoin").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("liqHeatmap");if(!d.levels||!d.levels.length){el.innerHTML='<p style="text-align:center;padding:20px;color:var(--text-tertiary)">Немає даних</p>';return}var cp=d.current_price;var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><span style="color:var(--text-primary);font-weight:600">Поточна:</span><span style="color:var(--accent-orange);font-weight:700;font-size:20px">$'+cp.toLocaleString()+'</span></div><div style="display:flex;flex-direction:column;gap:6px">';for(var i=0;i<d.levels.length;i++){var lv=d.levels[i];var isL=lv.side==="LONG";var bc=isL?"var(--accent-red)":"var(--accent-green)";var bg2=isL?"rgba(246,70,93,.1)":"rgba(46,189,133,.1)";h+='<div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="width:80px;text-align:right;font-family:monospace;color:'+bc+'">$'+lv.price.toLocaleString()+'</span><span style="width:50px;text-align:center;font-weight:600;color:'+bc+'">'+(lv.pct>0?"+":"")+lv.pct+'%</span><div style="flex:1;background:'+bg2+';border-radius:8px;height:24px;overflow:hidden"><div style="background:'+bc+';height:100%;border-radius:8px;width:'+Math.min(lv.intensity,100)+'%;opacity:.65"></div></div><span style="width:44px;color:var(--text-tertiary);font-size:11px">'+lv.side+'</span><span style="width:70px;text-align:right;color:var(--text-secondary)">$'+lv.est_usd_m+'M</span></div>'}h+='</div>';el.innerHTML=h}).catch(function(){});showToast("On-Chain оновлено",true)}
+function loadOnchain(){fetch("https://api.blockchain.info/stats?format=json").then(function(r){return r.json()}).then(function(d){if(d.status!=="ok"){document.getElementById("onchainStats").innerHTML='<p style="color:var(--accent-red);grid-column:1/-1">Unavailable</p>';return}var cards=[{l:"BTC Price",v:"$"+fmtBig(d.market_price_usd),c:"var(--accent-orange)"},{l:"Hash Rate",v:fmtBig(d.hash_rate)+" GH/s",c:"var(--accent-blue)"},{l:"TX (24h)",v:fmtBig(d.n_tx),c:"var(--accent-green)"},{l:"Block Time",v:(d.minutes_between_blocks||0).toFixed(1)+" min",c:"var(--accent-cyan)"},{l:"Difficulty",v:fmtBig(d.difficulty),c:"var(--accent-orange)"},{l:"Miner Revenue",v:"$"+fmtBig(d.miners_revenue_usd),c:"var(--accent-yellow)"},{l:"Trade Vol",v:"$"+fmtBig(d.trade_volume_usd),c:"var(--accent-green)"},{l:"Mempool",v:fmtBig(d.mempool_size)+" B",c:"var(--accent-blue)"}];var h="";for(var i=0;i<cards.length;i++){h+='<div class="card" style="padding:20px"><p style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.8px;font-weight:600;margin:0 0 10px">'+cards[i].l+'</p><p style="font-size:18px;font-weight:700;color:'+cards[i].c+';margin:0">'+cards[i].v+'</p></div>'}document.getElementById("onchainStats").innerHTML=h}).catch(function(e){console.warn("[OV]",e)});
+fetch(API+"/api/correlation").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("corrMatrix");if(!d.symbols||d.symbols.length<2){el.innerHTML='<p style="text-align:center;padding:20px;color:var(--text-tertiary)">'+(d.note||"Недостатньо даних")+'</p>';return}var syms=d.symbols,m=d.matrix;var h='<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr><th style="padding:10px 14px"></th>';for(var i=0;i<syms.length;i++)h+='<th style="padding:10px 14px;color:var(--text-secondary);font-size:12px;font-weight:700">'+syms[i]+'</th>';h+='</tr></thead><tbody>';for(var i=0;i<syms.length;i++){h+='<tr><td style="padding:10px 14px;color:var(--text-secondary);font-size:12px;font-weight:700">'+syms[i]+'</td>';for(var j=0;j<syms.length;j++){var val=m[syms[i]]?m[syms[i]][syms[j]]:null;var bg="transparent",txt="var(--text-secondary)";if(val!==null){if(val>.7){bg="rgba(48,209,88,.2)";txt="#30d158"}else if(val>.3){bg="rgba(48,209,88,.1)"}else if(val>-.3){bg="rgba(255,255,255,.04)"}else if(val>-.7){bg="rgba(255,69,58,.1)"}else{bg="rgba(255,69,58,.2)";txt="#ff453a"}if(i===j){bg="rgba(10,132,255,.15)";txt="#0a84ff"}}h+='<td style="padding:10px 14px;text-align:center;font-size:13px;font-family:monospace;background:'+bg+';color:'+txt+';border-radius:4px">'+(val!==null?val.toFixed(2):"—")+'</td>'}h+='</tr>'}h+='</tbody></table>';el.innerHTML=h}).catch(function(e){console.warn("[OV]",e)});
+fetch(API+"/api/liquidation_map/bitcoin").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("liqHeatmap");if(!d.levels||!d.levels.length){el.innerHTML='<p style="text-align:center;padding:20px;color:var(--text-tertiary)">Немає даних</p>';return}var cp=d.current_price;var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><span style="color:var(--text-primary);font-weight:600">Поточна:</span><span style="color:var(--accent-orange);font-weight:700;font-size:20px">$'+cp.toLocaleString()+'</span></div><div style="display:flex;flex-direction:column;gap:6px">';for(var i=0;i<d.levels.length;i++){var lv=d.levels[i];var isL=lv.side==="LONG";var bc=isL?"var(--accent-red)":"var(--accent-green)";var bg2=isL?"rgba(246,70,93,.1)":"rgba(46,189,133,.1)";h+='<div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="width:80px;text-align:right;font-family:monospace;color:'+bc+'">$'+lv.price.toLocaleString()+'</span><span style="width:50px;text-align:center;font-weight:600;color:'+bc+'">'+(lv.pct>0?"+":"")+lv.pct+'%</span><div style="flex:1;background:'+bg2+';border-radius:8px;height:24px;overflow:hidden"><div style="background:'+bc+';height:100%;border-radius:8px;width:'+Math.min(lv.intensity,100)+'%;opacity:.65"></div></div><span style="width:44px;color:var(--text-tertiary);font-size:11px">'+lv.side+'</span><span style="width:70px;text-align:right;color:var(--text-secondary)">$'+lv.est_usd_m+'M</span></div>'}h+='</div>';el.innerHTML=h}).catch(function(e){console.warn("[OV]",e)});showToast("On-Chain оновлено",true)}
 
 /* ── News ── */
 function loadNews(){
@@ -3130,7 +3202,7 @@ function buildOrderBook(price,vol){
 var allAssetsCache=[],_allAssetsCache=[];
 var _searchTimer=null;
 function _debounceSearch(q){clearTimeout(_searchTimer);_searchTimer=setTimeout(function(){onGlobalSearch(q)},150)}
-function refreshAssetsCache(){fetch(API+"/api/assets").then(function(r){return r.json()}).then(function(d){allAssetsCache=d.assets||d||[];_allAssetsCache=allAssetsCache}).catch(function(){})}
+function refreshAssetsCache(){fetch(API+"/api/assets").then(function(r){return r.json()}).then(function(d){allAssetsCache=d.assets||d||[];_allAssetsCache=allAssetsCache}).catch(function(e){console.warn("[OV]",e)})}
 function onGlobalSearch(q){
  var box=document.getElementById("searchResults");
  if(!q||q.length<1){box.style.display="none";return}
@@ -3302,7 +3374,7 @@ function updateHunterStatus(){
  fetch(API+"/api/hunter/status").then(function(r){return r.json()}).then(function(d){
   var el=document.getElementById("hunterInfo");
   if(el)el.textContent="Мисливець: "+(d.status||"active")+" · "+(d.count||0)+" знайдено";
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ── Analytics ── */
@@ -3337,7 +3409,7 @@ function loadAnalytics(){
    }
    document.getElementById("topMovers").innerHTML=mh;
   }
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 /* ── Portfolio ── */
@@ -3399,7 +3471,7 @@ function loadWallets(){
     +'</tr>';
   }
   el.innerHTML=h;
- }).catch(function(){})
+ }).catch(function(e){console.warn("[OV]",e)})
 }
 
 function addWallet(){
@@ -3756,7 +3828,7 @@ function loadMarketSummary(){
   document.getElementById("daSBGreen").style.width=bp+"%";
   document.getElementById("daSBYellow").style.width=np+"%";
   document.getElementById("daSBRed").style.width=rp+"%";
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
 }
 function _renderRankList(items,targetId,isGainer){
  var el=document.getElementById(targetId);
@@ -3770,8 +3842,8 @@ function _renderRankList(items,targetId,isGainer){
  }
  el.innerHTML=h;
 }
-function loadDeepGainers(){fetch(API+"/api/analytics/top_gainers?limit=10").then(function(r){return r.json()}).then(function(d){_renderRankList(d,"daGainers",true)}).catch(function(){})}
-function loadDeepLosers(){fetch(API+"/api/analytics/top_losers?limit=10").then(function(r){return r.json()}).then(function(d){_renderRankList(d,"daLosers",false)}).catch(function(){})}
+function loadDeepGainers(){fetch(API+"/api/analytics/top_gainers?limit=10").then(function(r){return r.json()}).then(function(d){_renderRankList(d,"daGainers",true)}).catch(function(e){console.warn("[OV]",e)})}
+function loadDeepLosers(){fetch(API+"/api/analytics/top_losers?limit=10").then(function(r){return r.json()}).then(function(d){_renderRankList(d,"daLosers",false)}).catch(function(e){console.warn("[OV]",e)})}
 function loadDeepVolume(){
  fetch(API+"/api/analytics/volume_leaders?limit=10").then(function(r){return r.json()}).then(function(items){
   var el=document.getElementById("daVolLeaders");
@@ -3784,7 +3856,7 @@ function loadDeepVolume(){
     +'<div style="display:flex;justify-content:space-between"><span style="font-size:20px;font-weight:700;color:var(--accent-cyan)">'+fmtVol(a.volume_1h)+'</span><span style="'+chC(ch)+';font-weight:600">'+chS(ch)+'</span></div></div>';
   }
   h+='</div>';el.innerHTML=h;
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
 }
 function loadDeepTimeline(days){
  document.querySelectorAll("#daTimelinePeriods .period-btn").forEach(function(b){b.classList.remove("active")});
@@ -3811,7 +3883,7 @@ function loadDeepTimeline(days){
     scales:{x:{ticks:{color:"#6e6e73",maxTicksLimit:12,font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}},
             y:{ticks:{color:"#6e6e73",font:{size:10}},grid:{color:"rgba(255,255,255,.06)"}}}}
   });
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
 }
 
 /* ══ Market Pulse on Overview ══ */
@@ -3826,7 +3898,7 @@ function loadMarketPulse(){
    +'<span style="font-size:13px;color:var(--text-tertiary)">Avg: <b style="'+(avg>=0?'color:var(--accent-green)':'color:var(--accent-red)')+'">'+(avg>=0?'+':'')+avg.toFixed(2)+'%</b></span>'
    +'<span style="font-size:13px;color:var(--text-tertiary)">🟢 '+d.bullish+' | 🔴 '+d.bearish+' | 🟡 '+d.neutral+'</span>'
    +'</div>';
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
 }
 
 /* ══ Push Notifications ══ */
@@ -3886,6 +3958,80 @@ function togglePush(on){
 /* ══ Premium Plans ══ */
 
 /* ══════ PROMO CODE ══════ */
+
+function adminPromoTypeChanged(){
+ var t=document.getElementById("adminPromoType").value;
+ document.getElementById("adminDiscountWrap").style.display=t==="discount"?"block":"none";
+ document.getElementById("adminPromoTier").closest("div").style.display=t==="discount"?"none":"block";
+}
+
+async function loadAdminPromos(){
+ var body=document.getElementById("adminPromoBody");
+ if(!body)return;
+ body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-tertiary)">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F...</td></tr>';
+ try{
+  var r=await fetch("/api/admin/promo/list",{headers:{"X-Username":currentUser}});
+  if(!r.ok){body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--accent-red)">\u041D\u0435\u043C\u0430\u0454 \u0434\u043E\u0441\u0442\u0443\u043F\u0443</td></tr>';return}
+  var data=await r.json();
+  var promos=data.promos||[];
+  if(!promos.length){body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-tertiary)">\u041D\u0435\u043C\u0430\u0454 \u043F\u0440\u043E\u043C\u043E\u043A\u043E\u0434\u0456\u0432</td></tr>';return}
+  var html="";
+  promos.forEach(function(p){
+   var typeLabel=p.promo_type==="trial"?"Trial":p.promo_type==="upgrade"?"Upgrade":"Discount";
+   var tierBadge=p.tier?(p.tier==="vip"?'<span style="background:linear-gradient(135deg,#ffd60a,#ff9f0a);color:#000;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">VIP</span>':'<span style="background:var(--accent-blue);color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">PRO</span>'):"";
+   var discountBadge=p.discount_pct?(" -"+p.discount_pct+"%"):"";
+   var usesText=p.max_uses===0?(p.used_count+"/"+"\u221E"):(p.used_count+"/"+p.max_uses);
+   var statusDot=p.is_active?'<span style="color:var(--accent-green)">\u25CF \u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0439</span>':'<span style="color:var(--text-tertiary)">\u25CB \u0412\u0438\u043C\u043A\u043D\u0435\u043D\u0438\u0439</span>';
+   var toggleBtn=p.is_active
+    ?'<button onclick="togglePromo('+p.id+')" class="btn-secondary" style="font-size:11px;padding:4px 10px;color:var(--accent-red)">\u0412\u0438\u043C\u043A\u043D\u0443\u0442\u0438</button>'
+    :'<button onclick="togglePromo('+p.id+')" class="btn-secondary" style="font-size:11px;padding:4px 10px;color:var(--accent-green)">\u0423\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438</button>';
+   html+='<tr style="border-bottom:1px solid var(--border-color)">';
+   html+='<td style="padding:10px 8px"><code style="background:var(--bg-secondary);padding:3px 8px;border-radius:6px;font-weight:600;letter-spacing:1px">'+p.code+'</code></td>';
+   html+='<td style="padding:10px 8px">'+typeLabel+discountBadge+" "+tierBadge+'</td>';
+   html+='<td style="padding:10px 8px;text-align:center">'+p.duration_days+'</td>';
+   html+='<td style="padding:10px 8px;text-align:center">'+usesText+'</td>';
+   html+='<td style="padding:10px 8px;text-align:center">'+statusDot+'</td>';
+   html+='<td style="padding:10px 8px;text-align:center">'+toggleBtn+'</td>';
+   html+='</tr>';
+  });
+  body.innerHTML=html;
+ }catch(e){body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--accent-red)">\u041F\u043E\u043C\u0438\u043B\u043A\u0430: '+e.message+'</td></tr>'}
+}
+
+async function createAdminPromo(){
+ var code=document.getElementById("adminPromoCode").value.trim().toUpperCase();
+ if(!code){showToast("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043A\u043E\u0434","error");return}
+ var ptype=document.getElementById("adminPromoType").value;
+ var tier=document.getElementById("adminPromoTier").value;
+ var days=parseInt(document.getElementById("adminPromoDays").value)||7;
+ var maxUses=parseInt(document.getElementById("adminPromoMaxUses").value)||0;
+ var discount=parseInt(document.getElementById("adminPromoDiscount").value)||0;
+ var body={code:code,promo_type:ptype,duration_days:days,max_uses:maxUses};
+ if(ptype==="discount"){body.discount_pct=discount}else{body.tier=tier}
+ try{
+  var r=await fetch("/api/admin/promo/create",{method:"POST",headers:{"Content-Type":"application/json","X-Username":currentUser},body:JSON.stringify(body)});
+  var data=await r.json();
+  if(data.ok){showToast("\u041F\u0440\u043E\u043C\u043E\u043A\u043E\u0434 "+code+" \u0441\u0442\u0432\u043E\u0440\u0435\u043D\u043E!","success");document.getElementById("adminPromoCode").value="";loadAdminPromos()}
+  else{showToast(data.error||"\u041F\u043E\u043C\u0438\u043B\u043A\u0430","error")}
+ }catch(e){showToast("\u041F\u043E\u043C\u0438\u043B\u043A\u0430: "+e.message,"error")}
+}
+
+async function togglePromo(id){
+ try{
+  var r=await fetch("/api/admin/promo/toggle/"+id,{method:"POST",headers:{"X-Username":currentUser}});
+  var data=await r.json();
+  if(data.ok){loadAdminPromos();showToast("\u0421\u0442\u0430\u0442\u0443\u0441 \u0437\u043C\u0456\u043D\u0435\u043D\u043E","success")}
+  else{showToast(data.error||"\u041F\u043E\u043C\u0438\u043B\u043A\u0430","error")}
+ }catch(e){showToast("\u041F\u043E\u043C\u0438\u043B\u043A\u0430","error")}
+}
+
+function checkShowAdminPromo(){
+ var panel=document.getElementById("adminPromoPanel");
+ if(!panel)return;
+ if(currentUser==="boss"||currentUser==="admin"){panel.style.display="block";loadAdminPromos()}
+ else{panel.style.display="none"}
+}
+
 function activatePromo(){
   var input=document.getElementById("promoCodeInput");
   var btn=document.getElementById("promoActivateBtn");
@@ -3952,7 +4098,7 @@ function loadTierInfo(){
   /* Store tier for feature gating */
   window._userTier=tier;
   window._tierLimits=d.limits||{};
- }).catch(function(){});
+ }).catch(function(e){console.warn("[OV]",e)});
 }
 function requestUpgrade(tier){
  var prices={pro:"$9.99",vip:"$29.99"};
@@ -4050,7 +4196,7 @@ function _startPayCheck(orderId){
     showToast(d.tier.toUpperCase()+" \u0430\u043A\u0442\u0438\u0432\u043E\u0432\u0430\u043D\u043E!",true);
     loadTierInfo();
    }
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
  },10000);  // Check every 10 seconds
  // Stop after 15 minutes
  setTimeout(function(){
@@ -4212,7 +4358,7 @@ function loadQuickPairs() {
       h += '<button onclick="dexSetPair(\x27' + p.from + '\x27,\x27' + p.to + '\x27)" class="btn-secondary btn-sm" style="font-size:12px;white-space:nowrap">' + p.icon + " " + p.from + "\u2192" + p.to + '</button>';
     });
     el.innerHTML = h;
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
 }
 
 function dexSetPair(from, to) {
@@ -4374,7 +4520,7 @@ onGlobalSearch = function(q) {
         }
         box.innerHTML = h;
         box.style.display = "block";
-      }).catch(function(){});
+      }).catch(function(e){console.warn("[OV]",e)});
     }, 300);
   }
 };
@@ -4865,7 +5011,7 @@ function runScreener(page) {
         fetch("https://api.coingecko.com/api/v3/coins/"+c.id+"/market_chart?vs_currency=usd&days=7&interval=daily").then(function(r){return r.json()}).then(function(d2){
           if(!d2.prices)return;var vals=d2.prices.map(function(p){return p[1]});
           drawSparkline("scrSpark"+ci,vals,vals[vals.length-1]>=vals[0]);
-        }).catch(function(){});
+        }).catch(function(e){console.warn("[OV]",e)});
       }
     });
 
@@ -4897,7 +5043,7 @@ function loadReferralConfig() {
       var btn = document.getElementById("ref-" + ex);
       if(btn && _refLinks[ex]) btn.href = _refLinks[ex];
     });
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
 }
 
 function getTradeUrl(symbol) {
@@ -5323,7 +5469,7 @@ function initQuickWatch(){
       if(cEl){cEl.textContent=(ch>=0?"+":"")+ch.toFixed(2)+"%";cEl.style.color=ch>=0?"var(--accent-green)":"var(--accent-red)"}
       if(vEl)vEl.textContent="Vol: "+fmtVol(vol);
     }
-  }).catch(function(){});
+  }).catch(function(e){console.warn("[OV]",e)});
   /* Update from WebSocket */
   setInterval(function(){
     _qwCoins.forEach(function(c){
@@ -5790,6 +5936,73 @@ function restoreTheme(){
   }catch(e){}
 }
 
+
+
+
+
+
+
+/* ═══ Last Updated Timestamps ═══ */
+function addTimestamp(containerId) {
+  var el = document.getElementById(containerId);
+  if(!el) return;
+  var existing = el.querySelector(".panel-timestamp");
+  if(existing) existing.remove();
+  var ts = document.createElement("div");
+  ts.className = "panel-timestamp";
+  ts.style.cssText = "text-align:right;font-size:11px;color:var(--text-tertiary);margin-top:12px;opacity:0.7";
+  ts.textContent = "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043E: " + new Date().toLocaleTimeString("uk");
+  el.appendChild(ts);
+}
+
+/* ═══ API Health Monitor ═══ */
+var _apiHealth = {ok: 0, fail: 0, lastCheck: 0};
+
+function checkApiHealth() {
+  fetch(API + "/api/hunter/status", {signal: AbortSignal.timeout(5000)})
+    .then(function(r) { 
+      _apiHealth.ok++; 
+      _apiHealth.lastCheck = Date.now();
+      updateHealthDot(true);
+    })
+    .catch(function() { 
+      _apiHealth.fail++;
+      _apiHealth.lastCheck = Date.now();
+      updateHealthDot(false);
+    });
+}
+
+function updateHealthDot(ok) {
+  var dot = document.getElementById("apiHealthDot");
+  if(!dot) return;
+  dot.style.background = ok ? "var(--accent-green)" : "var(--accent-red)";
+  dot.title = ok ? "API OK" : "API offline";
+}
+
+setInterval(checkApiHealth, 30000);
+setTimeout(checkApiHealth, 3000);
+
+/* ═══ Auto-Refresh for Active Panels ═══ */
+var _panelRefreshMap = {
+  "sentiment": {fn: loadSentiment, interval: 120000},
+  "whales": {fn: loadWhales, interval: 60000},
+  "trending": {fn: loadTrending, interval: 180000},
+  "screener": {fn: runScreener, interval: 120000},
+  "gas": {fn: loadGasTracker, interval: 60000},
+};
+var _panelRefreshTimer = null;
+
+function startPanelAutoRefresh(tabId) {
+  if(_panelRefreshTimer) {clearInterval(_panelRefreshTimer); _panelRefreshTimer = null}
+  var cfg = _panelRefreshMap[tabId];
+  if(!cfg) return;
+  _panelRefreshTimer = setInterval(function(){
+    if(document.visibilityState === "visible") {
+      try { cfg.fn() } catch(e) { console.warn("[OV] Auto-refresh error:", e) }
+    }
+  }, cfg.interval);
+}
+
 /* ═══ Command Palette (Ctrl+K) ═══ */
 var cmdPaletteItems=[
   {icon:"\uD83C\uDFAF",label:"\u0412\u043F\u043E\u043B\u044E\u0432\u0430\u043D\u043E",tab:"hunted",desc:"\u0410\u0432\u0442\u043E-\u0441\u043A\u0430\u043D\u0435\u0440"},
@@ -5863,7 +6076,13 @@ function cmdPaletteNav(e){
 }
 document.addEventListener("keydown",function(e){
   if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();var p=document.getElementById("cmdPalette");if(p.classList.contains("open"))closeCmdPalette();else openCmdPalette()}
-  if(e.key==="Escape"){var p=document.getElementById("cmdPalette");if(p.classList.contains("open"))closeCmdPalette()}
+  if(e.key==="Escape"){var p=document.getElementById("cmdPalette");if(p.classList.contains("open"))closeCmdPalette();closeAssetPage()}
+  // Number shortcuts: Alt+1-9 for quick tab access
+  if(e.altKey&&e.key>="1"&&e.key<="9"){
+    var quickTabs=["hunted","analytics","crypto","screener","trending","heatmap","advisor","watchlist","plans"];
+    var idx=parseInt(e.key)-1;
+    if(quickTabs[idx]){e.preventDefault();showTab(quickTabs[idx])}
+  }
 });
 
 /* ═══ Freemium Upgrade Prompt ═══ */

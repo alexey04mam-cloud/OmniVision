@@ -141,5 +141,19 @@ hunted, analytics, deepanalytics, advisor, crypto, stocks, commodities, dex, flo
 - **File ending fix**: Restored truncated Command Palette + closing HTML tags.
 - **Total codebase**: ~11,896 lines (was 11,561)
 
+## Session 3 Improvements (2026-06-06)
+- **Promo Code System**: PromoCode + PromoUsage DB models, /api/promo/activate, /api/admin/promo/create|list|toggle endpoints. User activation flow on Plans page + payment overlay.
+- **Default Promo Seeds**: WELCOME (7d PRO trial), FIRST30 (30% discount), VIP7DAYS (7d VIP trial), TRYPR0 (3d PRO), LAUNCH2026 (14d VIP). Auto-created at startup.
+- **Admin Promo Panel**: Full CRUD UI on Plans page (visible to admin user only) — create promos, toggle active/inactive, view usage stats, manage all codes.
+- **Telegram Bot — Varied Auto-Posts**: 6 rotating content types every 6 hours: Market Digest, Trending Coins, Big Movers, Fear & Greed Deep Dive, Promo CTA, DeFi Analytics.
+- **Telegram Bot — Referral System**: /invite command, referral links (t.me/bot?start=ref_ID), referral tracking, referrer notifications, share button. Bonus tiers at 3/5/10 referrals.
+- **Telegram Bot — Enhanced Welcome**: Referral tracking on /start, "Запросити" button in main menu, referral callback handler.
+- **API Health Monitor**: Background check every 30s, green/red dot in header next to WebSocket indicator.
+- **Auto-Refresh Panels**: Sentiment (120s), Whales (60s), Trending (180s), Screener (120s), Gas (60s) auto-refresh when tab is visible.
+- **Error Handling**: All 30 silent catch blocks replaced with proper error logging. Zero silent failures.
+- **Keyboard Shortcuts**: Alt+1-9 for quick tab navigation, Escape closes asset page.
+- **Last Updated Timestamps**: Utility function for panel freshness indication.
+- **Total codebase**: ~12,883 lines (110 API endpoints, 34 panels, 222 JS functions)
+
 ## Last Updated
 2026-06-06

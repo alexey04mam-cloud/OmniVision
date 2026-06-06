@@ -8,7 +8,8 @@ import asyncio
 import logging
 import time
 import json
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import httpx
@@ -30,6 +31,7 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 _data_file = "tg_subscribers.json"
 _subscribers = {}  # chat_id -> {username, alerts_enabled, language, joined_at, alerts: [{symbol, target, direction}]}
 _alert_history = []  # [{chat_id, symbol, message, sent_at}]
+_auto_post_counter = 0  # cycles through post types
 
 def _load_data():
     global _subscribers
@@ -412,6 +414,37 @@ async def cmd_premium(chat_id):
     )
 
 
+
+async def cmd_invite(chat_id, username=""):
+    """Handle /invite — show referral link"""
+    cid = str(chat_id)
+    ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{cid}"
+
+    # Count referrals
+    referrals = 0
+    for sid, sub in _subscribers.items():
+        if sub.get("referred_by") == cid:
+            referrals += 1
+
+    text = "\U0001f91d <b>Реферальна програма</b>\n\n"
+    text += "\U0001f517 <b>Тво\u0454 посилання:</b>\n"
+    text += f"<code>{ref_link}</code>\n\n"
+    text += f"\U0001f465 <b>Запрошено:</b> {referrals} людей\n\n"
+    text += "\U0001f381 <b>Бонуси:</b>\n"
+    text += "\u2022 3 реферали \u2192 +3 дні PRO\n"
+    text += "\u2022 5 рефералів \u2192 +7 днів PRO\n"
+    text += "\u2022 10 рефералів \u2192 +30 днів VIP\n\n"
+    text += "\U0001f4e4 Поділися посиланням з друзями!"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "\U0001f4e4 Поділитися", "url": f"https://t.me/share/url?url={ref_link}&text=Omni-Vision%20%E2%80%94%20%D0%BAрипто%20аналітика%20%F0%9F%94%AD"}],
+            [{"text": "\u25c0\ufe0f Назад", "callback_data": "back_main"}],
+        ]
+    }
+    await send_message(chat_id, text, reply_markup=keyboard)
+
+
 async def cmd_buy_tier(chat_id, tier, username=""):
     """Show payment options: Stars or site"""
     prices = {"pro": 9.99, "vip": 29.99}
@@ -532,6 +565,274 @@ async def _generate_digest():
     return text
 
 
+async def _generate_trending_post():
+    """Generate trending coins post for channel"""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get("https://api.coingecko.com/api/v3/search/trending")
+            data = r.json() if r.status_code == 200 else {}
+    except:
+        return None
+
+    coins = data.get("coins", [])[:7]
+    if not coins:
+        return None
+
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+    text = "\U0001f525 <b>Trending зараз | Omni-Vision</b>\n"
+    text += f"\U0001f4c5 {now}\n\n"
+    text += "\U0001f4a1 <b>Найпопулярніші монети зараз:</b>\n\n"
+
+    for i, c in enumerate(coins, 1):
+        item = c.get("item", {})
+        name = item.get("name", "?")
+        sym = item.get("symbol", "?").upper()
+        rank = item.get("market_cap_rank", "?")
+        score = item.get("score", 0)
+        price_btc = item.get("price_btc", 0)
+        text += f"{i}. <b>{sym}</b> ({name})\n"
+        text += f"   \u2514 Rank: #{rank} | Score: {score}\n"
+
+    text += "\n\U0001f50e <b>Детальніше на дашборді:</b>\n"
+    text += f'\U0001f4f1 <a href="{SITE_URL}/?tab=trending">\u0412ідкрити Trending</a>\n'
+    text += f'\U0001f916 <a href="https://t.me/{BOT_USERNAME}">Bot</a> | <a href="https://t.me/+fmJn1JHeb6NmZDRi">\U0001f4e2 Канал</a>'
+    return text
+
+
+async def _generate_price_alert_post():
+    """Generate significant price movement post"""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get("https://api.coingecko.com/api/v3/coins/markets",
+                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50,
+                        "page": 1, "sparkline": "false", "price_change_percentage": "1h,24h,7d"})
+            coins = r.json() if r.status_code == 200 else []
+    except:
+        return None
+
+    if not coins:
+        return None
+
+    # Find big movers (>5% in 24h)
+    big_movers = []
+    for c in coins:
+        ch24 = c.get("price_change_percentage_24h") or 0
+        if abs(ch24) >= 5:
+            big_movers.append(c)
+
+    if not big_movers:
+        # If no big movers, show top 3 movers anyway
+        sorted_coins = sorted(coins, key=lambda x: abs(x.get("price_change_percentage_24h") or 0), reverse=True)
+        big_movers = sorted_coins[:5]
+
+    big_movers.sort(key=lambda x: x.get("price_change_percentage_24h", 0), reverse=True)
+
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+    text = "\u26a1 <b>Рухи ринку | Omni-Vision</b>\n"
+    text += f"\U0001f4c5 {now}\n\n"
+
+    gainers = [m for m in big_movers if (m.get("price_change_percentage_24h") or 0) > 0]
+    losers = [m for m in big_movers if (m.get("price_change_percentage_24h") or 0) < 0]
+
+    if gainers:
+        text += "\U0001f4c8 <b>Різке зростання:</b>\n"
+        for c in gainers[:4]:
+            sym = (c.get("symbol") or "").upper()
+            price = c.get("current_price", 0)
+            ch = c.get("price_change_percentage_24h", 0)
+            mcap = c.get("market_cap", 0)
+            mcap_str = f"${mcap/1e9:.1f}B" if mcap >= 1e9 else f"${mcap/1e6:.0f}M"
+            text += f"  \u25B2 <b>{sym}</b> ${price:,.2f} (<b>+{ch:.1f}%</b>) MCap: {mcap_str}\n"
+
+    if losers:
+        text += "\n\U0001f4c9 <b>Різке падіння:</b>\n"
+        for c in losers[:4]:
+            sym = (c.get("symbol") or "").upper()
+            price = c.get("current_price", 0)
+            ch = c.get("price_change_percentage_24h", 0)
+            mcap = c.get("market_cap", 0)
+            mcap_str = f"${mcap/1e9:.1f}B" if mcap >= 1e9 else f"${mcap/1e6:.0f}M"
+            text += f"  \u25BC <b>{sym}</b> ${price:,.2f} (<b>{ch:.1f}%</b>) MCap: {mcap_str}\n"
+
+    text += f"\n\U0001f4f1 <a href=\"{SITE_URL}/?tab=screener\">Screener</a> | "
+    text += f'<a href="https://t.me/{BOT_USERNAME}">Bot</a> | '
+    text += '<a href="https://t.me/+fmJn1JHeb6NmZDRi">\U0001f4e2 Канал</a>'
+    return text
+
+
+async def _generate_fear_greed_post():
+    """Generate Fear & Greed focused post"""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get("https://api.alternative.me/fng/?limit=7")
+            fng_data = r.json().get("data", []) if r.status_code == 200 else []
+
+            r2 = await client.get("https://api.coingecko.com/api/v3/simple/price",
+                params={"ids": "bitcoin", "vs_currencies": "usd", "include_24hr_change": "true"})
+            btc = r2.json().get("bitcoin", {}) if r2.status_code == 200 else {}
+    except:
+        return None
+
+    if not fng_data:
+        return None
+
+    current = fng_data[0]
+    fg_val = int(current.get("value", 50))
+    fg_label = current.get("value_classification", "Neutral")
+
+    # Gauge visual
+    if fg_val <= 20:
+        gauge = "\U0001f534\U0001f534\U0001f534\U0001f534\u26aa"
+        tip = "\u26a0\ufe0f Екстремальний страх — історично це часто найкращий час для покупки"
+    elif fg_val <= 40:
+        gauge = "\U0001f7e0\U0001f7e0\U0001f7e0\u26aa\u26aa"
+        tip = "\U0001f914 Страх на ринку — можливості для DCA"
+    elif fg_val <= 60:
+        gauge = "\U0001f7e1\U0001f7e1\U0001f7e1\u26aa\u26aa"
+        tip = "\u2696\ufe0f Ринок нейтральний — спостерігайте за сигналами"
+    elif fg_val <= 80:
+        gauge = "\U0001f7e2\U0001f7e2\U0001f7e2\U0001f7e2\u26aa"
+        tip = "\U0001f4b0 Жадібність зроста\u0454 — будьте обережні з новими позиціями"
+    else:
+        gauge = "\U0001f7e2\U0001f7e2\U0001f7e2\U0001f7e2\U0001f7e2"
+        tip = "\U0001f6a8 Екстремальна жадібність — розгляньте фіксацію прибутку"
+
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+    btc_price = btc.get("usd", 0)
+    btc_change = btc.get("usd_24h_change", 0)
+
+    text = f"\U0001f3af <b>Fear & Greed Index | Omni-Vision</b>\n"
+    text += f"\U0001f4c5 {now}\n\n"
+    text += f"{gauge}\n"
+    text += f"\U0001f4ca <b>Індекс:</b> {fg_val}/100 ({fg_label})\n\n"
+    text += f"{tip}\n\n"
+
+    # 7-day history
+    if len(fng_data) > 1:
+        text += "\U0001f4c8 <b>Історія (7 днів):</b>\n"
+        for d in fng_data[:7]:
+            val = int(d.get("value", 0))
+            lbl = d.get("value_classification", "?")
+            ts = int(d.get("timestamp", 0))
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%d.%m") if ts else "?"
+            bar = "\u2588" * (val // 10) + "\u2591" * (10 - val // 10)
+            text += f"  {dt}: {bar} {val} ({lbl})\n"
+
+    text += f"\n\u20BF BTC: ${btc_price:,.0f} ({btc_change:+.1f}%)\n"
+    text += f"\n\U0001f4f1 <a href=\"{SITE_URL}\">Dashboard</a> | "
+    text += f'<a href="https://t.me/{BOT_USERNAME}">Bot</a> | '
+    text += '<a href="https://t.me/+fmJn1JHeb6NmZDRi">\U0001f4e2 Канал</a>'
+    return text
+
+
+async def _generate_promo_post():
+    """Generate promotional post with promo code CTA"""
+    promos = ["WELCOME", "FIRST30", "VIP7DAYS"]
+    promo = random.choice(promos)
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y")
+
+    text = "\U0001f381 <b>Спеціальна пропозиція | Omni-Vision</b>\n\n"
+
+    if promo == "WELCOME":
+        text += "\U0001f680 <b>7 днів PRO безкоштовно!</b>\n\n"
+        text += "Введіть промокод <code>WELCOME</code> і отримайте:\n"
+        text += "\u2705 Deep Analytics\n"
+        text += "\u2705 AI асистент (50 запитів/день)\n"
+        text += "\u2705 CSV експорт\n"
+        text += "\u2705 20 гаманців + 100 watchlist\n"
+    elif promo == "FIRST30":
+        text += "\U0001f4b5 <b>Знижка 30% на перший місяць!</b>\n\n"
+        text += "Введіть <code>FIRST30</code> при оплаті і отримайте:\n"
+        text += "\u2705 PRO за $6.99 замість $9.99\n"
+        text += "\u2705 VIP за $20.99 замість $29.99\n"
+    else:
+        text += "\U0001f451 <b>7 днів VIP безкоштовно!</b>\n\n"
+        text += "Введіть <code>VIP7DAYS</code> і отримайте:\n"
+        text += "\u2705 Всі функці\u0457 без обмежень\n"
+        text += "\u2705 Необмежений AI\n"
+        text += "\u2705 Пріоритетна підтримка\n"
+
+    text += f"\n\U0001f449 <b>Як активувати:</b>\n"
+    text += f"1\ufe0f\u20e3 Відкрийте <a href=\"{SITE_URL}/?tab=plans\">сторінку планів</a>\n"
+    text += f"2\ufe0f\u20e3 Введіть промокод <code>{promo}</code>\n"
+    text += f"3\ufe0f\u20e3 Насолоджуйтесь PRO-функціями!\n"
+    text += f"\nОбо в боті: /promo {promo}\n"
+    text += f'\n<a href="https://t.me/{BOT_USERNAME}">\U0001f916 Bot</a> | <a href="https://t.me/+fmJn1JHeb6NmZDRi">\U0001f4e2 Канал</a>'
+    return text
+
+
+async def _generate_defi_post():
+    """Generate DeFi analytics post"""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get("https://api.llama.fi/protocols")
+            protocols = r.json()[:10] if r.status_code == 200 else []
+
+            r2 = await client.get("https://api.llama.fi/v2/chains")
+            chains = r2.json()[:8] if r2.status_code == 200 else []
+    except:
+        return None
+
+    if not protocols:
+        return None
+
+    now = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
+    text = "\U0001f3e6 <b>DeFi Огляд | Omni-Vision</b>\n"
+    text += f"\U0001f4c5 {now}\n\n"
+
+    # Total TVL from chains
+    total_tvl = sum(c.get("tvl", 0) for c in chains) if chains else 0
+    if total_tvl:
+        text += f"\U0001f4b0 <b>Загальний TVL:</b> ${total_tvl/1e9:.1f}B\n\n"
+
+    text += "\U0001f3c6 <b>Топ протоколи:</b>\n"
+    for i, p in enumerate(protocols[:7], 1):
+        name = p.get("name", "?")
+        tvl = p.get("tvl", 0)
+        chain = p.get("chain", "Multi")
+        tvl_str = f"${tvl/1e9:.2f}B" if tvl >= 1e9 else f"${tvl/1e6:.0f}M"
+        text += f"  {i}. <b>{name}</b> — {tvl_str} ({chain})\n"
+
+    if chains:
+        text += "\n\U0001f517 <b>Топ чейни за TVL:</b>\n"
+        sorted_chains = sorted(chains, key=lambda x: x.get("tvl", 0), reverse=True)[:5]
+        for c in sorted_chains:
+            name = c.get("name", "?")
+            tvl = c.get("tvl", 0)
+            tvl_str = f"${tvl/1e9:.1f}B" if tvl >= 1e9 else f"${tvl/1e6:.0f}M"
+            text += f"  \u2022 <b>{name}</b>: {tvl_str}\n"
+
+    text += f"\n\U0001f4f1 <a href=\"{SITE_URL}/?tab=onchain\">Детальніше</a> | "
+    text += f'<a href="https://t.me/{BOT_USERNAME}">Bot</a> | '
+    text += '<a href="https://t.me/+fmJn1JHeb6NmZDRi">\U0001f4e2 Канал</a>'
+    return text
+
+
+async def _get_auto_post_content():
+    """Rotate through different post types for channel"""
+    global _auto_post_counter
+    _auto_post_counter += 1
+    post_type = _auto_post_counter % 6
+
+    generators = {
+        0: _generate_digest,           # Classic market digest
+        1: _generate_trending_post,    # Trending coins
+        2: _generate_price_alert_post, # Big movers
+        3: _generate_fear_greed_post,  # Fear & Greed deep dive
+        4: _generate_promo_post,       # Promo code CTA
+        5: _generate_defi_post,        # DeFi analytics
+    }
+
+    gen = generators.get(post_type, _generate_digest)
+    try:
+        content = await gen()
+        if content:
+            return content
+    except Exception as e:
+        log.error(f"[TG] Post generator {post_type} error: {e}")
+
+    # Fallback to digest
+    return await _generate_digest()
 
 
 async def send_stars_invoice(chat_id, tier):
@@ -764,6 +1065,33 @@ async def process_update(update: dict, db_session_factory=None):
                 await cmd_buy_tier(chat_id, tier, username)
             else:
                 await cmd_start(chat_id, username)
+        elif text.startswith("/start ref_"):
+            ref_id = text.replace("/start ref_", "").strip()
+            cid = str(chat_id)
+            if cid not in _subscribers and ref_id != cid:
+                # Track referral
+                _subscribers[cid] = {
+                    "username": username,
+                    "alerts_enabled": True,
+                    "language": "ukr",
+                    "joined_at": datetime.now(timezone.utc).isoformat(),
+                    "price_alerts": [],
+                    "notify_whales": True,
+                    "notify_signals": True,
+                    "notify_hunt": False,
+                    "referred_by": ref_id,
+                }
+                _save_data()
+                # Notify referrer
+                try:
+                    referrals = sum(1 for s in _subscribers.values() if s.get("referred_by") == ref_id)
+                    await send_message(int(ref_id),
+                        f"\U0001f389 <b>Новий реферал!</b>\n\n"
+                        f"Хтось при\u0454днався за тво\u0457м посиланням!\n"
+                        f"\U0001f465 Всього рефералів: <b>{referrals}</b>")
+                except:
+                    pass
+            await cmd_start(chat_id, username)
         elif text.startswith("/start"):
             await cmd_start(chat_id, username)
         elif text.startswith("/prices") or text.startswith("/p"):
@@ -790,6 +1118,8 @@ async def process_update(update: dict, db_session_factory=None):
             await cmd_promo(chat_id, text[7:])
         elif text.startswith("/promo"):
             await cmd_promo(chat_id, "")
+        elif text.startswith("/invite") or text.startswith("/ref"):
+            await cmd_invite(chat_id, username)
         elif text.startswith("/help"):
             await send_message(chat_id,
                 "📋 <b>Команди:</b>\n\n"
@@ -804,6 +1134,7 @@ async def process_update(update: dict, db_session_factory=None):
                 "/digest — Дайджест ринку\n"
                 "/post — Опублікувати в канал (admin)\n"
                 "/promo КОД — Активувати промокод\n"
+                "/invite — Реферальна програма\n"
                 "/help — Ця довідка")
         else:
             # Unknown command — show menu
@@ -979,27 +1310,29 @@ async def run_bot(db_session_factory=None):
         {"command": "my_alerts", "description": "Мої алерти"},
         {"command": "settings", "description": "Налаштування"},
         {"command": "help", "description": "Довідка"},
+        {"command": "invite", "description": "Реферальна програма"},
     ]})
 
     alert_check_interval = 60  # Check alerts every 60 seconds
     last_alert_check = 0
 
 
-    # Auto-post digest to channel every 12 hours
-    auto_post_interval = 43200  # 12 hours
+    # Auto-post varied content to channel every 6 hours
+    auto_post_interval = 21600  # 6 hours
     last_auto_post = 0
 
     while True:
-        # Auto-post check
+        # Auto-post check — rotates through digest, trending, movers, F&G, promo, DeFi
         if CHANNEL_ID and time.time() - last_auto_post > auto_post_interval:
             try:
-                digest = await _generate_digest()
-                await send_message(CHANNEL_ID, digest)
+                content = await _get_auto_post_content()
+                if content:
+                    await send_message(CHANNEL_ID, content)
+                    log.info(f"[TG] Auto-posted to channel (type #{_auto_post_counter % 6})")
                 last_auto_post = time.time()
-                log.info("[TG] Auto-posted digest to channel")
             except Exception as e:
                 log.error(f"[TG] Auto-post error: {e}")
-                last_auto_post = time.time()  # Don't retry immediately
+                last_auto_post = time.time()
 
         await poll_updates(db_session_factory)
 
