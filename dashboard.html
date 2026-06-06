@@ -97,6 +97,21 @@ body.light-theme .loading-bar-inner{background:var(--accent-blue)}
  .stats-grid{grid-template-columns:1fr 1fr !important}
 }
 
+/* Quick Watch Bar */
+.qw-item{background:var(--bg-tertiary);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .2s;border:1px solid transparent;position:relative;overflow:hidden}
+.qw-item:hover{border-color:var(--accent-blue);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.qw-item .qw-sym{font-size:13px;font-weight:700;color:var(--text-primary)}
+.qw-item .qw-price{font-size:15px;font-weight:800;color:var(--text-primary);margin:4px 0 2px}
+.qw-item .qw-ch{font-size:12px;font-weight:600}
+.qw-item .qw-vol{font-size:10px;color:var(--text-tertiary)}
+.qw-item .qw-spark{position:absolute;bottom:0;left:0;right:0;height:24px;opacity:.3}
+/* Live price flash animation */
+@keyframes flashGreen{0%{background:rgba(48,209,88,.25)}100%{background:transparent}}
+@keyframes flashRed{0%{background:rgba(255,69,58,.25)}100%{background:transparent}}
+.flash-green{animation:flashGreen .6s ease}
+.flash-red{animation:flashRed .6s ease}
+.ws-live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent-green);margin-right:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* Universal Coin Picker */
 .coin-picker{position:relative;display:inline-block;width:100%}
 .coin-picker input{width:100%;padding:10px 14px 10px 36px;border-radius:10px;border:1px solid var(--border-primary);background:var(--bg-tertiary);color:var(--text-primary);font-size:14px;box-sizing:border-box;outline:none;transition:border-color .2s}
@@ -579,7 +594,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
    <div style="display:flex;align-items:center;gap:10px">
     <div class="pulse-dot"></div>
-    <span style="font-size:13px;color:var(--accent-green);font-weight:500" id="headerStatus">Online</span>
+    <span style="font-size:13px;color:var(--accent-green);font-weight:500" id="headerStatus"><span class="ws-live-dot"></span>Live</span>
    </div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
@@ -590,6 +605,7 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
     <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%)" class="kbd">⌘K</span>
     <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-card);border:1px solid var(--border-primary);border-radius:12px;max-height:320px;overflow-y:auto;z-index:99;box-shadow:0 16px 48px rgba(0,0,0,.5)"></div>
    </div>
+   <span id="alertBadge" style="display:none;background:var(--accent-red);color:#fff;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;cursor:pointer" onclick="showTab(&#39;wallets&#39;)" title="\u0410\u043a\u0442\u0438\u0432\u043d\u0456 \u0430\u043b\u0435\u0440\u0442\u0438">0</span>
    <span id="hunterInfo" class="hide-mobile" style="font-size:12px;color:var(--text-tertiary)">Мисливець: завантаження...</span>
    <span id="refreshCountdown" style="font-size:11px;color:var(--text-tertiary);font-family:monospace;min-width:28px;text-align:center" class="hide-mobile">30с</span>
    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Light/Dark mode">&#x1F319;</button>
@@ -614,6 +630,43 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
   <div id="greetingBlock" style="margin-bottom:32px">
    <h1 style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.4px;margin:0 0 6px 0">{{GREETING}}</h1>
    <p style="font-size:15px;color:var(--text-tertiary);margin:0">{{DASHBOARD_TITLE}}</p>
+  </div>
+
+  <!-- Global Market Summary -->
+  <div id="marketSummaryBlock" class="card" style="padding:14px 20px;margin-bottom:20px;background:linear-gradient(135deg,rgba(10,132,255,.04),rgba(100,210,255,.04));border:1px solid rgba(10,132,255,.12)">
+   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+     <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;font-weight:600">Market Cap</span>
+      <span id="globalMcap" style="font-size:14px;font-weight:700;color:var(--text-primary)">&#x2014;</span>
+      <span id="globalMcapCh" style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px">&#x2014;</span>
+     </div>
+     <div style="width:1px;height:20px;background:var(--border-primary)"></div>
+     <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;font-weight:600">24h Vol</span>
+      <span id="globalVol" style="font-size:14px;font-weight:700;color:var(--text-primary)">&#x2014;</span>
+     </div>
+     <div style="width:1px;height:20px;background:var(--border-primary)" class="hide-mobile"></div>
+     <div style="display:flex;align-items:center;gap:6px" class="hide-mobile">
+      <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;font-weight:600">BTC</span>
+      <span id="globalBtcD" style="font-size:14px;font-weight:700;color:var(--accent-orange)">&#x2014;</span>
+     </div>
+     <div style="width:1px;height:20px;background:var(--border-primary)" class="hide-mobile"></div>
+     <div style="display:flex;align-items:center;gap:6px" class="hide-mobile">
+      <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;font-weight:600">ETH</span>
+      <span id="globalEthD" style="font-size:14px;font-weight:700;color:var(--accent-blue)">&#x2014;</span>
+     </div>
+     <div style="width:1px;height:20px;background:var(--border-primary)" class="hide-mobile"></div>
+     <div style="display:flex;align-items:center;gap:6px" class="hide-mobile">
+      <span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;font-weight:600">Coins</span>
+      <span id="globalCoins" style="font-size:14px;font-weight:700;color:var(--accent-cyan)">&#x2014;</span>
+     </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+     <span class="ws-live-dot"></span>
+     <span style="font-size:11px;color:var(--accent-green);font-weight:600">LIVE</span>
+    </div>
+   </div>
   </div>
 
   <!-- Stats -->
@@ -731,6 +784,18 @@ select.input-field{appearance:none;background-image:url("data:image/svg+xml,%3Cs
    <canvas id="btcMiniCanvas" height="60" style="width:100%"></canvas>
   </div>
 
+
+
+  <!-- Quick Watchlist Bar (live prices) -->
+  <div id="quickWatchBar" class="card" style="padding:14px 16px;margin-bottom:20px;overflow:hidden">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;font-weight:600">&#x2B50; &#x0428;&#x0432;&#x0438;&#x0434;&#x043A;&#x0438;&#x0439; &#x043E;&#x0433;&#x043B;&#x044F;&#x0434;</span>
+    <span style="font-size:11px;color:var(--text-tertiary)">&#x0417;&#x0430; Binance WebSocket</span>
+   </div>
+   <div id="quickWatchGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+    <div style="text-align:center;padding:16px;color:var(--text-tertiary);font-size:12px;grid-column:1/-1">&#x0417;&#x0430;&#x0432;&#x0430;&#x043D;&#x0442;&#x0430;&#x0436;&#x0435;&#x043D;&#x043D;&#x044F;...</div>
+   </div>
+  </div>
 
   <!-- Exchange Trade Banner -->
   <div id="tradeBanner" class="card" style="padding:16px 20px;margin-bottom:20px;background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(249,115,22,.08));border:1px solid rgba(245,158,11,.2)">
@@ -1830,6 +1895,8 @@ function showTab(n){
  var mc=document.getElementById("btcMiniChartBlock");if(mc)mc.style.display=(n==="hunted")?"block":"none";
  var tb=document.getElementById("tradeBanner");if(tb)tb.style.display=(n==="hunted")?"block":"none";
  var qa=document.getElementById("quickActionsBlock");if(qa)qa.style.display=(n==="hunted")?"block":"none";
+ var ms=document.getElementById("marketSummaryBlock");if(ms)ms.style.display=(n==="hunted")?"block":"none";
+ var qwb=document.getElementById("quickWatchBar");if(qwb)qwb.style.display=(n==="hunted")?"block":"none";
  var qw=document.getElementById("quickWatchBar");if(qw&&qw.style.display!=="none")qw.style.display=(n==="hunted")?"block":"none";
  /* Full-page asset view */
  var isAsset=(n==="asset");
@@ -1910,6 +1977,72 @@ function loadTicker(){
   }
   track.innerHTML=html;
  }).catch(function(){})
+}
+
+
+/* ══════ BINANCE WEBSOCKET — LIVE PRICES ══════ */
+var _ws=null,_wsCoins=["btcusdt","ethusdt","solusdt","bnbusdt","xrpusdt","dogeusdt","adausdt","avaxusdt","dotusdt","maticusdt","linkusdt","ltcusdt","atomusdt","uniusdt","nearusdt"],_livePrices={},_prevPrices={};
+function connectBinanceWS(){
+  if(_ws&&_ws.readyState<=1)return;
+  var streams=_wsCoins.map(function(s){return s+"@miniTicker"}).join("/");
+  _ws=new WebSocket("wss://stream.binance.com:9443/stream?streams="+streams);
+  _ws.onmessage=function(ev){
+    try{
+      var msg=JSON.parse(ev.data);
+      if(!msg.data)return;
+      var d=msg.data,sym=d.s,price=parseFloat(d.c),ch24=parseFloat(((d.c-d.o)/d.o*100).toFixed(2)),vol=parseFloat(d.v)*price;
+      var prev=_livePrices[sym];
+      _prevPrices[sym]=prev?prev.price:price;
+      _livePrices[sym]={price:price,change:ch24,volume:vol,high:parseFloat(d.h),low:parseFloat(d.l),ts:Date.now()};
+      updateLiveTicker(sym,price,ch24);
+      updateLiveElements(sym,price,ch24);
+    }catch(e){}
+  };
+  _ws.onclose=function(){setTimeout(connectBinanceWS,3000)};
+  _ws.onerror=function(){_ws.close()};
+  var hb=setInterval(function(){if(_ws.readyState===1)_ws.send("pong");else clearInterval(hb)},30000);
+}
+function updateLiveTicker(sym,price,ch){
+  var items=document.querySelectorAll(".ticker-item[data-symbol]");
+  items.forEach(function(el){
+    if(el.getAttribute("data-symbol")===sym.replace("USDT","").toUpperCase()||
+       el.getAttribute("data-symbol")===sym){
+      var pEl=el.querySelector(".t-price");
+      var cEl=el.querySelector(".t-change");
+      if(pEl){
+        var oldP=parseFloat(pEl.textContent.replace(/[$,]/g,""))||0;
+        pEl.textContent=fmtPrice(price);
+        if(price>oldP)pEl.style.color="var(--accent-green)";
+        else if(price<oldP)pEl.style.color="var(--accent-red)";
+        else pEl.style.color="";
+        clearTimeout(pEl._t);pEl._t=setTimeout(function(){pEl.style.color=""},1200);
+      }
+      if(cEl){
+        cEl.textContent=chIcon(ch)+" "+chS(ch);
+        cEl.style.color=ch>=0?"var(--accent-green)":"var(--accent-red)";
+      }
+    }
+  });
+}
+function updateLiveElements(sym,price,ch){
+  /* Update any element with data-live-sym matching */
+  document.querySelectorAll("[data-live-sym=\""+sym+"\"]").forEach(function(el){
+    var prev=_prevPrices[sym]||price;
+    el.textContent="$"+fmtPrice(price);
+    if(price>prev)el.classList.add("flash-green");
+    else if(price<prev)el.classList.add("flash-red");
+    clearTimeout(el._flashT);el._flashT=setTimeout(function(){el.classList.remove("flash-green","flash-red")},600);
+  });
+  /* Update BTC mini price on homepage */
+  if(sym==="BTCUSDT"){
+    var bp=document.getElementById("btcMiniPrice");
+    if(bp)bp.textContent="$"+fmtBig(price);
+  }
+}
+function getLivePrice(symbol){
+  var s=(symbol||"").toUpperCase();
+  if(!s.endsWith("USDT"))s+="USDT";
+  return _livePrices[s]||null;
 }
 
 /* ══════ OWN CHART ENGINE ══════ */
@@ -3034,21 +3167,74 @@ window.addEventListener("popstate",applyRoute);
 
 /* ══════ PRICE ALERTS ══════ */
 var priceAlerts=JSON.parse(localStorage.getItem("ov_alerts")||"[]");
+var _alertHistory=JSON.parse(localStorage.getItem("ov_alert_history")||"[]");
+var _alertSoundEnabled=localStorage.getItem("ov_alert_sound")!=="off";
+var _triggeredCount=0;
+
+/* Alert sound via Web Audio API */
+function playAlertSound(){
+  if(!_alertSoundEnabled)return;
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var osc=ctx.createOscillator();var gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.type="sine";osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.1);
+    osc.frequency.setValueAtTime(880,ctx.currentTime+0.2);
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.4);
+    osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.4);
+  }catch(e){}
+}
+function toggleAlertSound(){
+  _alertSoundEnabled=!_alertSoundEnabled;
+  localStorage.setItem("ov_alert_sound",_alertSoundEnabled?"on":"off");
+  showToast(_alertSoundEnabled?"\u0417\u0432\u0443\u043a \u0443\u0432\u0456\u043c\u043a\u043d\u0435\u043d\u043e":"\u0417\u0432\u0443\u043a \u0432\u0438\u043c\u043a\u043d\u0435\u043d\u043e",true);
+}
+function updateAlertBadge(){
+  var badge=document.getElementById("alertBadge");
+  if(!badge)return;
+  var active=priceAlerts.filter(function(a){return !a.triggered}).length;
+  badge.textContent=active;
+  badge.style.display=active>0?"flex":"none";
+}
 function addPriceAlert(symbol,price,direction){
- priceAlerts.push({symbol:symbol,price:parseFloat(price),direction:direction||"above",triggered:false,id:Date.now()});
+ priceAlerts.push({symbol:symbol,price:parseFloat(price),direction:direction||"above",triggered:false,id:Date.now(),created:new Date().toISOString()});
  localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
- showToast("Алерт додано: "+symbol+" "+direction+" $"+price,true);
+ updateAlertBadge();
+ showToast("\u0410\u043b\u0435\u0440\u0442 \u0434\u043e\u0434\u0430\u043d\u043e: "+symbol+" "+direction+" $"+price,true);
+}
+function removeAlert(id){
+ priceAlerts=priceAlerts.filter(function(a){return a.id!==id});
+ localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
+ updateAlertBadge();
+ showToast("\u0410\u043b\u0435\u0440\u0442 \u0432\u0438\u0434\u0430\u043b\u0435\u043d\u043e",true);
 }
 function checkAlerts(){
  var changed=false;
  priceAlerts.forEach(function(al){
   if(al.triggered)return;
   var asset=allAssetsCache.find(function(a){return a.symbol===al.symbol});
-  if(!asset)return;
-  var hit=(al.direction==="above"&&asset.price_usd>=al.price)||(al.direction==="below"&&asset.price_usd<=al.price);
-  if(hit){al.triggered=true;changed=true;showToast("🔔 "+al.symbol+" досяг $"+al.price+"!",true)}
+  /* Also check live WebSocket prices */
+  var liveP=getLivePrice(al.symbol);
+  var price=liveP?liveP.price:(asset?asset.price_usd:null);
+  if(!price)return;
+  var hit=(al.direction==="above"&&price>=al.price)||(al.direction==="below"&&price<=al.price);
+  if(hit){
+    al.triggered=true;al.triggeredAt=new Date().toISOString();al.triggeredPrice=price;
+    changed=true;_triggeredCount++;
+    _alertHistory.unshift({symbol:al.symbol,target:al.price,actual:price,direction:al.direction,time:new Date().toLocaleString()});
+    if(_alertHistory.length>50)_alertHistory=_alertHistory.slice(0,50);
+    localStorage.setItem("ov_alert_history",JSON.stringify(_alertHistory));
+    playAlertSound();
+    showToast("\ud83d\udd14 "+al.symbol+" \u0434\u043e\u0441\u044f\u0433 $"+fmtPrice(price)+"! (\u0446\u0456\u043b\u044c: $"+al.price+")",true);
+    /* Browser notification */
+    if(Notification.permission==="granted"){
+      new Notification("Omni-Vision Alert",{body:al.symbol+" "+al.direction+" $"+al.price+" \u2014 \u0437\u0430\u0440\u0430\u0437 $"+fmtPrice(price),icon:"data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>\ud83d\udd2d</text></svg>"});
+    }
+  }
  });
- if(changed)localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));
+ if(changed){localStorage.setItem("ov_alerts",JSON.stringify(priceAlerts));updateAlertBadge()}
 }
 
 /* ══════ MISSING FUNCTIONS (restored) ══════ */
@@ -4555,10 +4741,13 @@ function runScreener(page) {
     h += '<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">Volume</th>';
     h += '<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">MCap</th>';
     h += '<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">ATH</th>';
+    h += '<th style="padding:10px 8px;text-align:center;color:var(--text-tertiary);font-size:11px">7d Chart</th>';
+    h += '<th style="padding:10px 8px;text-align:right;color:var(--text-tertiary);font-size:11px">Vol/MCap</th>';
     h += '</tr></thead><tbody>';
     
-    coins.forEach(function(c){
-      h += '<tr style="border-bottom:1px solid var(--bg-tertiary);transition:background .15s" onmouseover="this.style.background=\'var(--bg-secondary)\';" onmouseout="this.style.background=\'\'">';
+    coins.forEach(function(c,ci){
+      var sparkId="scrSpark"+ci;
+      h += '<tr style="border-bottom:1px solid var(--bg-tertiary);transition:background .15s;cursor:pointer" onmouseover="this.style.background=\'var(--bg-secondary)\'" onmouseout="this.style.background=\'\'" onclick="openAssetPage(\''+c.id+'\')">';
       h += '<td style="padding:10px 8px;color:var(--text-tertiary)">' + (c.rank||"-") + '</td>';
       h += '<td style="padding:10px 8px"><div style="display:flex;align-items:center;gap:8px">';
       if(c.image) h += '<img src="' + c.image + '" style="width:22px;height:22px;border-radius:50%" loading="lazy">';
@@ -4577,11 +4766,28 @@ function runScreener(page) {
       h += '<td style="padding:10px 8px;text-align:right;color:var(--text-secondary)">$' + fmtBig(c.market_cap) + '</td>';
       var athPct = c.ath_change !== null ? c.ath_change.toFixed(0) + "%" : "-";
       h += '<td style="padding:10px 8px;text-align:right;color:var(--accent-red);font-size:11px">' + athPct + '</td>';
+      h += '<td style="padding:10px 8px;text-align:center"><canvas id="scrSpark'+ci+'" width="80" height="28" style="width:80px;height:28px"></canvas></td>';
+      var vmRatio=(c.volume&&c.market_cap)?(c.volume/c.market_cap*100).toFixed(1)+"%":"\u2014";
+      var vmColor=(c.volume&&c.market_cap&&c.volume/c.market_cap>0.1)?"var(--accent-green)":"var(--text-tertiary)";
+      h += '<td style="padding:10px 8px;text-align:right;font-size:11px;color:'+vmColor+'">'+vmRatio+'</td>';
       h += '</tr>';
     });
     h += '</tbody></table></div>';
     wrap.innerHTML = h;
     
+    /* Fetch sparkline data for each coin */
+    coins.forEach(function(c,ci){
+      if(c.sparkline_in_7d&&c.sparkline_in_7d.price){
+        var sp=c.sparkline_in_7d.price;var up7=sp[sp.length-1]>=sp[0];
+        drawSparkline("scrSpark"+ci,sp,up7);
+      }else if(c.id){
+        fetch("https://api.coingecko.com/api/v3/coins/"+c.id+"/market_chart?vs_currency=usd&days=7&interval=daily").then(function(r){return r.json()}).then(function(d2){
+          if(!d2.prices)return;var vals=d2.prices.map(function(p){return p[1]});
+          drawSparkline("scrSpark"+ci,vals,vals[vals.length-1]>=vals[0]);
+        }).catch(function(){});
+      }
+    });
+
     // Pagination
     var pager = document.getElementById("screenerPager");
     if(pager && d.pages > 1) {
@@ -4995,6 +5201,108 @@ function runConverter() {
 /* ══════════════════════════════════════════════════════
    LIVE MARKET WIDGETS
    ══════════════════════════════════════════════════════ */
+
+
+/* ══════ QUICK WATCHLIST BAR ══════ */
+var _qwCoins=[
+  {sym:"BTC",pair:"BTCUSDT",icon:"&#x20BF;",color:"#f7931a"},
+  {sym:"ETH",pair:"ETHUSDT",icon:"&#x039E;",color:"#627eea"},
+  {sym:"SOL",pair:"SOLUSDT",icon:"&#x2600;",color:"#9945ff"},
+  {sym:"BNB",pair:"BNBUSDT",icon:"&#x25C6;",color:"#f3ba2f"},
+  {sym:"XRP",pair:"XRPUSDT",icon:"&#x2B2F;",color:"#00aae4"},
+  {sym:"DOGE",pair:"DOGEUSDT",icon:"&#x1F436;",color:"#c2a633"},
+  {sym:"ADA",pair:"ADAUSDT",icon:"&#x25CF;",color:"#0033ad"},
+  {sym:"AVAX",pair:"AVAXUSDT",icon:"&#x25B2;",color:"#e84142"},
+  {sym:"LINK",pair:"LINKUSDT",icon:"&#x26D3;",color:"#2a5ada"},
+  {sym:"DOT",pair:"DOTUSDT",icon:"&#x25C9;",color:"#e6007a"}
+];
+function initQuickWatch(){
+  var grid=document.getElementById("quickWatchGrid");
+  if(!grid)return;
+  var h="";
+  _qwCoins.forEach(function(c){
+    h+="<div class=\"qw-item\" onclick=\"showTab(&#39;crypto&#39;)\" data-qw=\""+c.pair+"\">"
+      +"<div style=\"display:flex;align-items:center;gap:6px\"><span style=\"font-size:16px;color:"+c.color+"\">"+c.icon+"</span><span class=\"qw-sym\">"+c.sym+"</span></div>"
+      +"<div class=\"qw-price\" id=\"qw-p-"+c.pair+"\">&#x2014;</div>"
+      +"<div class=\"qw-ch\" id=\"qw-c-"+c.pair+"\">&#x2014;</div>"
+      +"<div class=\"qw-vol\" id=\"qw-v-"+c.pair+"\"></div>"
+      +"</div>";
+  });
+  grid.innerHTML=h;
+  /* Initial fetch from CoinGecko for immediate data */
+  fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,cardano,avalanche-2,chainlink,polkadot&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true").then(function(r){return r.json()}).then(function(d){
+    var map={"bitcoin":"BTCUSDT","ethereum":"ETHUSDT","solana":"SOLUSDT","binancecoin":"BNBUSDT","ripple":"XRPUSDT","dogecoin":"DOGEUSDT","cardano":"ADAUSDT","avalanche-2":"AVAXUSDT","chainlink":"LINKUSDT","polkadot":"DOTUSDT"};
+    for(var id in d){
+      var pair=map[id];if(!pair)continue;
+      var p=d[id].usd,ch=d[id].usd_24h_change||0,vol=d[id].usd_24h_vol||0;
+      var pEl=document.getElementById("qw-p-"+pair);
+      var cEl=document.getElementById("qw-c-"+pair);
+      var vEl=document.getElementById("qw-v-"+pair);
+      if(pEl)pEl.textContent="$"+fmtPrice(p);
+      if(cEl){cEl.textContent=(ch>=0?"+":"")+ch.toFixed(2)+"%";cEl.style.color=ch>=0?"var(--accent-green)":"var(--accent-red)"}
+      if(vEl)vEl.textContent="Vol: "+fmtVol(vol);
+    }
+  }).catch(function(){});
+  /* Update from WebSocket */
+  setInterval(function(){
+    _qwCoins.forEach(function(c){
+      var lp=_livePrices[c.pair];
+      if(!lp)return;
+      var pEl=document.getElementById("qw-p-"+c.pair);
+      var cEl=document.getElementById("qw-c-"+c.pair);
+      if(pEl){
+        var old=parseFloat(pEl.textContent.replace(/[$,]/g,""))||0;
+        pEl.textContent="$"+fmtPrice(lp.price);
+        if(lp.price>old)pEl.style.color="var(--accent-green)";
+        else if(lp.price<old)pEl.style.color="var(--accent-red)";
+        clearTimeout(pEl._t);pEl._t=setTimeout(function(){pEl.style.color="var(--text-primary)"},800);
+      }
+      if(cEl){cEl.textContent=(lp.change>=0?"+":"")+lp.change.toFixed(2)+"%";cEl.style.color=lp.change>=0?"var(--accent-green)":"var(--accent-red)"}
+    });
+  },1000);
+}
+
+
+/* ══════ SPARKLINE MINI CHART ══════ */
+function drawSparkline(canvasId,data,up){
+  var c=document.getElementById(canvasId);if(!c)return;
+  var ctx=c.getContext("2d");var W=c.width;var H=c.height;
+  ctx.clearRect(0,0,W,H);
+  if(!data||data.length<2)return;
+  var mn=Math.min.apply(null,data);var mx=Math.max.apply(null,data);var rng=mx-mn||1;
+  ctx.beginPath();
+  data.forEach(function(v,i){var x=i/(data.length-1)*W;var y=H-((v-mn)/rng)*(H-4)-2;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});
+  ctx.strokeStyle=up?"#30d158":"#ff453a";ctx.lineWidth=1.5;ctx.stroke();
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+  var g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,up?"rgba(48,209,88,.15)":"rgba(255,69,58,.15)");
+  g.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=g;ctx.fill();
+}
+
+/* ══════ GLOBAL MARKET DATA ══════ */
+function loadGlobalMarketData(){
+  fetch("https://api.coingecko.com/api/v3/global").then(function(r){return r.json()}).then(function(d){
+    var g=d.data;
+    var mcap=g.total_market_cap.usd||0;
+    var vol=g.total_volume.usd||0;
+    var btcD=g.market_cap_percentage.btc||0;
+    var ethD=g.market_cap_percentage.eth||0;
+    var coins=g.active_cryptocurrencies||0;
+    var mcapCh=g.market_cap_change_percentage_24h_usd||0;
+    var mEl=document.getElementById("globalMcap");if(mEl)mEl.textContent="$"+fmtBig(mcap);
+    var vEl=document.getElementById("globalVol");if(vEl)vEl.textContent="$"+fmtBig(vol);
+    var bEl=document.getElementById("globalBtcD");if(bEl)bEl.textContent=btcD.toFixed(1)+"%";
+    var eEl=document.getElementById("globalEthD");if(eEl)eEl.textContent=ethD.toFixed(1)+"%";
+    var cEl=document.getElementById("globalCoins");if(cEl)cEl.textContent=coins.toLocaleString();
+    var chEl=document.getElementById("globalMcapCh");
+    if(chEl){
+      chEl.textContent=(mcapCh>=0?"+":"")+mcapCh.toFixed(2)+"%";
+      chEl.style.background=mcapCh>=0?"rgba(48,209,88,.12)":"rgba(255,69,58,.12)";
+      chEl.style.color=mcapCh>=0?"var(--accent-green)":"var(--accent-red)";
+    }
+  }).catch(function(e){console.warn("Global market error:",e)});
+}
+
 function loadLiveWidgets(){
   loadFearGreed();
   loadDominance();
@@ -5998,11 +6306,16 @@ document.addEventListener("DOMContentLoaded", function(){
     createChartToggle("cryptoChartType","line",function(t){if(typeof loadCryptoChart==="function")loadCryptoChart()});
   },500);
   checkOnboarding();
+  if("Notification" in window&&Notification.permission==="default")Notification.requestPermission();
+  updateAlertBadge();
   startAutoRefresh();
   restoreSidebarGroups();
   loadRadar("crypto");
+  connectBinanceWS();
   if(typeof loadMarketPulse==="function") loadMarketPulse();
   if(typeof loadLiveWidgets==="function") loadLiveWidgets();
+  if(typeof loadGlobalMarketData==="function") loadGlobalMarketData();
+  initQuickWatch();
   if(typeof loadReferralConfig==="function") loadReferralConfig();
   if(typeof initMultiCharts==="function") initMultiCharts();
 });
@@ -6015,4 +6328,24 @@ document.addEventListener("DOMContentLoaded", function(){
    <span class="cmd-icon">&#x1F50D;</span>
    <input id="cmdInput" type="text" placeholder="&#x0428;&#x0443;&#x043A;&#x0430;&#x0442;&#x0438; &#x0444;&#x0443;&#x043D;&#x043A;&#x0446;&#x0456;&#x0457;, &#x0456;&#x043D;&#x0441;&#x0442;&#x0440;&#x0443;&#x043C;&#x0435;&#x043D;&#x0442;&#x0438;..." oninput="filterCmdPalette(this.value)" onkeydown="cmdPaletteNav(event)">
   </div>
-  <div c
+    <div class="cmd-results" id="cmdResults"></div>
+ </div>
+</div>
+
+<!-- Overlay for mobile sidebar -->
+<div id="overlay" onclick="toggleSidebar()"></div>
+
+<!-- Toast notifications -->
+<div id="toastBox" style="position:fixed;bottom:80px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
+
+<!-- Mobile Bottom Nav -->
+<div class="mobile-bottom-nav">
+ <a onclick="showTab(&#39;hunted&#39;)" class="active"><span>&#x1F3E0;</span>&#x0413;&#x043E;&#x043B;&#x043E;&#x0432;&#x043D;&#x0430;</a>
+ <a onclick="showTab(&#39;trending&#39;)"><span>&#x1F525;</span>&#x0422;&#x0440;&#x0435;&#x043D;&#x0434;&#x0438;</a>
+ <a onclick="showTab(&#39;screener&#39;)"><span>&#x1F50D;</span>Screener</a>
+ <a onclick="showTab(&#39;advisor&#39;)"><span>&#x1F9E0;</span>AI</a>
+ <a onclick="toggleSidebar()"><span>&#x2630;</span>&#x041C;&#x0435;&#x043D;&#x044E;</a>
+</div>
+
+</body>
+</html>

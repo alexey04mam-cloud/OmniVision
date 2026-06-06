@@ -131,5 +131,15 @@ hunted, analytics, deepanalytics, advisor, crypto, stocks, commodities, dex, flo
 - On-Chain BTC: blockchain.info/stats direct
 - All other: CoinGecko, DexScreener, BestChange, DeFiLlama
 
+## Session 2 Improvements (2026-06-06)
+- **Binance WebSocket**: Real-time price updates via wss://stream.binance.com for 15 coins (BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, DOT, MATIC, LINK, LTC, ATOM, UNI, NEAR). Flash animations on price change.
+- **Global Market Summary Bar**: Total market cap, 24h volume, BTC/ETH dominance, active coins count — shown on homepage.
+- **Quick Watchlist Bar**: 10 top coins with live WebSocket prices, instant update every second, mini-icons.
+- **Enhanced Alerts**: Web Audio API sound notifications, browser Notification API, alert history (50 items), badge counter in header, removeAlert function.
+- **Screener Sparklines**: 7-day mini charts for each coin in screener, Vol/MCap ratio column, clickable rows to asset page. Sparkline data from CoinGecko API.
+- **Live indicator**: Pulsing green dot in header showing WebSocket connection status.
+- **File ending fix**: Restored truncated Command Palette + closing HTML tags.
+- **Total codebase**: ~11,896 lines (was 11,561)
+
 ## Last Updated
-2026-06-05
+2026-06-06

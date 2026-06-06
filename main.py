@@ -2792,7 +2792,7 @@ async def market_screener(
                     "order": "market_cap_desc",
                     "per_page": 250,
                     "page": 1,
-                    "sparkline": "false",
+                    "sparkline": "true",
                     "price_change_percentage": "1h,24h,7d"
                 }
             )
@@ -2823,6 +2823,7 @@ async def market_screener(
 
             filtered.append({
                 "rank": c.get("market_cap_rank"),
+                "id": c.get("id"),
                 "symbol": (c.get("symbol") or "").upper(),
                 "name": c.get("name"),
                 "image": c.get("image"),
@@ -2834,6 +2835,7 @@ async def market_screener(
                 "change_7d": c.get("price_change_percentage_7d_in_currency"),
                 "ath": c.get("ath"),
                 "ath_change": c.get("ath_change_percentage"),
+                "sparkline_in_7d": c.get("sparkline_in_7d"),
             })
 
         # Sort
