@@ -148,45 +148,4 @@ Full list in `.env.example`.
 
 1. **Subscriptions** — Pro $9.99/mo, VIP $29.99/mo (CryptoBot + Stars)
 2. **Referral commissions** — Bybit, BingX, OKX, Binance affiliate links
-3. **Telegram channel** — monetize audience with signals/ads
-4. **White-label** — resell customized versions
-5. **Promo codes** — run campaigns, track conversions
-
----
-
-## Codebase
-
-- **14,055 lines** of production code
-- **110+ API endpoints** covering every feature
-- **35 UI panels** — each with loading states, error handling, responsive design
-- **0 npm dependencies** on frontend — no build step, no node_modules
-- **Validated** — all JS passes `node --check`, all Python passes `py_compile`
-- **Well-structured** — FastAPI backend, single-file frontend, separate Telegram bot
-
----
-
-## What's Included
-
-- Full source code (no obfuscation)
-- Working deployment on Railway
-- Telegram bot with all commands
-- Landing page (SEO-optimized)
-- `.env.example` with all config keys
-- `deploy.bat` — one-click deploy script
-- `dev.bat` — local development server
-- `MEMORY.md` — detailed project documentation
-- This README
-
----
-
-## Contact
-
-**Price: $1,000**
-
-Interested? Reach out:
-- **Telegram:** [@alexey04mam](https://t.me/alexey04mam)
-- **Email:** alexey04mam@gmail.com
-
----
-
-*Built with FastAPI, Chart.js, lightweight-charts, Binance WebSocket, and CoinGecko API.*
+3. **Telegram channel** 
