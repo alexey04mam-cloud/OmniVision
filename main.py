@@ -646,6 +646,14 @@ def welcome_page(request: Request):
         return RedirectResponse(url="/login", status_code=302)
     return HTMLResponse(content=html)
 
+@app.get("/sell", response_class=HTMLResponse)
+def sell_page():
+    """Project sale page"""
+    html = read_template("sell.html")
+    if not html:
+        return HTMLResponse("<h1>Page not found</h1>", status_code=404)
+    return HTMLResponse(content=html)
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     user = get_current_user(request)

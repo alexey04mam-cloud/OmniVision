@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OmniVision — Crypto Analytics Platform For Sale | $1,000</title>
+<meta name="description" content="Buy a production-ready crypto analytics SaaS with 35 tools, AI assistant, Telegram bot, and built-in monetization. 14,000+ lines of code. $1,000.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e17;--card:#131a2b;--border:#1e2a42;--blue:#0a84ff;--cyan:#32d6e2;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--purple:#bf5af2;--text:#f5f5f7;--text2:#8e8e93;--text3:#636366}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+a{color:var(--blue);text-decoration:none}
+
+/* Hero */
+.hero{text-align:center;padding:80px 20px 60px;background:linear-gradient(180deg,rgba(10,132,255,.08) 0%,transparent 100%)}
+.hero-badge{display:inline-block;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(48,209,88,.1);color:var(--green);border:1px solid rgba(48,209,88,.2);margin-bottom:20px}
+.hero h1{font-size:clamp(32px,5vw,56px);font-weight:800;margin-bottom:16px;background:linear-gradient(135deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:18px;color:var(--text2);max-width:640px;margin:0 auto 32px}
+.hero-price{font-size:48px;font-weight:800;color:var(--green);margin-bottom:8px}
+.hero-price-note{font-size:14px;color:var(--text3);margin-bottom:32px}
+.btn-primary{display:inline-block;padding:14px 36px;border-radius:12px;font-size:16px;font-weight:700;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;border:none;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(10,132,255,.3)}
+.btn-secondary{display:inline-block;padding:14px 36px;border-radius:12px;font-size:16px;font-weight:600;background:transparent;color:var(--text);border:1px solid var(--border);cursor:pointer;margin-left:12px;transition:border-color .2s}
+.btn-secondary:hover{border-color:var(--blue)}
+
+/* Stats */
+.stats{display:flex;justify-content:center;gap:40px;padding:40px 20px;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-num{font-size:36px;font-weight:800;color:var(--blue)}
+.stat-label{font-size:13px;color:var(--text3);margin-top:4px}
+
+/* Section */
+.section{max-width:1000px;margin:0 auto;padding:60px 20px}
+.section h2{font-size:28px;font-weight:700;margin-bottom:12px;text-align:center}
+.section .subtitle{text-align:center;color:var(--text2);font-size:15px;margin-bottom:40px}
+
+/* Features Grid */
+.features{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:40px}
+.feature{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.feature-icon{font-size:28px;margin-bottom:10px}
+.feature h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.feature p{font-size:13px;color:var(--text2);line-height:1.5}
+
+/* Revenue */
+.revenue{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;margin:40px auto;max-width:700px}
+.revenue h3{font-size:20px;font-weight:700;margin-bottom:20px;text-align:center}
+.revenue-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.revenue-row:last-child{border:none}
+.revenue-row span:first-child{color:var(--text2)}
+.revenue-row span:last-child{font-weight:700;color:var(--green)}
+
+/* Tech */
+.tech-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.tech-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px}
+.tech-item strong{color:var(--blue)}
+
+/* Comparison */
+.compare-table{width:100%;border-collapse:collapse;margin:20px 0}
+.compare-table th,.compare-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:13px}
+.compare-table th{color:var(--text3);font-weight:600;font-size:12px;text-transform:uppercase}
+.compare-table td:first-child{font-weight:600}
+.check{color:var(--green)}
+.cross{color:var(--red)}
+
+/* CTA */
+.cta{text-align:center;padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(10,132,255,.06))}
+.cta h2{font-size:32px;font-weight:800;margin-bottom:12px}
+.cta p{color:var(--text2);margin-bottom:32px;font-size:16px}
+.contact-cards{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:24px}
+.contact-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 32px;text-align:center;min-width:200px}
+.contact-card .c-icon{font-size:32px;margin-bottom:8px}
+.contact-card .c-label{font-size:12px;color:var(--text3);margin-bottom:4px}
+.contact-card .c-value{font-size:15px;font-weight:600}
+
+/* Footer */
+.footer{text-align:center;padding:32px;font-size:12px;color:var(--text3);border-top:1px solid var(--border)}
+
+/* What's included */
+.included{list-style:none;padding:0;max-width:600px;margin:0 auto}
+.included li{padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:10px}
+.included li::before{content:"\2713";color:var(--green);font-weight:700;font-size:16px}
+
+@media(max-width:600px){
+ .stats{gap:24px}
+ .stat-num{font-size:28px}
+ .hero h1{font-size:28px}
+ .hero-price{font-size:36px}
+ .btn-secondary{margin:12px 0 0;display:block}
+}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+ <div class="hero-badge">FOR SALE — Ready to Deploy</div>
+ <h1>OmniVision</h1>
+ <p>Production-ready crypto analytics SaaS with 35 tools, AI-powered smart alerts, Telegram bot, and built-in payment system.</p>
+ <div class="hero-price">$1,000</div>
+ <div class="hero-price-note">One-time payment. Full source code. No recurring fees.</div>
+ <a href="https://t.me/alexey04mam" class="btn-primary">Buy Now via Telegram</a>
+ <a href="https://dependable-tranquility-production-d86f.up.railway.app" class="btn-secondary" target="_blank">Live Demo</a>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+ <div class="stat"><div class="stat-num">14K+</div><div class="stat-label">Lines of Code</div></div>
+ <div class="stat"><div class="stat-num">35</div><div class="stat-label">Tools & Panels</div></div>
+ <div class="stat"><div class="stat-num">110+</div><div class="stat-label">API Endpoints</div></div>
+ <div class="stat"><div class="stat-num">$0</div><div class="stat-label">Dependencies Cost</div></div>
+</div>
+
+<!-- Features -->
+<div class="section">
+ <h2>What's Inside</h2>
+ <p class="subtitle">Every feature is built, tested, and production-ready</p>
+
+ <div class="features">
+  <div class="feature">
+   <div class="feature-icon">&#x1F9E0;</div>
+   <h3>AI Smart Alerts</h3>
+   <p>Background AI scans the market every 15 min. Detects volume spikes, price breakouts, trend reversals, extreme sentiment. Generates AI analysis via Groq.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F4CA;</div>
+   <h3>Market Screener</h3>
+   <p>Filter 250+ coins by price, volume, market cap. 7-day sparklines, Vol/MCap ratio, clickable rows for deep-dive. Auto-refreshes.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F916;</div>
+   <h3>AI Chat Assistant</h3>
+   <p>Groq LLaMA 3.3 70B with OpenRouter fallback + rule-based fallback. Always responds, even if APIs fail.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F4B0;</div>
+   <h3>Payment System</h3>
+   <p>CryptoBot (Visa/MC/Apple Pay/crypto) + Telegram Stars. Webhook auto-confirm. 3-tier: Free/Pro/VIP. Promo codes with admin panel.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F4F1;</div>
+   <h3>Telegram Bot</h3>
+   <p>Price alerts, market digests, 6 auto-post types every 6h, referral system with bonus tiers, premium management.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x26A1;</div>
+   <h3>Real-Time Data</h3>
+   <p>Binance WebSocket for 15 coins. Live prices with flash animations. Fear & Greed, dominance, top movers — all live.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F5FA;</div>
+   <h3>Heatmap & Charts</h3>
+   <p>Treemap top-50, correlation matrix, multi-chart (2/4 layout), candlestick + line toggle, liquidation map.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F310;</div>
+   <h3>DeFi Analytics</h3>
+   <p>DeFiLlama TVL, top protocols, chain TVLs, stablecoins. DEX converter via DexScreener. Gas tracker for 7 chains.</p>
+  </div>
+  <div class="feature">
+   <div class="feature-icon">&#x1F3AF;</div>
+   <h3>UX Polish</h3>
+   <p>Splash screen, onboarding tour, Ctrl+K palette, dark/light theme, PWA install, mobile bottom nav, i18n (EN/UK).</p>
+  </div>
+ </div>
+</div>
+
+<!-- Revenue -->
+<div class="section">
+ <h2>Revenue Potential</h2>
+ <p class="subtitle">Multiple income streams from day one</p>
+
+ <div class="revenue">
+  <h3>Monthly Revenue Projection</h3>
+  <div class="revenue-row"><span>50 Pro users &times; $9.99/mo</span><span>$499/mo</span></div>
+  <div class="revenue-row"><span>10 VIP users &times; $29.99/mo</span><span>$299/mo</span></div>
+  <div class="revenue-row"><span>Exchange referral commissions</span><span>$100-500/mo</span></div>
+  <div class="revenue-row"><span>Telegram channel monetization</span><span>$50-200/mo</span></div>
+  <div class="revenue-row" style="border-top:2px solid var(--green);padding-top:16px;margin-top:4px"><span style="color:var(--text);font-weight:700">Total potential</span><span style="font-size:20px">$948-1,498/mo</span></div>
+ </div>
+</div>
+
+<!-- Comparison -->
+<div class="section">
+ <h2>OmniVision vs. Alternatives</h2>
+ <p class="subtitle">Why build from scratch when you can buy?</p>
+
+ <table class="compare-table">
+  <thead>
+   <tr><th>Feature</th><th>Free Templates</th><th>Hiring Developer</th><th>OmniVision</th></tr>
+  </thead>
+  <tbody>
+   <tr><td>35 working tools</td><td class="cross">&#x2717; 3-5 pages</td><td class="check">&#x2713; $10,000+</td><td class="check">&#x2713; Included</td></tr>
+   <tr><td>AI assistant</td><td class="cross">&#x2717;</td><td class="check">&#x2713; $2,000+</td><td class="check">&#x2713; Included</td></tr>
+   <tr><td>Payment system</td><td class="cross">&#x2717;</td><td class="check">&#x2713; $1,500+</td><td class="check">&#x2713; Included</td></tr>
+   <tr><td>Telegram bot</td><td class="cross">&#x2717;</td><td class="check">&#x2713; $1,000+</td><td class="check">&#x2713; Included</td></tr>
+   <tr><td>Real-time WebSocket</td><td class="cross">&#x2717;</td><td class="check">&#x2713; $500+</td><td class="check">&#x2713; Included</td></tr>
+   <tr><td>Time to launch</td><td>Months</td><td>2-4 months</td><td style="color:var(--green);font-weight:700">5 minutes</td></tr>
+   <tr><td>Cost</td><td>$0 + months of work</td><td>$10,000-15,000</td><td style="color:var(--green);font-weight:700">$1,000</td></tr>
+  </tbody>
+ </table>
+</div>
+
+<!-- Tech Stack -->
+<div class="section">
+ <h2>Tech Stack</h2>
+ <p class="subtitle">Clean, modern, zero framework lock-in</p>
+ <div class="tech-grid">
+  <div class="tech-item"><strong>Backend:</strong> Python, FastAPI, SQLAlchemy</div>
+  <div class="tech-item"><strong>Frontend:</strong> Vanilla HTML/CSS/JS</div>
+  <div class="tech-item"><strong>Database:</strong> SQLite (upgrade to Postgres easily)</div>
+  <div class="tech-item"><strong>AI:</strong> Groq + OpenRouter</div>
+  <div class="tech-item"><strong>Charts:</strong> Chart.js, lightweight-charts</div>
+  <div class="tech-item"><strong>Real-time:</strong> Binance WebSocket</div>
+  <div class="tech-item"><strong>Bot:</strong> Telegram Bot API, httpx</div>
+  <div class="tech-item"><strong>Payments:</strong> CryptoBot + Stars</div>
+  <div class="tech-item"><strong>APIs:</strong> CoinGecko, DeFiLlama, DexScreener</div>
+  <div class="tech-item"><strong>Deploy:</strong> Railway / Docker</div>
+ </div>
+</div>
+
+<!-- What's Included -->
+<div class="section">
+ <h2>What's Included</h2>
+ <p class="subtitle">Everything you need to launch</p>
+ <ul class="included">
+  <li>Full source code — no obfuscation, no encryption</li>
+  <li>Working deployment on Railway</li>
+  <li>Telegram bot with all commands</li>
+  <li>Landing page (SEO-optimized)</li>
+  <li>Admin panel for promo codes</li>
+  <li>.env.example with all configuration keys</li>
+  <li>Deploy scripts (deploy.bat, dev.bat)</li>
+  <li>Project documentation (MEMORY.md)</li>
+  <li>Free support via Telegram for 7 days after purchase</li>
+ </ul>
+</div>
+
+<!-- CTA -->
+<div class="cta">
+ <h2>Ready to Launch Your Crypto Platform?</h2>
+ <p>Get OmniVision for $1,000 — deploy in 5 minutes, start earning today.</p>
+ <a href="https://t.me/alexey04mam" class="btn-primary" style="font-size:18px;padding:16px 48px">Contact on Telegram</a>
+
+ <div class="contact-cards">
+  <div class="contact-card">
+   <div class="c-icon">&#x1F4AC;</div>
+   <div class="c-label">Telegram</div>
+   <div class="c-value"><a href="https://t.me/alexey04mam">@alexey04mam</a></div>
+  </div>
+  <div class="contact-card">
+   <div class="c-icon">&#x1F4E7;</div>
+   <div class="c-label">Email</div>
+   <div class="c-value"><a href="mailto:alexey04mam@gmail.com">alexey04mam@gmail.com</a></div>
+  </div>
+  <div class="contact-card">
+   <div class="c-icon">&#x1F4BB;</div>
+   <div class="c-label">Live Demo</div>
+   <div class="c-value"><a href="https://dependable-tranquility-production-d86f.up.railway.app" target="_blank">View Platform</a></div>
+  </div>
+ </div>
+</div>
+
+<div class="footer">
+ OmniVision &copy; 2026. All rights reserved. Built with FastAPI, Chart.js & CoinGecko API.
+</div>
+
+</body>
+</html>
