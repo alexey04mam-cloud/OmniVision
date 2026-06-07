@@ -4721,6 +4721,16 @@ def commodities_scan():
         return {"commodities": [], "error": str(e)}
 
 
+
+@app.get("/sell")
+def serve_sell_page():
+    """Serve the sale landing page"""
+    sell_path = os.path.join(os.path.dirname(__file__), "sell.html")
+    if os.path.exists(sell_path):
+        with open(sell_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>Coming Soon</h1>")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False)

@@ -148,4 +148,33 @@ Full list in `.env.example`.
 
 1. **Subscriptions** — Pro $9.99/mo, VIP $29.99/mo (CryptoBot + Stars)
 2. **Referral commissions** — Bybit, BingX, OKX, Binance affiliate links
-3. **Telegram channel** 
+3. **Telegram channel** — monetize community with promos + auto-posts
+4. **Telegram channel** — @omnivision_alerts_bot auto-posts drive free traffic
+
+---
+
+## Codebase Stats
+
+| Metric | Value |
+|--------|-------|
+| Total Lines of Code | 14,000+ |
+| API Endpoints | 110+ |
+| Frontend Panels | 35 |
+| JS Functions | 220+ |
+| Python Dependencies | 12 |
+| External API Integrations | 8 |
+| Framework Dependencies | 0 (vanilla JS) |
+
+---
+
+## Contact
+
+**Ready to buy?** Reach out:
+
+- **Telegram:** [@Alexey_0609](https://t.me/Alexey_0609)
+- **Email:** alexey04mam@gmail.com
+- **Live Demo:** [dependable-tranquility-production-d86f.up.railway.app](https://dependable-tranquility-production-d86f.up.railway.app)
+
+---
+
+*Built with care. Maintained actively. Ready for your brand.*
