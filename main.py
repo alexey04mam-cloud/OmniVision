@@ -2300,13 +2300,11 @@ def admin_toggle_promo(request: Request, promo_id: int, db: Session = Depends(ge
 # ═══ AI Smart Alerts API ═══
 
 @app.get("/api/smart-alerts")
-async def get_smart_alerts(limit: int = 20):
+def get_smart_alerts(limit: int = 20):
     """Get recent smart alerts"""
-    async with async_session() as s:
-        result = await s.execute(
-            select(SmartAlert).order_by(SmartAlert.created_at.desc()).limit(limit)
-        )
-        alerts = result.scalars().all()
+    db = SessionLocal()
+    try:
+        alerts = db.query(SmartAlert).order_by(SmartAlert.created_at.desc()).limit(limit).all()
         return [
             {
                 "id": a.id,
@@ -2321,24 +2319,28 @@ async def get_smart_alerts(limit: int = 20):
             }
             for a in alerts
         ]
+    finally:
+        db.close()
 
 @app.post("/api/smart-alerts/{alert_id}/read")
-async def mark_alert_read(alert_id: int):
-    async with async_session() as s:
-        result = await s.execute(select(SmartAlert).where(SmartAlert.id == alert_id))
-        alert = result.scalar_one_or_none()
+def mark_alert_read(alert_id: int):
+    db = SessionLocal()
+    try:
+        alert = db.query(SmartAlert).filter(SmartAlert.id == alert_id).first()
         if alert:
             alert.is_read = True
-            await s.commit()
+            db.commit()
+    finally:
+        db.close()
     return {"ok": True}
 
 @app.get("/api/smart-alerts/unread-count")
-async def unread_smart_alerts():
-    async with async_session() as s:
-        result = await s.execute(
-            select(func.count(SmartAlert.id)).where(SmartAlert.is_read == False)
-        )
-        count = result.scalar() or 0
+def unread_smart_alerts():
+    db = SessionLocal()
+    try:
+        count = db.query(SmartAlert).filter(SmartAlert.is_read == False).count()
+    finally:
+        db.close()
     return {"count": count}
 
 async def _analyze_market_for_smart_alerts():
@@ -2438,17 +2440,16 @@ async def _analyze_market_for_smart_alerts():
         if alerts_to_create:
             from datetime import timedelta
             cutoff = datetime.utcnow() - timedelta(hours=6)
-            async with async_session() as s:
+            db = SessionLocal()
+            try:
                 for alert_data in alerts_to_create[:10]:  # Max 10 per scan
                     # Check for duplicate
-                    existing = await s.execute(
-                        select(SmartAlert).where(
-                            SmartAlert.alert_type == alert_data["alert_type"],
-                            SmartAlert.coin == alert_data["coin"],
-                            SmartAlert.created_at > cutoff
-                        )
-                    )
-                    if existing.scalar_one_or_none():
+                    existing = db.query(SmartAlert).filter(
+                        SmartAlert.alert_type == alert_data["alert_type"],
+                        SmartAlert.coin == alert_data["coin"],
+                        SmartAlert.created_at > cutoff
+                    ).first()
+                    if existing:
                         continue
 
                     # Generate AI analysis
@@ -2467,8 +2468,10 @@ async def _analyze_market_for_smart_alerts():
                         data_snapshot=alert_data.get("data_snapshot", "{}"),
                         ai_analysis=ai_text
                     )
-                    s.add(new_alert)
-                await s.commit()
+                    db.add(new_alert)
+                db.commit()
+            finally:
+                db.close()
 
     except Exception as e:
         print(f"Smart alerts scan error: {e}")
@@ -4682,91 +4685,21 @@ async def get_news():
 
 @app.get("/api/wallet/balance/{chain}/{address}")
 async def wallet_balance(chain: str, address: str):
-    """Get wallet balance for supported chains"""
+    """Check wallet balance on various chains"""
     try:
-        if chain == "ethereum":
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(f"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd")
-                eth_price = r.json().get("ethereum", {}).get("usd", 0)
-            return {
-                "chain": chain, "address": address,
-                "native_balance": "Use Etherscan API",
-                "native_symbol": "ETH",
-                "native_price_usd": eth_price,
-                "note": "For full balance data, connect Etherscan/Moralis API"
-            }
-        elif chain == "solana":
-            return {
-                "chain": chain, "address": address,
-                "native_symbol": "SOL",
-                "note": "For full balance data, connect Solana RPC"
-            }
-        return {"chain": chain, "address": address, "note": "Chain not fully supported yet"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            if chain.lower() == "ton":
+                resp = await client.get(f"https://toncenter.com/api/v2/getAddressBalance?address={address}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    balance = int(data.get("result", 0)) / 1e9
+                    return {"chain": "TON", "address": address, "balance": round(balance, 4), "symbol": "TON"}
+            return {"chain": chain, "address": address, "balance": 0, "symbol": chain.upper(), "note": "Chain not supported yet"}
     except Exception as e:
         return {"error": str(e)}
 
 
-
-# ═══════════════════════════════════════════════
-# PWA & SEO
-# ═══════════════════════════════════════════════
-
-@app.get("/manifest.json")
-def pwa_manifest():
-    return {
-        "name": "Omni-Vision — Crypto Analytics",
-        "short_name": "OmniVision",
-        "description": "Professional crypto analytics platform with 32 tools",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#000000",
-        "theme_color": "#0a84ff",
-        "orientation": "any",
-        "icons": [
-            {"src": "https://api.dicebear.com/7.x/shapes/svg?seed=omnivision&size=192", "sizes": "192x192", "type": "image/svg+xml"},
-            {"src": "https://api.dicebear.com/7.x/shapes/svg?seed=omnivision&size=512", "sizes": "512x512", "type": "image/svg+xml"}
-        ]
-    }
-
-@app.get("/robots.txt", response_class=PlainTextResponse)
-def robots_txt():
-    return "User-agent: *\nAllow: /\nSitemap: https://dependable-tranquility-production-d86f.up.railway.app/sitemap.xml"
-
-@app.get("/sitemap.xml", response_class=PlainTextResponse)
-def sitemap():
-    return """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://dependable-tranquility-production-d86f.up.railway.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://dependable-tranquility-production-d86f.up.railway.app/login</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://dependable-tranquility-production-d86f.up.railway.app/register</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-</urlset>"""
-
-
-
-@app.get("/api/ticker")
-async def ticker_tape():
-    """Ticker tape data for top coins"""
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get("https://api.coingecko.com/api/v3/coins/markets",
-                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 20, "page": 1})
-            if r.status_code == 200:
-                return [{"symbol": c["symbol"].upper(), "price": c["current_price"],
-                         "change": round(c.get("price_change_percentage_24h", 0) or 0, 2),
-                         "name": c["name"]} for c in r.json()]
-    except:
-        pass
-    return []
-
-
-
-@app.get("/api/hunter/status")
-def hunter_status_ep():
-    """Hunter scan status"""
-    return {"status": "active", "interval": int(os.getenv("HUNT_INTERVAL", "60")),
-            "radars": ["crypto", "stocks", "commodities"], "last_scan": None}
-
-
+# ═══ STOCKS / COMMODITIES SCANNER ═══
 
 @app.get("/api/stocks/scan")
 def stocks_scan():
@@ -4776,7 +4709,6 @@ def stocks_scan():
         return data
     except Exception as e:
         return {"stocks": [], "error": str(e)}
-
 
 
 @app.get("/api/commodities/scan")
