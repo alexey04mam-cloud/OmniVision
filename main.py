@@ -17,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Float, func, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Float, Boolean, func, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -2308,13 +2308,11 @@ def admin_toggle_promo(request: Request, promo_id: int, db: Session = Depends(ge
 # ═══ AI Smart Alerts API ═══
 
 @app.get("/api/smart-alerts")
-async def get_smart_alerts(limit: int = 20):
+def get_smart_alerts(limit: int = 20):
     """Get recent smart alerts"""
-    async with async_session() as s:
-        result = await s.execute(
-            select(SmartAlert).order_by(SmartAlert.created_at.desc()).limit(limit)
-        )
-        alerts = result.scalars().all()
+    db = SessionLocal()
+    try:
+        alerts = db.query(SmartAlert).order_by(SmartAlert.created_at.desc()).limit(limit).all()
         return [
             {
                 "id": a.id,
@@ -2329,24 +2327,28 @@ async def get_smart_alerts(limit: int = 20):
             }
             for a in alerts
         ]
+    finally:
+        db.close()
 
 @app.post("/api/smart-alerts/{alert_id}/read")
-async def mark_alert_read(alert_id: int):
-    async with async_session() as s:
-        result = await s.execute(select(SmartAlert).where(SmartAlert.id == alert_id))
-        alert = result.scalar_one_or_none()
+def mark_alert_read(alert_id: int):
+    db = SessionLocal()
+    try:
+        alert = db.query(SmartAlert).filter(SmartAlert.id == alert_id).first()
         if alert:
             alert.is_read = True
-            await s.commit()
+            db.commit()
+    finally:
+        db.close()
     return {"ok": True}
 
 @app.get("/api/smart-alerts/unread-count")
-async def unread_smart_alerts():
-    async with async_session() as s:
-        result = await s.execute(
-            select(func.count(SmartAlert.id)).where(SmartAlert.is_read == False)
-        )
-        count = result.scalar() or 0
+def unread_smart_alerts():
+    db = SessionLocal()
+    try:
+        count = db.query(SmartAlert).filter(SmartAlert.is_read == False).count()
+    finally:
+        db.close()
     return {"count": count}
 
 async def _analyze_market_for_smart_alerts():
@@ -2355,17 +2357,23 @@ async def _analyze_market_for_smart_alerts():
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             # Fetch market data
-            resp = await client.get(
-                "https://api.coingecko.com/api/v3/coins/markets",
-                params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50, "page": 1, "sparkline": "false", "price_change_percentage": "1h,24h,7d"}
-            )
-            if resp.status_code != 200:
+            try:
+                resp = await client.get(
+                    "https://api.coingecko.com/api/v3/coins/markets",
+                    params={"vs_currency": "usd", "order": "market_cap_desc", "per_page": 50, "page": 1, "sparkline": "false", "price_change_percentage": "1h,24h,7d"}
+                )
+                if resp.status_code != 200:
+                    return
+                coins = resp.json()
+            except Exception:
                 return
-            coins = resp.json()
 
             # Fetch Fear & Greed
-            fg_resp = await client.get("https://api.alternative.me/fng/?limit=2")
-            fg_data = fg_resp.json().get("data", []) if fg_resp.status_code == 200 else []
+            try:
+                fg_resp = await client.get("https://api.alternative.me/fng/?limit=2")
+                fg_data = fg_resp.json().get("data", []) if fg_resp.status_code == 200 else []
+            except Exception:
+                fg_data = []
 
         alerts_to_create = []
 
@@ -2446,17 +2454,16 @@ async def _analyze_market_for_smart_alerts():
         if alerts_to_create:
             from datetime import timedelta
             cutoff = datetime.utcnow() - timedelta(hours=6)
-            async with async_session() as s:
+            db = SessionLocal()
+            try:
                 for alert_data in alerts_to_create[:10]:  # Max 10 per scan
                     # Check for duplicate
-                    existing = await s.execute(
-                        select(SmartAlert).where(
-                            SmartAlert.alert_type == alert_data["alert_type"],
-                            SmartAlert.coin == alert_data["coin"],
-                            SmartAlert.created_at > cutoff
-                        )
-                    )
-                    if existing.scalar_one_or_none():
+                    existing = db.query(SmartAlert).filter(
+                        SmartAlert.alert_type == alert_data["alert_type"],
+                        SmartAlert.coin == alert_data["coin"],
+                        SmartAlert.created_at > cutoff
+                    ).first()
+                    if existing:
                         continue
 
                     # Generate AI analysis
@@ -2475,8 +2482,10 @@ async def _analyze_market_for_smart_alerts():
                         data_snapshot=alert_data.get("data_snapshot", "{}"),
                         ai_analysis=ai_text
                     )
-                    s.add(new_alert)
-                await s.commit()
+                    db.add(new_alert)
+                db.commit()
+            finally:
+                db.close()
 
     except Exception as e:
         print(f"Smart alerts scan error: {e}")
