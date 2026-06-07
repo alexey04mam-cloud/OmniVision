@@ -17,7 +17,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Float, func, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float, func, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
